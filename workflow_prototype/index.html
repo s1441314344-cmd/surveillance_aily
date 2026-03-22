@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MES 工作流编排 - 飞书风格</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- 顶部工具栏 -->
+        <header class="header">
+            <div class="header-left">
+                <h1>饮料生产工作流</h1>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-default" onclick="resetWorkflow()">重置</button>
+                <button class="btn btn-primary" onclick="saveWorkflow()">保存</button>
+            </div>
+        </header>
+
+        <!-- 工作流画布 -->
+        <div class="canvas-wrapper" id="canvasWrapper">
+            <div class="canvas" id="canvas">
+                <!-- SVG 连线层 -->
+                <svg class="svg-layer" id="svgLayer">
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L0,6 L9,3 z" fill="#DEE0E3" />
+                        </marker>
+                    </defs>
+                </svg>
+                
+                <!-- 节点层 -->
+                <div class="nodes-layer" id="nodesLayer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加节点选择弹窗 -->
+    <div class="modal" id="addNodeModal">
+        <div class="modal-mask" onclick="closeAddModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>选择节点类型</h3>
+                <button class="modal-close" onclick="closeAddModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="node-options">
+                    <div class="node-option" onclick="addNodeOfType('task')">
+                        <div class="option-icon task">📋</div>
+                        <div class="option-info">
+                            <div class="option-title">任务节点</div>
+                            <div class="option-desc">执行具体生产任务</div>
+                        </div>
+                    </div>
+                    <div class="node-option" onclick="addNodeOfType('parallel')">
+                        <div class="option-icon parallel">⫘</div>
+                        <div class="option-info">
+                            <div class="option-title">并行分支</div>
+                            <div class="option-desc">同时执行多个任务分支</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑节点弹窗 -->
+    <div class="modal" id="editNodeModal">
+        <div class="modal-mask" onclick="closeEditModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>编辑节点</h3>
+                <button class="modal-close" onclick="closeEditModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-item">
+                    <label>节点名称</label>
+                    <input type="text" id="editNodeName" placeholder="输入节点名称">
+                </div>
+                <div class="form-item">
+                    <label>执行岗位</label>
+                    <select id="editNodePosition">
+                        <option value="中控技术员">中控技术员</option>
+                        <option value="操作工">操作工</option>
+                        <option value="质检员">质检员</option>
+                        <option value="班组长">班组长</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>参数配置</label>
+                    <div id="editParamsList" class="params-edit-list"></div>
+                    <button class="btn-add-param" onclick="addEditParam()">+ 添加参数</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeEditModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveNodeEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

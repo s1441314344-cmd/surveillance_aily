@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能巡检控制台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1016;
+      --panel: rgba(18, 24, 33, 0.9);
+      --panel-alt: rgba(22, 30, 41, 0.94);
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #ebeff5;
+      --muted: #9babbd;
+      --accent: #ff7a18;
+      --accent-2: #ffd166;
+      --danger: #ff6b6b;
+      --success: #52db95;
+      --warning: #ffcd57;
+      --shadow: 0 26px 90px rgba(0, 0, 0, 0.34);
+      --radius: 24px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Noto Sans SC", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(255, 122, 24, 0.22), transparent 26%),
+        radial-gradient(circle at right center, rgba(255, 209, 102, 0.15), transparent 24%),
+        linear-gradient(140deg, #06090e 0%, #0b1016 40%, #111827 100%);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 30px 30px;
+      mask-image: radial-gradient(circle at center, black, transparent 82%);
+    }
+    h1, h2, h3 {
+      margin: 0;
+      font-family: "Antonio", sans-serif;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .shell {
+      width: min(1440px, calc(100vw - 30px));
+      margin: 18px auto 46px;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .hero-main, .hero-side, .metric-card, .card {
+      padding: 24px;
+    }
+    .hero-main {
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-main::after {
+      content: "";
+      position: absolute;
+      right: -6%;
+      top: -28%;
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle, rgba(255, 122, 24, .42), transparent 70%);
+      pointer-events: none;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      color: var(--accent-2);
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: clamp(46px, 7vw, 78px);
+      line-height: .95;
+      margin-top: 16px;
+      margin-bottom: 14px;
+    }
+    .hero-copy {
+      max-width: 720px;
+      font-size: 15px;
+      line-height: 1.85;
+      color: #d0d7e2;
+    }
+    .hero-side {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      font-size: 13px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 14px rgba(82, 219, 149, .7);
+    }
+    .status-dot.warning {
+      background: var(--danger);
+      box-shadow: 0 0 14px rgba(255, 107, 107, .7);
+    }
+    .subtle, .meta, small, .empty {
+      color: var(--muted);
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .metric-card strong {
+      display: block;
+      margin-top: 10px;
+      font-size: 32px;
+      color: var(--accent-2);
+      font-family: "Antonio", sans-serif;
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .tab, .btn, button {
+      font: inherit;
+    }
+    .tab {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      padding: 12px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .tab.active, .tab:hover {
+      background: linear-gradient(135deg, rgba(255,122,24,.18), rgba(255,209,102,.12));
+      border-color: rgba(255,122,24,.44);
+    }
+    .page { display: none; }
+    .page.active {
+      display: block;
+      animation: fade .3s ease;
+    }
+    @keyframes fade {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 18px;
+    }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .section-head p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .btn {
+      border: none;
+      border-radius: 16px;
+      padding: 12px 18px;
+      cursor: pointer;
+      font-weight: 700;
+      color: #111;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 12px 28px rgba(255, 122, 24, .2);
+    }
+    .btn.secondary {
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+    .btn.danger {
+      background: rgba(255, 107, 107, .14);
+      border: 1px solid rgba(255, 107, 107, .22);
+      color: #ffd7d7;
+      box-shadow: none;
+    }
+    .btn.small {
+      padding: 9px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+    .list, .records, .work-orders {
+      display: grid;
+      gap: 12px;
+    }
+    .item {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 16px;
+      background: rgba(255,255,255,.03);
+    }
+    .item-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .item-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+    }
+    .badge.alert { color: #ffd5d5; background: rgba(255,107,107,.14); }
+    .badge.ok { color: #cff8e2; background: rgba(82,219,149,.13); }
+    .badge.warn { color: #fff0bf; background: rgba(255,205,87,.13); }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    form {
+      display: grid;
+      gap: 14px;
+    }
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .field-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+    }
+    input, select, textarea {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      padding: 13px 14px;
+      outline: none;
+    }
+    textarea { min-height: 132px; resize: vertical; }
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(255,122,24,.5);
+      box-shadow: 0 0 0 4px rgba(255,122,24,.12);
+    }
+    .dropzone {
+      border: 1.5px dashed rgba(255,255,255,.16);
+      border-radius: 22px;
+      padding: 26px;
+      text-align: center;
+      background: rgba(255,255,255,.02);
+      transition: .2s ease;
+    }
+    .dropzone.dragover, .dropzone:hover {
+      border-color: rgba(255,122,24,.5);
+      background: rgba(255,122,24,.08);
+    }
+    .preview-wrap {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .preview-wrap img {
+      width: 100%;
+      height: 300px;
+      object-fit: cover;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+    }
+    .result-block {
+      background: rgba(255,255,255,.03);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 18px;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      color: #fff3df;
+      line-height: 1.75;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: 360px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(11, 15, 20, .97);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      color: var(--text);
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: .25s ease;
+      z-index: 50;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .hidden { display: none !important; }
+    .empty {
+      padding: 28px;
+      text-align: center;
+      border-radius: 18px;
+      border: 1px dashed var(--line);
+    }
+    @media (max-width: 1200px) {
+      .hero, .grid-2 { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .filters, .field-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      .shell { width: calc(100vw - 20px); }
+      .metric-grid, .filters, .field-grid, .field-grid-3, .preview-wrap { grid-template-columns: 1fr; }
+      h1 { font-size: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="panel hero-main">
+        <div class="eyebrow">Zhipu Multimodal Inspection</div>
+        <h1>智能巡检<br>独立控制台</h1>
+        <div class="hero-copy">
+          这是一套完全脱离飞书多维表与 Aily 的智能巡检工作台，支持摄像头管理、巡检规则配置、
+          上传识别、RTSP 抽帧识别、定时任务调度、异常自动建工单和轻量处理闭环。
+        </div>
+      </div>
+      <div class="panel hero-side">
+        <div class="card">
+          <small>智谱模型状态</small>
+          <div style="margin-top:10px" class="status-pill">
+            <span class="status-dot" id="llm-dot"></span>
+            <span id="llm-status-text">检测中</span>
+          </div>
+          <div class="subtle" style="margin-top:12px" id="llm-model-text">正在读取模型配置...</div>
+        </div>
+        <div class="card">
+          <small>当前能力</small>
+          <div style="margin-top:12px; line-height:1.9">
+            <div>上传识别、摄像头抽帧、自动巡检、异常工单</div>
+            <div class="subtle">Flask + SQLite + 智谱多模态模型</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="metric-grid">
+      <div class="panel metric-card"><small>摄像头</small><strong id="metric-cameras">0</strong></div>
+      <div class="panel metric-card"><small>规则</small><strong id="metric-rules">0</strong></div>
+      <div class="panel metric-card"><small>识别记录</small><strong id="metric-records">0</strong></div>
+      <div class="panel metric-card"><small>异常记录</small><strong id="metric-violations">0</strong></div>
+      <div class="panel metric-card"><small>运行任务</small><strong id="metric-tasks">0</strong></div>
+      <div class="panel metric-card"><small>待处理工单</small><strong id="metric-workorders">0</strong></div>
+    </section>
+
+    <section class="tabs">
+      <button class="tab active" data-page="overview">总览</button>
+      <button class="tab" data-page="cameras">摄像头</button>
+      <button class="tab" data-page="rules">分析规则</button>
+      <button class="tab" data-page="templates">提示词模板</button>
+      <button class="tab" data-page="tasks">巡检任务</button>
+      <button class="tab" data-page="upload-detect">上传识别</button>
+      <button class="tab" data-page="submit-task">任务提交</button>
+      <button class="tab" data-page="camera-detect">摄像头识别</button>
+      <button class="tab" data-page="records">识别记录</button>
+      <button class="tab" data-page="work-orders">工单中心</button>
+      <button class="tab" data-page="settings">系统设置</button>
+    </section>
+
+    <section class="page active" id="page-overview">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head">
+            <div><h2>最近识别</h2><p>识别结果、摘要、工单关联都会自动归档。</p></div>
+          </div>
+          <div id="latest-records" class="list"></div>
+        </div>
+        <div class="panel card">
+          <div class="section-head">
+            <div><h2>最新工单</h2><p>异常记录可自动或手动生成处理工单。</p></div>
+          </div>
+          <div id="latest-work-orders" class="work-orders"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-cameras">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head"><div><h2>摄像头列表</h2><p>维护 RTSP 地址、位置和抽帧频率。</p></div></div>
+          <div id="camera-list" class="list"></div>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2 id="camera-form-title">新增摄像头</h2><p>创建后可用于手动识别和定时巡检。</p></div></div>
+          <form id="camera-form">
+            <input type="hidden" id="camera-id">
+            <div class="field-grid">
+              <label>编码<input id="camera-code" required></label>
+              <label>名称<input id="camera-name" required></label>
+            </div>
+            <label>RTSP 地址<input id="camera-rtsp" placeholder="rtsp://user:password@host:554/stream"></label>
+            <div class="field-grid">
+              <label>位置<input id="camera-location" placeholder="如：厂区北门"></label>
+              <label>抽帧频率（秒）<input id="camera-frequency" type="number" min="10" value="60"></label>
+            </div>
+            <div class="actions">
+              <button class="btn" type="submit">保存摄像头</button>
+              <button class="btn secondary hidden" id="camera-cancel" type="button">取消编辑</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-rules">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head"><div><h2>规则列表</h2><p>按场景维护提示词和预期输出格式。</p></div></div>
+          <div id="rule-list" class="list"></div>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2 id="rule-form-title">新增规则</h2><p>支持场景、提示词、输出格式和启停状态。</p></div></div>
+          <form id="rule-form">
+            <input type="hidden" id="rule-id">
+            <div class="field-grid">
+              <label>规则编码<input id="rule-code" required></label>
+              <label>规则名称<input id="rule-name" required></label>
+            </div>
+            <label>分析场景<input id="rule-scene" required placeholder="如：施工现场安全帽巡检"></label>
+            <label>规则描述<input id="rule-description" placeholder="补充说明该规则的适用场景"></label>
+            <label>输出格式<input id="rule-output-format" placeholder="如：结论、问题、图片证据、整改建议"></label>
+            <label>提示词<textarea id="rule-prompt" required placeholder="输入发送给智谱模型的巡检提示词"></textarea></label>
+            <div class="actions">
+              <button class="btn" type="submit">保存规则</button>
+              <button class="btn secondary hidden" id="rule-cancel" type="button">取消编辑</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-tasks">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head"><div><h2>自动巡检任务</h2><p>定时抽帧并自动调用智谱识别。</p></div></div>
+          <div id="task-list" class="list"></div>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2 id="task-form-title">新增任务</h2><p>支持自动生成工单和手动立即执行。</p></div></div>
+          <form id="task-form">
+            <input type="hidden" id="task-id">
+            <label>任务名称<input id="task-name" required placeholder="如：北门安全帽巡检"></label>
+            <div class="field-grid">
+              <label>摄像头<select id="task-camera" required></select></label>
+              <label>规则<select id="task-rule" required></select></label>
+            </div>
+            <div class="field-grid">
+              <label>频率（秒）<input id="task-frequency" type="number" min="10" value="60"></label>
+              <label>状态<select id="task-status"><option value="active">启用</option><option value="inactive">停用</option></select></label>
+            </div>
+            <div class="field-grid">
+              <label>分辨率<select id="task-resolution"><option value="original">原始</option><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label>
+              <label>JPEG质量（1-100）<input id="task-quality" type="number" min="1" max="100" value="80"></label>
+            </div>
+            <div class="field-grid">
+              <label>最大帧数<input id="task-max-frames" type="number" min="100" value="1000"></label>
+              <label>存储路径<input id="task-storage-path" placeholder="./data/frames/"></label>
+            </div>
+            <label><span>异常自动建工单</span><select id="task-auto-workorder"><option value="true">开启</option><option value="false">关闭</option></select></label>
+            <div class="actions">
+              <button class="btn" type="submit">保存任务</button>
+              <button class="btn secondary hidden" id="task-cancel" type="button">取消编辑</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-templates">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head">
+            <div><h2>提示词模板库</h2><p>管理可复用的提示词模板，支持智能优化和推荐。</p></div>
+            <div class="actions">
+              <button class="btn secondary" id="export-templates-btn" type="button">导出</button>
+              <button class="btn secondary" id="import-templates-btn" type="button">导入</button>
+            </div>
+          </div>
+          <div class="field-grid" style="margin: 16px 0">
+            <select id="template-category-filter"><option value="">全部分类</option></select>
+            <input id="template-search" placeholder="搜索模板名称或描述">
+          </div>
+          <div id="template-list" class="list"></div>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2 id="template-form-title">新增模板</h2><p>系统预设模板不可删除，可禁用。</p></div></div>
+          <form id="template-form">
+            <input type="hidden" id="template-id">
+            <div class="field-grid">
+              <label>模板编码<input id="template-code" required placeholder="如：safety_helmet"></label>
+              <label>模板名称<input id="template-name" required placeholder="如：安全帽检测"></label>
+            </div>
+            <div class="field-grid">
+              <label>分类<select id="template-category"><option value="安全">安全</option><option value="消防">消防</option><option value="设备">设备</option><option value="质量">质量</option><option value="其他">其他</option></select></label>
+              <label>状态<select id="template-status"><option value="active">启用</option><option value="inactive">停用</option></select></label>
+            </div>
+            <label>描述<textarea id="template-description" placeholder="模板描述"></textarea></label>
+            <label>提示词内容<textarea id="template-prompt" required placeholder="输入提示词内容"></textarea></label>
+            <div class="actions">
+              <button class="btn" type="submit">保存模板</button>
+              <button class="btn secondary" id="template-cancel" type="button">取消编辑</button>
+            </div>
+          </form>
+          <div id="template-optimize-result" class="result-block hidden" style="margin-top:16px">
+            <h4>优化建议</h4>
+            <div id="optimize-suggestions"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-upload-detect">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head"><div><h2>上传图片识别</h2><p>上传一张图片并选择规则，立即调用智谱模型分析。</p></div></div>
+          <div class="field-grid">
+            <label>关联摄像头（可选）<select id="upload-camera"></select></label>
+            <label>分析规则<select id="upload-rule"></select></label>
+          </div>
+          <div class="field-grid" style="margin-top:12px">
+            <label>模型名称<input id="upload-model-name" placeholder="如：glm-4v-plus"></label>
+            <label>异常自动建工单<select id="upload-auto-workorder"><option value="">跟随系统配置</option><option value="true">是</option><option value="false">否</option></select></label>
+          </div>
+          <div id="dropzone" class="dropzone">
+            <h3>Drop Image</h3>
+            <p class="subtle">点击或拖拽图片到这里，支持 JPG / PNG / BMP / WEBP</p>
+            <input id="detect-file" type="file" accept="image/*" class="hidden">
+            <button class="btn secondary" id="select-file-btn" type="button" style="margin-top:12px">选择图片</button>
+          </div>
+          <div class="actions" style="margin-top:16px"><button class="btn" id="upload-detect-btn" type="button">开始识别</button></div>
+          <div class="preview-wrap hidden" id="upload-preview-wrap">
+            <img id="preview-image" alt="预览图">
+            <div class="result-block"><pre id="upload-result">尚未识别</pre></div>
+          </div>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2>识别结果</h2><p>可直接从结果里创建或查看工单。</p></div></div>
+          <div id="upload-detect-meta" class="list"><div class="empty">等待识别结果</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-submit-task">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head"><div><h2>任务提交（双图）</h2><p>上传两张图片、选择规则和模型，返回结构化结果。</p></div></div>
+          <div class="field-grid">
+            <label>分析规则<select id="submit-rule"></select></label>
+            <label>模型名称<input id="submit-model-name" placeholder="如：glm-4v-plus"></label>
+          </div>
+          <div class="field-grid" style="margin-top:12px">
+            <label>图片 1<input id="submit-image-1" type="file" accept="image/*"></label>
+            <label>图片 2<input id="submit-image-2" type="file" accept="image/*"></label>
+          </div>
+          <div class="actions" style="margin-top:16px">
+            <button class="btn" id="submit-task-btn" type="button">提交任务</button>
+          </div>
+          <div id="submit-task-result" class="result-block" style="margin-top:16px">
+            <pre>等待提交任务...</pre>
+          </div>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2>最近任务</h2><p>查看任务结构化返回与对比图片。</p></div></div>
+          <div id="submit-task-list" class="list"><div class="empty">暂无任务</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-camera-detect">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head"><div><h2>摄像头抽帧识别</h2><p>从 RTSP 摄像头抓取单帧并交给智谱分析。</p></div></div>
+          <div class="field-grid">
+            <label>摄像头<select id="camera-detect-camera"></select></label>
+            <label>分析规则<select id="camera-detect-rule"></select></label>
+          </div>
+          <div class="field-grid" style="margin-top:16px">
+            <label>模型名称<input id="camera-model-name" placeholder="如：glm-4v-plus"></label>
+            <label>异常自动建工单<select id="camera-auto-workorder"><option value="">跟随系统配置</option><option value="true">是</option><option value="false">否</option></select></label>
+          </div>
+          <div class="actions" style="margin-top:16px"><button class="btn" id="camera-detect-btn" type="button">抽帧并识别</button></div>
+          <div class="preview-wrap hidden" id="camera-preview-wrap">
+            <img id="camera-result-image" alt="抽帧图">
+            <div class="result-block"><pre id="camera-result-text"></pre></div>
+          </div>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2>状态面板</h2><p>这里显示摄像头检测返回的摘要和工单联动。</p></div></div>
+          <div id="camera-detect-meta" class="list"><div class="empty">等待执行</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-records">
+      <div class="panel card">
+        <div class="section-head">
+          <div><h2>识别记录</h2><p>支持按摄像头、规则、工单状态、日期筛选。</p></div>
+          <button class="btn secondary" id="export-btn" type="button">导出 CSV</button>
+        </div>
+        <div class="filters">
+          <select id="filter-camera"></select>
+          <select id="filter-rule"></select>
+          <select id="filter-workorder-status"><option value="">全部工单状态</option><option value="pending">待处理</option><option value="processing">处理中</option><option value="closed">已关闭</option></select>
+          <input id="filter-start" type="date">
+          <input id="filter-end" type="date">
+        </div>
+        <div class="actions" style="margin-bottom:16px"><button class="btn secondary" id="filter-btn" type="button">刷新筛选</button></div>
+        <div id="record-list" class="records"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-work-orders">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head">
+            <div><h2>工单中心</h2><p>轻量闭环：指派、处理中、关闭。</p></div>
+            <select id="workorder-status-filter" style="max-width:220px">
+              <option value="">全部状态</option>
+              <option value="pending">待处理</option>
+              <option value="processing">处理中</option>
+              <option value="closed">已关闭</option>
+            </select>
+          </div>
+          <div id="work-order-list" class="work-orders"></div>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2>工单处理</h2><p>选择左侧工单后在这里更新处理状态。</p></div></div>
+          <form id="work-order-form">
+            <input type="hidden" id="work-order-id">
+            <div class="field-grid">
+              <label>处理人<input id="work-order-assignee" placeholder="如：张三"></label>
+              <label>优先级<select id="work-order-priority"><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
+            </div>
+            <label>状态<select id="work-order-status"><option value="pending">待处理</option><option value="processing">处理中</option><option value="closed">已关闭</option></select></label>
+            <label>处理说明<textarea id="work-order-note" placeholder="填写处理过程、原因和结果"></textarea></label>
+            <label>处理图片<input id="work-order-image" type="file" accept="image/*"></label>
+            <div class="actions"><button class="btn" type="submit">更新工单</button></div>
+          </form>
+          <div id="work-order-detail" class="list" style="margin-top:16px"><div class="empty">请选择一条工单</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-settings">
+      <div class="grid-2">
+        <div class="panel card">
+          <div class="section-head"><div><h2>系统设置</h2><p>支持维护大模型名称、地址和 API Key。</p></div></div>
+          <form id="settings-form">
+            <div class="field-grid">
+              <label>自动建工单<select id="setting-auto-workorder"><option value="true">开启</option><option value="false">关闭</option></select></label>
+              <label>上传限制（MB）<input id="setting-upload-limit" type="number" min="1" value="20"></label>
+            </div>
+            <label>模型超时（秒）<input id="setting-timeout" type="number" min="10" value="120"></label>
+            <div class="field-grid">
+              <label>模型名称<input id="setting-model-name" placeholder="如：glm-4v-plus"></label>
+              <label>模型地址<input id="setting-model-url" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions"></label>
+            </div>
+            <label>API Key<input id="setting-model-apikey" placeholder="请输入模型 API Key"></label>
+            <div class="actions"><button class="btn" type="submit">保存设置</button></div>
+          </form>
+        </div>
+        <div class="panel card">
+          <div class="section-head"><div><h2>运行说明</h2><p>规则维护、任务提交、模型配置均可在本页面完成。</p></div></div>
+          <div id="settings-info" class="list"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = "/api";
+    const state = {
+      cameras: [],
+      rules: [],
+      tasks: [],
+      records: [],
+      workOrders: [],
+      templates: [],
+      selectedFile: null,
+      modelConfig: null,
+      selectedWorkOrderId: null,
+      settings: {},
+    };
+    const $ = (id) => document.getElementById(id);
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      bindTabs();
+      bindForms();
+      bindUpload();
+      try {
+        await bootstrap();
+      } catch (error) {
+        console.error(error);
+        showToast(`初始化失败: ${error.message}`);
+      }
+    });
+
+    async function bootstrap() {
+      const tasks = [
+        loadLLMStatus(),
+        loadSettings(),
+        loadModelConfig(),
+        loadCameras(),
+        loadRules(),
+        loadTemplates(),
+        loadTasks(),
+        loadRecords(),
+        loadWorkOrders(),
+        loadSubmitTasks(),
+        refreshDashboard(),
+      ];
+      for (const task of tasks) {
+        try {
+          await task;
+        } catch (error) {
+          console.error("bootstrap task failed", error);
+        }
+      }
+    }
+
+    function bindTabs() {
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+          document.querySelectorAll(".page").forEach((page) => page.classList.remove("active"));
+          tab.classList.add("active");
+          $(`page-${tab.dataset.page}`).classList.add("active");
+        });
+      });
+    }
+
+    function bindForms() {
+      $("camera-form").addEventListener("submit", submitCamera);
+      $("rule-form").addEventListener("submit", submitRule);
+      $("template-form").addEventListener("submit", submitTemplate);
+      $("task-form").addEventListener("submit", submitTask);
+      $("work-order-form").addEventListener("submit", submitWorkOrder);
+      $("settings-form").addEventListener("submit", submitSettings);
+      $("camera-cancel").addEventListener("click", resetCameraForm);
+      $("rule-cancel").addEventListener("click", resetRuleForm);
+      $("template-cancel").addEventListener("click", resetTemplateForm);
+      $("task-cancel").addEventListener("click", resetTaskForm);
+      $("filter-btn").addEventListener("click", loadRecords);
+      $("export-btn").addEventListener("click", exportRecords);
+      $("workorder-status-filter").addEventListener("change", loadWorkOrders);
+      $("upload-detect-btn").addEventListener("click", detectUpload);
+      $("submit-task-btn").addEventListener("click", submitDualImageTask);
+      $("camera-detect-btn").addEventListener("click", detectCamera);
+      $("export-templates-btn").addEventListener("click", exportTemplates);
+      $("import-templates-btn").addEventListener("click", importTemplates);
+      $("template-category-filter").addEventListener("change", loadTemplates);
+      $("template-search").addEventListener("input", debounce(loadTemplates, 300));
+    }
+
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+
+    function bindUpload() {
+      $("select-file-btn").addEventListener("click", () => $("detect-file").click());
+      $("detect-file").addEventListener("change", (event) => handleFile(event.target.files[0]));
+      const dropzone = $("dropzone");
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+      dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("dragover");
+        handleFile(event.dataTransfer.files[0]);
+      });
+    }
+
+    async function api(url, options = {}) {
+      const response = await fetch(`${API}${url}`, options);
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "请求失败");
+      }
+      return data;
+    }
+
+    function showToast(message) {
+      const toast = $("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 2500);
+    }
+
+    async function loadLLMStatus() {
+      const { data } = await api("/settings/llm");
+      $("llm-status-text").textContent = data.configured ? "智谱已配置" : "智谱未配置";
+      $("llm-model-text").textContent = `${data.provider.toUpperCase()} / ${data.model}`;
+      $("llm-dot").classList.toggle("warning", !data.configured);
+    }
+
+    async function loadSettings() {
+      const { data } = await api("/settings");
+      state.settings = data;
+      const system = data.system || {};
+      $("setting-auto-workorder").value = String(system.auto_create_work_order ?? true);
+      $("setting-upload-limit").value = system.upload_limit_mb ?? 20;
+      $("setting-timeout").value = system.llm_timeout_seconds ?? 120;
+      $("settings-info").innerHTML = `
+        <div class="item">
+          <div class="item-title">运行参数</div>
+          <div class="meta">
+            <span>自动建工单：${system.auto_create_work_order ? "开启" : "关闭"}</span>
+            <span>上传限制：${system.upload_limit_mb ?? 20} MB</span>
+            <span>模型超时：${system.llm_timeout_seconds ?? 120} 秒</span>
+          </div>
+          <div class="subtle">智谱 API Key 通过 config.ini 或环境变量加载，不会在前端明文展示。</div>
+        </div>
+      `;
+    }
+
+    async function loadModelConfig() {
+      const { data } = await api("/models");
+      state.modelConfig = data;
+      $("setting-model-name").value = data.model_name || "";
+      $("setting-model-url").value = data.base_url || "";
+      $("setting-model-apikey").value = data.api_key || "";
+      $("upload-model-name").value = data.model_name || "";
+      $("camera-model-name").value = data.model_name || "";
+      $("submit-model-name").value = data.model_name || "";
+    }
+
+    async function submitSettings(event) {
+      event.preventDefault();
+      await api("/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system: {
+            auto_create_work_order: $("setting-auto-workorder").value === "true",
+            upload_limit_mb: Number($("setting-upload-limit").value || 20),
+            llm_timeout_seconds: Number($("setting-timeout").value || 120),
+          }
+        }),
+      });
+      await api("/models", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model_name: $("setting-model-name").value.trim(),
+          base_url: $("setting-model-url").value.trim(),
+          api_key: $("setting-model-apikey").value.trim(),
+        }),
+      });
+      showToast("设置已更新");
+      await Promise.all([loadSettings(), loadLLMStatus(), loadModelConfig()]);
+    }
+
+    async function refreshDashboard() {
+      const { data } = await api("/dashboard");
+      $("metric-cameras").textContent = data.camera_count;
+      $("metric-rules").textContent = data.rule_count;
+      $("metric-records").textContent = data.record_count;
+      $("metric-violations").textContent = data.violation_count;
+      $("metric-tasks").textContent = data.active_task_count;
+      $("metric-workorders").textContent = data.pending_work_order_count;
+
+      $("latest-records").innerHTML = data.latest_records.length
+        ? data.latest_records.map(renderRecordCard).join("")
+        : '<div class="empty">还没有识别记录。</div>';
+      $("latest-work-orders").innerHTML = data.latest_work_orders.length
+        ? data.latest_work_orders.map(renderWorkOrderCard).join("")
+        : '<div class="empty">还没有工单。</div>';
+      bindRecordActions($("latest-records"));
+      bindWorkOrderActions($("latest-work-orders"));
+    }
+
+    async function loadCameras() {
+      const { data } = await api("/cameras");
+      state.cameras = data;
+      renderCameraList();
+      fillSelect("upload-camera", data, true, "不关联摄像头");
+      fillSelect("camera-detect-camera", data, false, "选择摄像头");
+      fillSelect("task-camera", data, false, "选择摄像头");
+      fillSelect("filter-camera", data, true, "全部摄像头");
+    }
+
+    function renderCameraList() {
+      $("camera-list").innerHTML = state.cameras.length
+        ? state.cameras.map((camera) => `
+          <div class="item">
+            <div class="item-head">
+              <div>
+                <div class="item-title">${camera.name}</div>
+                <div class="meta">
+                  <span>${camera.code}</span>
+                  <span>${camera.location || "未填写位置"}</span>
+                  <span>${camera.frequency || 60} 秒/次</span>
+                </div>
+              </div>
+              <span class="badge ${camera.status === "active" ? "ok" : ""}">${camera.status === "active" ? "启用" : "停用"}</span>
+            </div>
+            <div class="subtle">${camera.rtsp_url || "未配置 RTSP 地址"}</div>
+            <div class="actions">
+              <button class="btn secondary small" data-edit-camera="${camera.id}" type="button">编辑</button>
+              <button class="btn danger small" data-delete-camera="${camera.id}" type="button">删除</button>
+            </div>
+          </div>
+        `).join("")
+        : '<div class="empty">暂无摄像头，请先添加。</div>';
+      $("camera-list").querySelectorAll("[data-edit-camera]").forEach((button) => button.addEventListener("click", () => editCamera(Number(button.dataset.editCamera))));
+      $("camera-list").querySelectorAll("[data-delete-camera]").forEach((button) => button.addEventListener("click", () => deleteCamera(Number(button.dataset.deleteCamera))));
+    }
+
+    async function submitCamera(event) {
+      event.preventDefault();
+      const id = $("camera-id").value;
+      const payload = {
+        code: $("camera-code").value.trim(),
+        name: $("camera-name").value.trim(),
+        rtsp_url: $("camera-rtsp").value.trim(),
+        location: $("camera-location").value.trim(),
+        frequency: Number($("camera-frequency").value || 60),
+      };
+      await api(id ? `/cameras/${id}` : "/cameras", {
+        method: id ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      showToast(id ? "摄像头已更新" : "摄像头已创建");
+      resetCameraForm();
+      await Promise.all([loadCameras(), refreshDashboard()]);
+    }
+
+    function editCamera(id) {
+      const camera = state.cameras.find((item) => item.id === id);
+      if (!camera) return;
+      $("camera-form-title").textContent = "编辑摄像头";
+      $("camera-id").value = camera.id;
+      $("camera-code").value = camera.code;
+      $("camera-name").value = camera.name;
+      $("camera-rtsp").value = camera.rtsp_url || "";
+      $("camera-location").value = camera.location || "";
+      $("camera-frequency").value = camera.frequency || 60;
+      $("camera-cancel").classList.remove("hidden");
+    }
+
+    async function deleteCamera(id) {
+      if (!confirm("确定删除这个摄像头吗？")) return;
+      await api(`/cameras/${id}`, { method: "DELETE" });
+      showToast("摄像头已删除");
+      await Promise.all([loadCameras(), refreshDashboard()]);
+    }
+
+    function resetCameraForm() {
+      $("camera-form").reset();
+      $("camera-id").value = "";
+      $("camera-form-title").textContent = "新增摄像头";
+      $("camera-frequency").value = 60;
+      $("camera-cancel").classList.add("hidden");
+    }
+
+    async function loadRules() {
+      const { data } = await api("/rules");
+      state.rules = data;
+      renderRuleList();
+      fillSelect("upload-rule", data, false, "选择规则");
+      fillSelect("submit-rule", data, false, "选择规则");
+      fillSelect("camera-detect-rule", data, false, "选择规则");
+      fillSelect("task-rule", data, false, "选择规则");
+      fillSelect("filter-rule", data, true, "全部规则");
+    }
+
+    function renderRuleList() {
+      $("rule-list").innerHTML = state.rules.length
+        ? state.rules.map((rule) => `
+          <div class="item">
+            <div class="item-head">
+              <div>
+                <div class="item-title">${rule.name}</div>
+                <div class="meta">
+                  <span>${rule.code}</span>
+                  <span>${rule.scene || "未设置场景"}</span>
+                </div>
+              </div>
+              <span class="badge ${rule.status === "active" ? "ok" : ""}">${rule.status === "active" ? "启用" : "停用"}</span>
+            </div>
+            <div class="subtle">${rule.description || "无规则描述"}</div>
+            <div class="subtle" style="margin-top:6px">输出格式：${rule.output_format || "未指定"}</div>
+            <div class="actions">
+              <button class="btn secondary small" data-view-rule="${rule.id}" type="button">查看提示词</button>
+              <button class="btn secondary small" data-edit-rule="${rule.id}" type="button">编辑</button>
+              <button class="btn danger small" data-delete-rule="${rule.id}" type="button">删除</button>
+            </div>
+          </div>
+        `).join("")
+        : '<div class="empty">暂无规则，请先新增。</div>';
+      $("rule-list").querySelectorAll("[data-view-rule]").forEach((button) => button.addEventListener("click", () => {
+        const rule = state.rules.find((item) => item.id === Number(button.dataset.viewRule));
+        if (rule) alert(rule.prompt_content);
+      }));
+      $("rule-list").querySelectorAll("[data-edit-rule]").forEach((button) => button.addEventListener("click", () => editRule(Number(button.dataset.editRule))));
+      $("rule-list").querySelectorAll("[data-delete-rule]").forEach((button) => button.addEventListener("click", () => deleteRule(Number(button.dataset.deleteRule))));
+    }
+
+    async function submitRule(event) {
+      event.preventDefault();
+      const id = $("rule-id").value;
+      const payload = {
+        code: $("rule-code").value.trim(),
+        name: $("rule-name").value.trim(),
+        scene: $("rule-scene").value.trim(),
+        description: $("rule-description").value.trim(),
+        output_format: $("rule-output-format").value.trim(),
+        prompt_content: $("rule-prompt").value.trim(),
+      };
+      await api(id ? `/rules/${id}` : "/rules", {
+        method: id ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      showToast(id ? "规则已更新" : "规则已创建");
+      resetRuleForm();
+      await Promise.all([loadRules(), refreshDashboard()]);
+    }
+
+    function editRule(id) {
+      const rule = state.rules.find((item) => item.id === id);
+      if (!rule) return;
+      $("rule-form-title").textContent = "编辑规则";
+      $("rule-id").value = rule.id;
+      $("rule-code").value = rule.code;
+      $("rule-name").value = rule.name;
+      $("rule-scene").value = rule.scene || "";
+      $("rule-description").value = rule.description || "";
+      $("rule-output-format").value = rule.output_format || "";
+      $("rule-prompt").value = rule.prompt_content || "";
+      $("rule-cancel").classList.remove("hidden");
+    }
+
+    async function deleteRule(id) {
+      if (!confirm("确定删除这个规则吗？")) return;
+      await api(`/rules/${id}`, { method: "DELETE" });
+      showToast("规则已删除");
+      await Promise.all([loadRules(), refreshDashboard()]);
+    }
+
+    function resetRuleForm() {
+      $("rule-form").reset();
+      $("rule-id").value = "";
+      $("rule-form-title").textContent = "新增规则";
+      $("rule-cancel").classList.add("hidden");
+    }
+
+    async function loadTasks() {
+      const { data } = await api("/tasks");
+      state.tasks = data;
+      renderTaskList();
+    }
+
+    function renderTaskList() {
+      $("task-list").innerHTML = state.tasks.length
+        ? state.tasks.map((task) => `
+          <div class="item">
+            <div class="item-head">
+              <div>
+                <div class="item-title">${task.name}</div>
+                <div class="meta">
+                  <span>${task.camera_name || "-"}</span>
+                  <span>${task.rule_name || "-"}</span>
+                  <span>${task.frequency_seconds} 秒/次</span>
+                  <span>${task.resolution || "original"} | Q${task.quality || 80}</span>
+                </div>
+              </div>
+              <span class="badge ${task.status === "active" ? "ok" : "warn"}">${task.status === "active" ? "运行中" : "已停用"}</span>
+            </div>
+            <div class="subtle">最近执行：${task.last_run_time || "暂无"} | 下次执行：${task.next_run_time || "待计算"}</div>
+            <div class="subtle" style="margin-top:6px">${task.last_error ? `最近错误：${task.last_error}` : "最近执行正常"}</div>
+            <div class="actions">
+              <button class="btn secondary small" data-run-task="${task.id}" type="button">立即执行</button>
+              <button class="btn secondary small" data-edit-task="${task.id}" type="button">编辑</button>
+              <button class="btn danger small" data-delete-task="${task.id}" type="button">删除</button>
+            </div>
+          </div>
+        `).join("")
+        : '<div class="empty">暂无巡检任务。</div>';
+      $("task-list").querySelectorAll("[data-run-task]").forEach((button) => button.addEventListener("click", () => runTask(Number(button.dataset.runTask))));
+      $("task-list").querySelectorAll("[data-edit-task]").forEach((button) => button.addEventListener("click", () => editTask(Number(button.dataset.editTask))));
+      $("task-list").querySelectorAll("[data-delete-task]").forEach((button) => button.addEventListener("click", () => deleteTask(Number(button.dataset.deleteTask))));
+    }
+
+    async function submitTask(event) {
+      event.preventDefault();
+      const id = $("task-id").value;
+      const payload = {
+        name: $("task-name").value.trim(),
+        camera_id: Number($("task-camera").value),
+        rule_id: Number($("task-rule").value),
+        frequency_seconds: Number($("task-frequency").value || 60),
+        status: $("task-status").value,
+        auto_create_work_order: $("task-auto-workorder").value === "true",
+        resolution: $("task-resolution").value,
+        quality: Number($("task-quality").value || 80),
+        max_frames: Number($("task-max-frames").value || 1000),
+        storage_path: $("task-storage-path").value.trim() || null,
+      };
+      await api(id ? `/tasks/${id}` : "/tasks", {
+        method: id ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      showToast(id ? "任务已更新" : "任务已创建");
+      resetTaskForm();
+      await Promise.all([loadTasks(), refreshDashboard()]);
+    }
+
+    function editTask(id) {
+      const task = state.tasks.find((item) => item.id === id);
+      if (!task) return;
+      $("task-form-title").textContent = "编辑任务";
+      $("task-id").value = task.id;
+      $("task-name").value = task.name;
+      $("task-camera").value = task.camera_id;
+      $("task-rule").value = task.rule_id;
+      $("task-frequency").value = task.frequency_seconds;
+      $("task-status").value = task.status;
+      $("task-auto-workorder").value = String(Boolean(task.auto_create_work_order));
+      $("task-resolution").value = task.resolution || "original";
+      $("task-quality").value = task.quality || 80;
+      $("task-max-frames").value = task.max_frames || 1000;
+      $("task-storage-path").value = task.storage_path || "";
+      $("task-cancel").classList.remove("hidden");
+    }
+
+    async function runTask(id) {
+      await api(`/tasks/${id}/run`, { method: "POST" });
+      showToast("任务执行成功");
+      await Promise.all([loadTasks(), loadRecords(), loadWorkOrders(), refreshDashboard()]);
+    }
+
+    async function deleteTask(id) {
+      if (!confirm("确定删除这个任务吗？")) return;
+      await api(`/tasks/${id}`, { method: "DELETE" });
+      showToast("任务已删除");
+      await Promise.all([loadTasks(), refreshDashboard()]);
+    }
+
+    function resetTaskForm() {
+      $("task-form").reset();
+      $("task-id").value = "";
+      $("task-form-title").textContent = "新增任务";
+      $("task-frequency").value = 60;
+      $("task-status").value = "active";
+      $("task-auto-workorder").value = "true";
+      $("task-cancel").classList.add("hidden");
+    }
+
+    function fillSelect(id, items, optional = false, placeholder = "请选择") {
+      const select = $(id);
+      const current = select.value;
+      select.innerHTML = "";
+      const first = document.createElement("option");
+      first.value = "";
+      first.textContent = placeholder;
+      select.appendChild(first);
+      items.forEach((item) => {
+        const option = document.createElement("option");
+        option.value = item.id;
+        option.textContent = item.name;
+        select.appendChild(option);
+      });
+      if (!optional && !current && items[0]) {
+        select.value = String(items[0].id);
+      } else if (current) {
+        select.value = current;
+      }
+    }
+
+    function handleFile(file) {
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        showToast("请选择图片文件");
+        return;
+      }
+      state.selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        $("preview-image").src = event.target.result;
+        $("upload-preview-wrap").classList.remove("hidden");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function normalizeAutoWorkOrder(selectId) {
+      const value = $(selectId).value;
+      return value === "" ? null : value === "true";
+    }
+
+    async function detectUpload() {
+      if (!state.selectedFile) {
+        showToast("请先选择图片");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("image", state.selectedFile);
+      formData.append("rule_id", $("upload-rule").value);
+      if ($("upload-camera").value) formData.append("camera_id", $("upload-camera").value);
+      const autoCreate = normalizeAutoWorkOrder("upload-auto-workorder");
+      if (autoCreate !== null) formData.append("auto_create_work_order", String(autoCreate));
+      if ($("upload-model-name").value.trim()) formData.append("model_name", $("upload-model-name").value.trim());
+      $("upload-result").textContent = "识别中，请稍候...";
+      const { data } = await api("/detect", { method: "POST", body: formData });
+      renderDetectionResult(data, "upload");
+      showToast("上传识别完成");
+      await Promise.all([loadRecords(), loadWorkOrders(), refreshDashboard()]);
+    }
+
+    async function detectCamera() {
+      const payload = {
+        rule_id: Number($("camera-detect-rule").value),
+      };
+      if ($("camera-model-name").value.trim()) payload.model_name = $("camera-model-name").value.trim();
+      const autoCreate = normalizeAutoWorkOrder("camera-auto-workorder");
+      if (autoCreate !== null) payload.auto_create_work_order = autoCreate;
+      const { data } = await api(`/detect/camera/${$("camera-detect-camera").value}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      renderDetectionResult(data, "camera");
+      showToast("摄像头识别完成");
+      await Promise.all([loadRecords(), loadWorkOrders(), refreshDashboard()]);
+    }
+
+    async function submitDualImageTask() {
+      const file1 = $("submit-image-1").files[0];
+      const file2 = $("submit-image-2").files[0];
+      if (!file1 || !file2) {
+        showToast("请上传两张图片");
+        return;
+      }
+      if (!$("submit-rule").value) {
+        showToast("请选择规则");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("image_1", file1);
+      formData.append("image_2", file2);
+      formData.append("rule_id", $("submit-rule").value);
+      if ($("submit-model-name").value.trim()) {
+        formData.append("model_name", $("submit-model-name").value.trim());
+      }
+      $("submit-task-result").innerHTML = "<pre>任务提交中，请稍候...</pre>";
+      const { data } = await api("/submit-task", { method: "POST", body: formData });
+      $("submit-task-result").innerHTML = `<pre>${JSON.stringify(data.llm_structured_result || {}, null, 2)}</pre>`;
+      showToast("双图任务已提交");
+      await loadSubmitTasks();
+    }
+
+    async function loadSubmitTasks() {
+      const { data } = await api("/submit-tasks?limit=20");
+      $("submit-task-list").innerHTML = data.length
+        ? data.map((item) => `
+          <div class="item">
+            <div class="item-head">
+              <div>
+                <div class="item-title">任务 #${item.id}</div>
+                <div class="meta">
+                  <span>${item.rule_name || "-"}</span>
+                  <span>${item.model_name || "-"}</span>
+                  <span>${item.created_at || "-"}</span>
+                </div>
+              </div>
+              <span class="badge ${item.status === "success" ? "ok" : "alert"}">${item.status}</span>
+            </div>
+            <div class="actions">
+              ${item.image_url_1 ? `<button class="btn secondary small" onclick="window.open('${item.image_url_1}','_blank')">图1</button>` : ""}
+              ${item.image_url_2 ? `<button class="btn secondary small" onclick="window.open('${item.image_url_2}','_blank')">图2</button>` : ""}
+              <button class="btn secondary small" data-view-submit-task="${item.id}" type="button">结构化结果</button>
+            </div>
+          </div>
+        `).join("")
+        : '<div class="empty">暂无任务</div>';
+      $("submit-task-list").querySelectorAll("[data-view-submit-task]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const task = data.find((x) => x.id === Number(button.dataset.viewSubmitTask));
+          if (!task) return;
+          $("submit-task-result").innerHTML = `<pre>${JSON.stringify(task.llm_structured_result || {}, null, 2)}</pre>`;
+          document.querySelector('[data-page="submit-task"]').click();
+        });
+      });
+    }
+
+    function renderDetectionResult(data, mode) {
+      const record = data.record;
+      const workOrder = data.work_order;
+      if (mode === "upload") {
+        $("upload-result").textContent = record.llm_result || "模型未返回内容";
+        $("upload-detect-meta").innerHTML = renderDetectionMeta(record, workOrder);
+        if (record.result_image_url) $("preview-image").src = record.result_image_url;
+      } else {
+        $("camera-preview-wrap").classList.remove("hidden");
+        $("camera-result-image").src = record.image_url;
+        $("camera-result-text").textContent = record.llm_result || "模型未返回内容";
+        $("camera-detect-meta").innerHTML = renderDetectionMeta(record, workOrder);
+      }
+      document.querySelectorAll("[data-create-workorder]").forEach((button) => button.addEventListener("click", () => createWorkOrderFromRecord(Number(button.dataset.createWorkorder))));
+      document.querySelectorAll("[data-open-workorder]").forEach((button) => button.addEventListener("click", () => openWorkOrder(Number(button.dataset.openWorkorder))));
+    }
+
+    function renderDetectionMeta(record, workOrder) {
+      return `
+        <div class="item">
+          <div class="item-head">
+            <div>
+              <div class="item-title">${record.rule_name || "巡检结果"}</div>
+              <div class="meta">
+                <span>记录 #${record.id}</span>
+                <span>${record.detect_time}</span>
+                <span>${record.camera_name || record.source_type}</span>
+              </div>
+            </div>
+            <span class="badge ${record.has_violation ? "alert" : "ok"}">${record.has_violation ? "发现异常" : "未见异常"}</span>
+          </div>
+          <div class="subtle">${record.analysis_summary || "暂无摘要"}</div>
+          <div class="actions">
+            ${workOrder ? `<button class="btn secondary small" data-open-workorder="${workOrder.id}" type="button">查看工单 #${workOrder.id}</button>` : ""}
+            ${record.has_violation && !workOrder ? `<button class="btn secondary small" data-create-workorder="${record.id}" type="button">生成工单</button>` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadRecords() {
+      const params = new URLSearchParams();
+      if ($("filter-camera").value) params.set("camera_id", $("filter-camera").value);
+      if ($("filter-rule").value) params.set("rule_id", $("filter-rule").value);
+      if ($("filter-workorder-status").value) params.set("work_order_status", $("filter-workorder-status").value);
+      if ($("filter-start").value) params.set("start_time", $("filter-start").value);
+      if ($("filter-end").value) params.set("end_time", $("filter-end").value);
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const { data } = await api(`/records${query}`);
+      state.records = data.records;
+      $("record-list").innerHTML = state.records.length
+        ? state.records.map(renderRecordCard).join("")
+        : '<div class="empty">当前筛选条件下没有识别记录。</div>';
+      bindRecordActions($("record-list"));
+    }
+
+    function renderRecordCard(record) {
+      return `
+        <div class="item">
+          <div class="item-head">
+            <div>
+              <div class="item-title">${record.rule_name || "未命名规则"}</div>
+              <div class="meta">
+                <span>#${record.id}</span>
+                <span>${record.detect_time}</span>
+                <span>${record.camera_name || record.source_type}</span>
+                <span>${record.rule_scene || "无场景"}</span>
+              </div>
+            </div>
+            <span class="badge ${record.has_violation ? "alert" : "ok"}">${record.has_violation ? "异常" : "正常"}</span>
+          </div>
+          <div class="subtle">${record.analysis_summary || "暂无摘要"}</div>
+          <div class="meta">
+            <span>风险等级：${record.severity || "normal"}</span>
+            <span>工单：${record.work_order_id ? `#${record.work_order_id} / ${record.work_order_status}` : "未创建"}</span>
+          </div>
+          <div class="actions">
+            ${record.image_url ? `<button class="btn secondary small" data-open-image="${record.image_url}" type="button">查看图片</button>` : ""}
+            <button class="btn secondary small" data-view-record="${record.id}" type="button">查看详情</button>
+            ${record.has_violation && !record.work_order_id ? `<button class="btn secondary small" data-create-workorder="${record.id}" type="button">建工单</button>` : ""}
+            <button class="btn danger small" data-delete-record="${record.id}" type="button">删除</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function bindRecordActions(container) {
+      container.querySelectorAll("[data-open-image]").forEach((button) => button.addEventListener("click", () => window.open(button.dataset.openImage, "_blank")));
+      container.querySelectorAll("[data-view-record]").forEach((button) => button.addEventListener("click", () => viewRecord(Number(button.dataset.viewRecord))));
+      container.querySelectorAll("[data-delete-record]").forEach((button) => button.addEventListener("click", () => deleteRecord(Number(button.dataset.deleteRecord))));
+      container.querySelectorAll("[data-create-workorder]").forEach((button) => button.addEventListener("click", () => createWorkOrderFromRecord(Number(button.dataset.createWorkorder))));
+    }
+
+    async function viewRecord(id) {
+      const { data } = await api(`/records/${id}`);
+      const record = data.record;
+      const workOrder = data.work_order;
+      const detail = [
+        `规则：${record.rule_name || "-"}`,
+        `场景：${record.rule_scene || "-"}`,
+        `来源：${record.source_type || "-"}`,
+        `摄像头：${record.camera_name || "-"}`,
+        `时间：${record.detect_time || "-"}`,
+        `风险等级：${record.severity || "-"}`,
+        `工单：${workOrder ? `#${workOrder.id} / ${workOrder.status}` : "无"}`,
+        "",
+        "模型返回：",
+        record.llm_result || "无"
+      ].join("\n");
+      alert(detail);
+    }
+
+    async function deleteRecord(id) {
+      if (!confirm("确定删除这条识别记录吗？")) return;
+      await api(`/records/${id}`, { method: "DELETE" });
+      showToast("记录已删除");
+      await Promise.all([loadRecords(), loadWorkOrders(), refreshDashboard()]);
+    }
+
+    function exportRecords() {
+      const params = new URLSearchParams();
+      if ($("filter-camera").value) params.set("camera_id", $("filter-camera").value);
+      if ($("filter-rule").value) params.set("rule_id", $("filter-rule").value);
+      if ($("filter-workorder-status").value) params.set("work_order_status", $("filter-workorder-status").value);
+      if ($("filter-start").value) params.set("start_time", $("filter-start").value);
+      if ($("filter-end").value) params.set("end_time", $("filter-end").value);
+      window.open(`${API}/records/export?${params.toString()}`, "_blank");
+    }
+
+    async function loadWorkOrders() {
+      const status = $("workorder-status-filter").value;
+      const query = status ? `?status=${encodeURIComponent(status)}` : "";
+      const { data } = await api(`/work-orders${query}`);
+      state.workOrders = data;
+      $("work-order-list").innerHTML = state.workOrders.length
+        ? state.workOrders.map(renderWorkOrderCard).join("")
+        : '<div class="empty">暂无工单。</div>';
+      bindWorkOrderActions($("work-order-list"));
+    }
+
+    function renderWorkOrderCard(workOrder) {
+      return `
+        <div class="item">
+          <div class="item-head">
+            <div>
+              <div class="item-title">${workOrder.title}</div>
+              <div class="meta">
+                <span>#${workOrder.id}</span>
+                <span>${workOrder.camera_name || "-"}</span>
+                <span>${workOrder.rule_name || "-"}</span>
+              </div>
+            </div>
+            <span class="badge ${workOrder.status === "closed" ? "ok" : workOrder.status === "processing" ? "warn" : "alert"}">
+              ${workOrder.status === "pending" ? "待处理" : workOrder.status === "processing" ? "处理中" : "已关闭"}
+            </span>
+          </div>
+          <div class="subtle">${workOrder.description || workOrder.analysis_summary || "暂无描述"}</div>
+          <div class="meta">
+            <span>优先级：${workOrder.priority || "medium"}</span>
+            <span>处理人：${workOrder.assignee || "未指派"}</span>
+          </div>
+          <div class="actions">
+            <button class="btn secondary small" data-open-workorder="${workOrder.id}" type="button">处理</button>
+            <button class="btn danger small" data-delete-workorder="${workOrder.id}" type="button">删除</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function bindWorkOrderActions(container) {
+      container.querySelectorAll("[data-open-workorder]").forEach((button) => button.addEventListener("click", () => openWorkOrder(Number(button.dataset.openWorkorder))));
+      container.querySelectorAll("[data-delete-workorder]").forEach((button) => button.addEventListener("click", () => deleteWorkOrder(Number(button.dataset.deleteWorkorder))));
+    }
+
+    async function createWorkOrderFromRecord(recordId) {
+      const { data } = await api("/work-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record_id: recordId }),
+      });
+      showToast(`工单 #${data.id} 已创建`);
+      await Promise.all([loadWorkOrders(), loadRecords(), refreshDashboard()]);
+      openWorkOrder(data.id);
+    }
+
+    async function openWorkOrder(id) {
+      const { data } = await api(`/work-orders/${id}`);
+      state.selectedWorkOrderId = id;
+      $("work-order-id").value = data.id;
+      $("work-order-assignee").value = data.assignee || "";
+      $("work-order-priority").value = data.priority || "medium";
+      $("work-order-status").value = data.status || "pending";
+      $("work-order-note").value = data.processing_note || "";
+      $("work-order-detail").innerHTML = `
+        <div class="item">
+          <div class="item-head">
+            <div>
+              <div class="item-title">${data.title}</div>
+              <div class="meta">
+                <span>来源记录 #${data.record_id}</span>
+                <span>${data.camera_name || "-"}</span>
+                <span>${data.rule_name || "-"}</span>
+              </div>
+            </div>
+            <span class="badge ${data.status === "closed" ? "ok" : data.status === "processing" ? "warn" : "alert"}">${data.status}</span>
+          </div>
+          <div class="subtle">${data.description || "暂无描述"}</div>
+          <div class="meta">
+            <span>优先级：${data.priority || "medium"}</span>
+            <span>处理人：${data.assignee || "未指派"}</span>
+            <span>创建时间：${data.created_at || "-"}</span>
+          </div>
+          ${data.processing_image_url ? `<div class="actions"><button class="btn secondary small" onclick="window.open('${data.processing_image_url}', '_blank')">查看处理图片</button></div>` : ""}
+        </div>
+      `;
+      document.querySelector('[data-page="work-orders"]').click();
+    }
+
+    async function submitWorkOrder(event) {
+      event.preventDefault();
+      const workOrderId = $("work-order-id").value;
+      if (!workOrderId) {
+        showToast("请先从左侧选择一条工单");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("assignee", $("work-order-assignee").value.trim());
+      formData.append("priority", $("work-order-priority").value);
+      formData.append("status", $("work-order-status").value);
+      formData.append("processing_note", $("work-order-note").value.trim());
+      const file = $("work-order-image").files[0];
+      if (file) formData.append("processing_image", file);
+      await api(`/work-orders/${workOrderId}`, { method: "PUT", body: formData });
+      showToast("工单已更新");
+      $("work-order-image").value = "";
+      await Promise.all([loadWorkOrders(), loadRecords(), refreshDashboard()]);
+      openWorkOrder(Number(workOrderId));
+    }
+
+    async function deleteWorkOrder(id) {
+      if (!confirm("确定删除这条工单吗？")) return;
+      await api(`/work-orders/${id}`, { method: "DELETE" });
+      showToast("工单已删除");
+      $("work-order-id").value = "";
+      $("work-order-detail").innerHTML = '<div class="empty">请选择一条工单</div>';
+      await Promise.all([loadWorkOrders(), loadRecords(), refreshDashboard()]);
+    }
+
+    async function loadTemplates() {
+      const params = new URLSearchParams();
+      if ($("template-category-filter").value) params.set("category", $("template-category-filter").value);
+      if ($("template-search").value) params.set("search", $("template-search").value);
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const { data } = await api(`/prompt-templates${query}`);
+      state.templates = data.templates || [];
+      renderTemplateList(state.templates);
+      loadTemplateCategories();
+    }
+
+    function loadTemplateCategories() {
+      api("/prompt-templates/categories").then(({ data }) => {
+        const select = $("template-category-filter");
+        const current = select.value;
+        select.innerHTML = '<option value="">全部分类</option>';
+        (data || []).forEach(cat => {
+          select.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+        select.value = current;
+      });
+    }
+
+    function renderTemplateList(templates) {
+      if (!templates.length) {
+        $("template-list").innerHTML = '<div class="empty">暂无模板</div>';
+        return;
+      }
+      $("template-list").innerHTML = templates.map(t => `
+        <div class="item">
+          <div class="item-head">
+            <div>
+              <div class="item-title">${t.name}</div>
+              <div class="meta">
+                <span>#${t.id}</span>
+                <span>${t.category}</span>
+                <span>使用 ${t.usage_count || 0} 次</span>
+                <span>成功率 ${(t.success_rate || 0).toFixed(1)}%</span>
+              </div>
+            </div>
+            <span class="badge ${t.is_system ? 'warn' : t.status === 'active' ? 'ok' : ''}">${t.is_system ? '系统' : t.status === 'active' ? '启用' : '停用'}</span>
+          </div>
+          <div class="subtle">${t.description || "暂无描述"}</div>
+          <div class="actions">
+            ${!t.is_system ? `<button class="btn secondary small" data-edit-template="${t.id}" type="button">编辑</button>` : ""}
+            ${!t.is_system ? `<button class="btn danger small" data-delete-template="${t.id}" type="button">删除</button>` : ""}
+            <button class="btn secondary small" data-optimize-template="${t.id}" type="button">优化建议</button>
+            <button class="btn secondary small" data-use-template="${t.id}" type="button">使用</button>
+          </div>
+        </div>
+      `).join("");
+      bindTemplateActions();
+    }
+
+    function bindTemplateActions() {
+      document.querySelectorAll("[data-edit-template]").forEach(btn => {
+        btn.addEventListener("click", () => editTemplate(Number(btn.dataset.editTemplate)));
+      });
+      document.querySelectorAll("[data-delete-template]").forEach(btn => {
+        btn.addEventListener("click", () => deleteTemplate(Number(btn.dataset.deleteTemplate)));
+      });
+      document.querySelectorAll("[data-optimize-template]").forEach(btn => {
+        btn.addEventListener("click", () => optimizeTemplate(Number(btn.dataset.optimizeTemplate)));
+      });
+      document.querySelectorAll("[data-use-template]").forEach(btn => {
+        btn.addEventListener("click", () => useTemplate(Number(btn.dataset.useTemplate)));
+      });
+    }
+
+    function editTemplate(id) {
+      const t = state.templates.find(x => x.id === id);
+      if (!t) return;
+      $("template-form-title").textContent = "编辑模板";
+      $("template-id").value = t.id;
+      $("template-code").value = t.code;
+      $("template-code").readOnly = true;
+      $("template-name").value = t.name;
+      $("template-category").value = t.category;
+      $("template-status").value = t.status;
+      $("template-description").value = t.description || "";
+      $("template-prompt").value = t.prompt_content || "";
+    }
+
+    function resetTemplateForm() {
+      $("template-form-title").textContent = "新增模板";
+      $("template-id").value = "";
+      $("template-code").value = "";
+      $("template-code").readOnly = false;
+      $("template-name").value = "";
+      $("template-category").value = "安全";
+      $("template-status").value = "active";
+      $("template-description").value = "";
+      $("template-prompt").value = "";
+      $("template-optimize-result").classList.add("hidden");
+    }
+
+    async function submitTemplate(event) {
+      event.preventDefault();
+      const id = $("template-id").value;
+      const payload = {
+        name: $("template-name").value.trim(),
+        category: $("template-category").value,
+        prompt_content: $("template-prompt").value.trim(),
+        description: $("template-description").value.trim(),
+        status: $("template-status").value,
+      };
+      if (!id) {
+        payload.code = $("template-code").value.trim();
+        if (!payload.code || !payload.name || !payload.prompt_content) {
+          showToast("请填写完整信息");
+          return;
+        }
+        await api("/prompt-templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        showToast("模板创建成功");
+      } else {
+        await api(`/prompt-templates/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        showToast("模板更新成功");
+      }
+      resetTemplateForm();
+      await loadTemplates();
+    }
+
+    async function deleteTemplate(id) {
+      if (!confirm("确定删除这个模板吗？")) return;
+      const { success, error } = await api(`/prompt-templates/${id}`, { method: "DELETE" });
+      if (!success) {
+        showToast(error || "删除失败");
+        return;
+      }
+      showToast("模板已删除");
+      await loadTemplates();
+    }
+
+    async function optimizeTemplate(id) {
+      const { data } = await api("/prompt-templates/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id: id }),
+      });
+      $("template-optimize-result").classList.remove("hidden");
+      $("optimize-suggestions").innerHTML = (data.suggestions || []).map(s => `
+        <div style="margin: 8px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+          <strong>[${s.priority}]</strong> ${s.suggestion}
+        </div>
+      `).join("") || "<div>暂无优化建议</div>";
+    }
+
+    function useTemplate(id) {
+      const t = state.templates.find(x => x.id === id);
+      if (!t) return;
+      $("rule-prompt").value = t.prompt_content || "";
+      showToast(`已使用模板"${t.name}"的提示词`);
+      document.querySelector('[data-page="rules"]').click();
+    }
+
+    function exportTemplates() {
+      window.open(`${API}/prompt-templates/export`, "_blank");
+    }
+
+    function importTemplates() {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json";
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          const templates = Array.isArray(data) ? data : data.templates || [];
+          if (!templates.length) {
+            showToast("未找到有效的模板数据");
+            return;
+          }
+          const { data: result } = await api("/prompt-templates/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ templates, overwrite: false }),
+          });
+          showToast(`导入完成：成功 ${result.imported}，跳过 ${result.skipped}`);
+          await loadTemplates();
+        } catch (err) {
+          showToast("导入失败：" + err.message);
+        }
+      };
+      input.click();
+    }
+  </script>
+</body>
+</html>

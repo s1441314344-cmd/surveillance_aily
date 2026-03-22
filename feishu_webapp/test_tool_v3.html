@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>智能巡检测试工具 v3.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            padding-top: 20px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .mode-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .mode-tab {
+            flex: 1;
+            padding: 12px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .mode-tab.active {
+            background: white;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+        }
+
+        .config-section h3 {
+            font-size: 14px;
+            color: #667eea;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .config-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .config-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .config-select:disabled {
+            background: #f0f0f0;
+            cursor: not-allowed;
+        }
+
+        .upload-area {
+            border: 3px dashed #ccc;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .image-preview {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f0f0f0;
+            display: none;
+        }
+
+        .image-preview.show {
+            display: block;
+        }
+
+        .image-preview img {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+        }
+
+        .image-change {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .result-panel {
+            display: none;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .result-panel.show {
+            display: block;
+        }
+
+        .result-title {
+            color: #155724;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #c3e6cb;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-item.success {
+            color: #155724;
+        }
+
+        .result-item.error {
+            color: #dc3545;
+        }
+
+        .aily-output {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .aily-output-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .log-panel {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .log-content {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #d4d4d4;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding-left: 10px;
+            border-left: 2px solid #666;
+        }
+
+        .log-entry.success {
+            border-left-color: #2ecc71;
+            color: #2ecc71;
+        }
+
+        .log-entry.error {
+            border-left-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .log-entry.warning {
+            border-left-color: #f39c12;
+            color: #f39c12;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .info-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .llm-config {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .llm-config h4 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .llm-status {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .llm-status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.green { background: #28a745; }
+        .status-dot.red { background: #dc3545; }
+        .status-dot.yellow { background: #ffc107; }
+
+        .detection-options {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .detection-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .prompt-preview {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .prompt-preview-title {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .prompt-preview-content {
+            white-space: pre-wrap;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .llm-result {
+            background: #e7f3ff;
+            border: 1px solid #b3d8ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .llm-result-title {
+            font-weight: 600;
+            color: #004085;
+            margin-bottom: 10px;
+        }
+
+        .llm-result-content {
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 智能巡检测试工具 v3.0</h1>
+            <p>支持本地LLM检测 | 提示词管理 | 不依赖Aily</p>
+        </div>
+
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="tabLocal" onclick="switchMode('local')">
+                🤖 本地LLM检测
+            </button>
+            <button class="mode-tab" id="tabAily" onclick="switchMode('aily')">
+                ☁️ Aily云端检测
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📋 多维表格配置</div>
+            <div class="config-grid">
+                <div class="config-section">
+                    <h3>📜 巡检规则</h3>
+                    <select class="config-select" id="ruleSelect" disabled>
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+                <div class="config-section">
+                    <h3>📍 巡检点位</h3>
+                    <select class="config-select" id="pointSelect" disabled>
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+                <div class="config-section">
+                    <h3>🏢 巡检单位</h3>
+                    <select class="config-select" id="unitSelect" disabled>
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">规则详情</div>
+                    <div class="info-value" id="ruleInfo">请选择规则</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">点位详情</div>
+                    <div class="info-value" id="pointInfo">请选择点位</div>
+                </div>
+            </div>
+
+            <div class="prompt-preview hidden" id="promptPreview">
+                <div class="prompt-preview-title">📝 当前使用的提示词：</div>
+                <div class="prompt-preview-content" id="promptContent">暂无</div>
+            </div>
+        </div>
+
+        <div class="card" id="llmConfigCard">
+            <div class="card-title">⚙️ LLM配置状态</div>
+            <div class="llm-config">
+                <h4>🔧 当前配置</h4>
+                <div class="llm-status" id="llmStatus">
+                    <div class="llm-status-item">
+                        <span class="status-dot yellow" id="statusLocal"></span>
+                        <span>本地LLM模式</span>
+                    </div>
+                    <div class="llm-status-item">
+                        <span class="status-dot yellow" id="statusZhipu"></span>
+                        <span id="statusZhipuText">智谱GLM-4V</span>
+                    </div>
+                    <div class="llm-status-item">
+                        <span class="status-dot yellow" id="statusOllama"></span>
+                        <span>Ollama本地</span>
+                    </div>
+                </div>
+            </div>
+            <div class="detection-options">
+                <label class="detection-option">
+                    <input type="checkbox" id="useYolo" checked>
+                    <span>🔍 YOLO目标检测</span>
+                </label>
+                <label class="detection-option">
+                    <input type="checkbox" id="useLlm" checked>
+                    <span>🤖 LLM综合分析</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📷 图片上传（模拟摄像头）</div>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📷</div>
+                <div class="upload-text">点击选择或拖拽图片到此处</div>
+                <div class="upload-hint">支持 JPG、PNG 格式，模拟摄像头获取图片</div>
+            </div>
+            <input type="file" id="fileInput" accept="image/*">
+
+            <div class="image-preview" id="imagePreview">
+                <img id="previewImg" src="" alt="预览">
+                <div class="image-change" id="changeImage">更换图片</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <button class="btn btn-primary" id="btnDetect" disabled>
+                🤖 开始本地LLM检测
+            </button>
+            <button class="btn btn-secondary hidden" id="btnSyncPrompts" onclick="syncPrompts()">
+                🔄 从飞书同步提示词
+            </button>
+
+            <div class="result-panel" id="resultPanel">
+                <div class="result-title">✓ 检测完成</div>
+                <div id="resultContent"></div>
+            </div>
+
+            <div class="llm-result hidden" id="llmResultPanel">
+                <div class="llm-result-title">🤖 LLM分析结果</div>
+                <div class="llm-result-content" id="llmResultContent"></div>
+            </div>
+        </div>
+
+        <div class="card" id="logCard" style="display: none;">
+            <div class="card-title">📝 操作日志</div>
+            <div class="log-panel">
+                <div class="log-content" id="logContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            API_BASE_URL: window.location.hostname === 'localhost'
+                ? 'http://localhost:5002/api'
+                : 'https://your-server-domain.com/api'
+        };
+
+        let currentMode = 'local';
+        let rules = [];
+        let points = [];
+        let units = [];
+        let selectedFile = null;
+        let llmConfig = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+        });
+
+        async function initApp() {
+            addLog('初始化测试工具 v3.0...', 'info');
+
+            await Promise.all([
+                loadRules(),
+                loadPoints(),
+                loadUnits(),
+                loadLlmConfig()
+            ]);
+
+            bindEvents();
+            addLog('初始化完成', 'success');
+        }
+
+        async function loadLlmConfig() {
+            try {
+                addLog('加载LLM配置...');
+                const response = await fetch(`${CONFIG.API_BASE_URL}/config/llm`);
+                const result = await response.json();
+
+                if (result.success) {
+                    llmConfig = result.data;
+                    updateLlmStatus();
+                    addLog(`LLM配置加载完成`, 'success');
+                }
+            } catch (error) {
+                addLog('加载LLM配置失败: ' + error.message, 'error');
+            }
+        }
+
+        function updateLlmStatus() {
+            if (!llmConfig) return;
+
+            document.getElementById('statusLocal').className =
+                'status-dot ' + (llmConfig.use_local_llm ? 'green' : 'red');
+            document.getElementById('statusZhipu').className =
+                'status-dot ' + (llmConfig.zhipu_configured ? 'green' : 'red');
+            document.getElementById('statusOllama').className =
+                'status-dot ' + (llmConfig.use_ollama ? 'green' : 'red');
+
+            document.getElementById('statusZhipuText').textContent =
+                llmConfig.zhipu_model || '智谱GLM-4V';
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+
+            document.getElementById('tabLocal').classList.toggle('active', mode === 'local');
+            document.getElementById('tabAily').classList.toggle('active', mode === 'aily');
+
+            const btnDetect = document.getElementById('btnDetect');
+            const llmConfigCard = document.getElementById('llmConfigCard');
+            const btnSyncPrompts = document.getElementById('btnSyncPrompts');
+
+            if (mode === 'local') {
+                btnDetect.innerHTML = '🤖 开始本地LLM检测';
+                llmConfigCard.classList.remove('hidden');
+                btnSyncPrompts.classList.remove('hidden');
+            } else {
+                btnDetect.innerHTML = '☁️ 开始Aily检测';
+                llmConfigCard.classList.add('hidden');
+                btnSyncPrompts.classList.add('hidden');
+            }
+
+            checkCanDetect();
+        }
+
+        async function loadRules() {
+            try {
+                addLog('加载巡检规则...');
+                const response = await fetch(`${CONFIG.API_BASE_URL}/test/rules`);
+                const result = await response.json();
+
+                if (result.success) {
+                    rules = result.data;
+                    renderSelect('ruleSelect', rules, 'code', 'name');
+                    addLog(`已加载 ${rules.length} 条巡检规则`, 'success');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                addLog('加载巡检规则失败: ' + error.message, 'error');
+                document.getElementById('ruleSelect').innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
+        async function loadPoints() {
+            try {
+                addLog('加载巡检点位...');
+                const response = await fetch(`${CONFIG.API_BASE_URL}/test/points`);
+                const result = await response.json();
+
+                if (result.success) {
+                    points = result.data;
+                    renderSelect('pointSelect', points, 'code', 'name');
+                    addLog(`已加载 ${points.length} 个巡检点位`, 'success');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                addLog('加载巡检点位失败: ' + error.message, 'error');
+                document.getElementById('pointSelect').innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
+        async function loadUnits() {
+            try {
+                addLog('加载巡检单位...');
+                const response = await fetch(`${CONFIG.API_BASE_URL}/test/units`);
+                const result = await response.json();
+
+                if (result.success) {
+                    units = result.data;
+                    renderSelect('unitSelect', units, 'code', 'name', true);
+                    addLog(`已加载 ${units.length} 个巡检单位`, 'success');
+                } else {
+                    addLog('巡检单位表未配置或加载失败', 'warning');
+                    document.getElementById('unitSelect').innerHTML = '<option value="">未配置</option>';
+                }
+            } catch (error) {
+                addLog('加载巡检单位失败: ' + error.message, 'error');
+                document.getElementById('unitSelect').innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
+        function renderSelect(selectId, data, valueField, labelField, allowEmpty = false) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = '';
+
+            if (allowEmpty) {
+                const emptyOption = document.createElement('option');
+                emptyOption.value = '';
+                emptyOption.textContent = '-- 不选择 --';
+                select.appendChild(emptyOption);
+            }
+
+            if (!data || data.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = '-- 暂无数据 --';
+                select.appendChild(option);
+                select.disabled = true;
+                return;
+            }
+
+            data.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item[valueField];
+                option.textContent = item[labelField];
+                select.appendChild(option);
+            });
+
+            select.disabled = false;
+        }
+
+        function bindEvents() {
+            document.getElementById('ruleSelect').addEventListener('change', handleRuleChange);
+            document.getElementById('pointSelect').addEventListener('change', handlePointChange);
+            document.getElementById('unitSelect').addEventListener('change', handleUnitChange);
+
+            document.getElementById('uploadArea').addEventListener('click', () => {
+                document.getElementById('fileInput').click();
+            });
+
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+            document.getElementById('changeImage').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('fileInput').click();
+            });
+
+            const uploadArea = document.getElementById('uploadArea');
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.startsWith('image/')) {
+                    handleFile(files[0]);
+                }
+            });
+
+            document.getElementById('btnDetect').addEventListener('click', startDetection);
+        }
+
+        function handleRuleChange() {
+            const ruleCode = document.getElementById('ruleSelect').value;
+            const rule = rules.find(r => r.code === ruleCode);
+
+            if (rule) {
+                document.getElementById('ruleInfo').textContent =
+                    `${rule.name || rule.code} | ${rule.detect_type || '未分类'}`;
+                addLog(`已选择规则: ${rule.name || rule.code}`, 'success');
+
+                if (rule.params) {
+                    document.getElementById('promptPreview').classList.remove('hidden');
+                    document.getElementById('promptContent').textContent = rule.params;
+                } else {
+                    document.getElementById('promptPreview').classList.add('hidden');
+                }
+            } else {
+                document.getElementById('ruleInfo').textContent = '请选择规则';
+                document.getElementById('promptPreview').classList.add('hidden');
+            }
+            checkCanDetect();
+        }
+
+        function handlePointChange() {
+            const pointCode = document.getElementById('pointSelect').value;
+            const point = points.find(p => p.code === pointCode);
+
+            if (point) {
+                document.getElementById('pointInfo').textContent =
+                    `${point.name || point.code} | ${point.location || '未定位'}`;
+                addLog(`已选择点位: ${point.name || point.code}`, 'success');
+            } else {
+                document.getElementById('pointInfo').textContent = '请选择点位';
+            }
+            checkCanDetect();
+        }
+
+        function handleUnitChange() {
+            const unitCode = document.getElementById('unitSelect').value;
+            if (unitCode) {
+                const unit = units.find(u => u.code === unitCode);
+                addLog(`已选择单位: ${unit ? unit.name : unitCode}`, 'success');
+            }
+            checkCanDetect();
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                return;
+            }
+
+            selectedFile = file;
+            addLog(`已选择文件: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('uploadArea').style.display = 'none';
+                document.getElementById('imagePreview').classList.add('show');
+            };
+            reader.readAsDataURL(file);
+
+            checkCanDetect();
+        }
+
+        function checkCanDetect() {
+            const rule = document.getElementById('ruleSelect').value;
+            const point = document.getElementById('pointSelect').value;
+            const btn = document.getElementById('btnDetect');
+            btn.disabled = !rule || !point || !selectedFile;
+        }
+
+        async function startDetection() {
+            const ruleCode = document.getElementById('ruleSelect').value;
+            const pointCode = document.getElementById('pointSelect').value;
+            const unitCode = document.getElementById('unitSelect').value;
+            const btn = document.getElementById('btnDetect');
+
+            if (!selectedFile) {
+                alert('请先选择图片');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> 检测中...';
+            addLog('开始检测...');
+
+            try {
+                const base64 = await fileToBase64(selectedFile);
+
+                let response;
+                if (currentMode === 'local') {
+                    addLog('使用本地LLM模式检测...');
+
+                    const useYolo = document.getElementById('useYolo').checked;
+                    const useLlm = document.getElementById('useLlm').checked;
+
+                    response = await fetch(`${CONFIG.API_BASE_URL}/local/detect`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            rule_id: ruleCode,
+                            point_id: pointCode,
+                            image_base64: base64,
+                            use_yolo: useYolo,
+                            use_llm: useLlm
+                        })
+                    });
+                } else {
+                    addLog('使用Aily模式检测...');
+
+                    response = await fetch(`${CONFIG.API_BASE_URL}/test/detect`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            rule_id: ruleCode,
+                            point_id: pointCode,
+                            unit_id: unitCode || null,
+                            image_base64: base64
+                        })
+                    });
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('检测完成', 'success');
+                    showResult(result.data, currentMode);
+
+                    if (currentMode === 'local' && result.data.llm_result) {
+                        showLlmResult(result.data);
+                    }
+                } else {
+                    throw new Error(result.error || '检测失败');
+                }
+            } catch (error) {
+                addLog('检测失败: ' + error.message, 'error');
+                alert('检测失败: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = currentMode === 'local' ? '🤖 开始本地LLM检测' : '☁️ 开始Aily检测';
+                checkCanDetect();
+            }
+        }
+
+        function showLlmResult(data) {
+            const panel = document.getElementById('llmResultPanel');
+            const content = document.getElementById('llmResultContent');
+
+            let analysisText = '';
+            if (data.llm_result && data.llm_result.analysis) {
+                analysisText = data.llm_result.analysis;
+            } else if (data.parsed_result) {
+                analysisText = `检测结果: ${data.parsed_result.has_violation ? '发现违规' : '正常'}\n` +
+                    `描述: ${data.parsed_result.description}\n` +
+                    `严重程度: ${data.parsed_result.severity}`;
+            }
+
+            content.textContent = analysisText || '暂无分析结果';
+            panel.classList.remove('hidden');
+        }
+
+        async function syncPrompts() {
+            const btn = document.getElementById('btnSyncPrompts');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> 同步中...';
+
+            try {
+                addLog('从飞书同步提示词...');
+
+                const response = await fetch(`${CONFIG.API_BASE_URL}/prompts/sync`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog(`同步完成: ${result.message}`, 'success');
+                    alert(`成功同步 ${result.synced_count} 条提示词`);
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                addLog('同步失败: ' + error.message, 'error');
+                alert('同步失败: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔄 从飞书同步提示词';
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function showResult(data, mode) {
+            const panel = document.getElementById('resultPanel');
+            const content = document.getElementById('resultContent');
+
+            if (mode === 'local') {
+                let yoloInfo = '';
+                if (data.yolo_result) {
+                    const yolo = data.yolo_result;
+                    if (yolo.detections && yolo.detections.length > 0) {
+                        yoloInfo = `YOLO检测: ${yolo.count} 个目标`;
+                    } else {
+                        yoloInfo = 'YOLO检测: 未检测到目标';
+                    }
+                }
+
+                content.innerHTML = `
+                    <div class="result-item">
+                        <span>巡检规则</span>
+                        <span>${data.rule_name || data.rule_id}</span>
+                    </div>
+                    <div class="result-item">
+                        <span>巡检点位</span>
+                        <span>${data.point_name || data.point_id}</span>
+                    </div>
+                    <div class="result-item">
+                        <span>检测方法</span>
+                        <span>${data.detection_method}</span>
+                    </div>
+                    <div class="result-item">
+                        <span>检测结果</span>
+                        <span>${yoloInfo || 'YOLO未启用'}</span>
+                    </div>
+                    <div class="result-item success">
+                        <span>状态</span>
+                        <span>✓ 检测完成</span>
+                    </div>
+                `;
+            } else {
+                let ailyOutput = '';
+                if (data.aily_result) {
+                    ailyOutput = `
+                        <div class="aily-output-title">Aily返回结果：</div>
+                        <div class="aily-output">${JSON.stringify(data.aily_result, null, 2)}</div>
+                    `;
+                }
+
+                content.innerHTML = `
+                    <div class="result-item">
+                        <span>巡检规则</span>
+                        <span>${data.rule_name || data.rule_id}</span>
+                    </div>
+                    <div class="result-item">
+                        <span>巡检点位</span>
+                        <span>${data.point_name || data.point_id}</span>
+                    </div>
+                    ${data.unit_name ? `
+                    <div class="result-item">
+                        <span>巡检单位</span>
+                        <span>${data.unit_name}</span>
+                    </div>
+                    ` : ''}
+                    <div class="result-item">
+                        <span>检测结果</span>
+                        <span>检测到 ${data.detection_count} 个目标</span>
+                    </div>
+                    <div class="result-item ${data.aily_triggered ? 'success' : 'error'}">
+                        <span>Aily技能</span>
+                        <span>${data.aily_triggered ? '✓ 已触发' : '✗ 触发失败'}</span>
+                    </div>
+                    ${ailyOutput}
+                `;
+            }
+
+            panel.classList.add('show');
+        }
+
+        function addLog(message, type = 'info') {
+            const logCard = document.getElementById('logCard');
+            const logContent = document.getElementById('logContent');
+
+            logCard.style.display = 'block';
+
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+
+            logContent.appendChild(entry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+    </script>
+</body>
+</html>

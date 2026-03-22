@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>智能巡检系统 v2</title>
+    <script src="https://lf1-cdn-tos.bytegoofy.com/goofy/lark/op/h5-js-sdk-1.5.28.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            padding-top: 20px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 20px 10px;
+            text-align: center;
+            color: white;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-select, .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .form-select:focus, .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .upload-area {
+            border: 3px dashed #ccc;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .image-preview {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f0f0f0;
+        }
+
+        .image-preview img {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+        }
+
+        .image-change {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-panel {
+            display: none;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .result-panel.show {
+            display: block;
+        }
+
+        .result-title {
+            color: #155724;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #c3e6cb;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .log-panel {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .log-content {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #d4d4d4;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding-left: 10px;
+            border-left: 2px solid #666;
+        }
+
+        .log-entry.success {
+            border-left-color: #2ecc71;
+            color: #2ecc71;
+        }
+
+        .log-entry.error {
+            border-left-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .log-card {
+            display: none;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .info-item label {
+            font-size: 12px;
+            color: #999;
+            display: block;
+        }
+
+        .info-item span {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .success-badge {
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .error-badge {
+            background: #dc3545;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .stat-number {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 智能巡检系统</h1>
+            <p>选择规则、点位，上传图片进行AI检测</p>
+        </div>
+
+        <div class="card">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="statRules">0</div>
+                    <div class="stat-label">巡检规则</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="statPoints">0</div>
+                    <div class="stat-label">巡检点位</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="statRecords">0</div>
+                    <div class="stat-label">检测记录</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📋 选择巡检规则</div>
+            <div class="form-group">
+                <select class="form-select" id="ruleSelect">
+                    <option value="">请选择巡检规则...</option>
+                </select>
+            </div>
+            <div class="info-grid" id="ruleInfo" style="display: none;">
+                <div class="info-item">
+                    <label>规则名称</label>
+                    <span id="ruleName">-</span>
+                </div>
+                <div class="info-item">
+                    <label>检测类型</label>
+                    <span id="ruleType">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📷 选择巡检点位</div>
+            <div class="form-group">
+                <select class="form-select" id="pointSelect">
+                    <option value="">请选择巡检点位...</option>
+                </select>
+            </div>
+            <div class="info-grid" id="pointInfo" style="display: none;">
+                <div class="info-item">
+                    <label>点位名称</label>
+                    <span id="pointName">-</span>
+                </div>
+                <div class="info-item">
+                    <label>位置</label>
+                    <span id="pointLocation">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📤 上传检测图片</div>
+            <div class="form-group">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📷</div>
+                    <div class="upload-text">点击拍照或选择照片</div>
+                    <div class="upload-hint">支持 JPG、PNG 格式</div>
+                </div>
+                <input type="file" id="fileInput" accept="image/*" capture="environment">
+            </div>
+
+            <div class="image-preview" id="imagePreview" style="display: none;">
+                <img id="previewImg" src="" alt="预览">
+                <div class="image-change" id="changeImage">更换图片</div>
+            </div>
+
+            <button class="btn btn-primary" id="btnDetect" disabled>
+                开始检测
+            </button>
+
+            <div class="result-panel" id="resultPanel">
+                <div class="result-title">✓ 检测完成</div>
+                <div id="resultContent"></div>
+            </div>
+        </div>
+
+        <div class="card log-card" id="logCard">
+            <div class="card-title">📝 操作日志</div>
+            <div class="log-panel">
+                <div class="log-content" id="logContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            API_BASE_URL: 'http://localhost:5002/api',
+            FEISHU_APP_ID: 'cli_a938218fc6f9dbcb'
+        };
+
+        let selectedRule = null;
+        let selectedPoint = null;
+        let selectedFile = null;
+        let rules = [];
+        let points = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            bindEvents();
+        });
+
+        async function initApp() {
+            addLog('正在初始化应用...');
+            await Promise.all([loadRules(), loadPoints()]);
+            addLog('应用初始化完成', 'success');
+        }
+
+        async function loadRules() {
+            try {
+                addLog('正在加载巡检规则...');
+                const response = await fetch(`${CONFIG.API_BASE_URL}/rules`);
+                const result = await response.json();
+
+                if (result.success) {
+                    rules = result.data || [];
+                    renderRuleSelect();
+                    document.getElementById('statRules').textContent = rules.length;
+                    addLog(`已加载 ${rules.length} 个巡检规则`, 'success');
+                } else {
+                    throw new Error(result.error || '加载失败');
+                }
+            } catch (error) {
+                addLog('加载规则失败: ' + error.message, 'error');
+            }
+        }
+
+        async function loadPoints() {
+            try {
+                addLog('正在加载巡检点位...');
+                const response = await fetch(`${CONFIG.API_BASE_URL}/points`);
+                const result = await response.json();
+
+                if (result.success) {
+                    points = result.data || [];
+                    renderPointSelect();
+                    document.getElementById('statPoints').textContent = points.length;
+                    addLog(`已加载 ${points.length} 个巡检点位`, 'success');
+                } else {
+                    throw new Error(result.error || '加载失败');
+                }
+            } catch (error) {
+                addLog('加载点位失败: ' + error.message, 'error');
+            }
+        }
+
+        function renderRuleSelect() {
+            const select = document.getElementById('ruleSelect');
+            select.innerHTML = '<option value="">请选择巡检规则...</option>';
+            rules.forEach(rule => {
+                const option = document.createElement('option');
+                option.value = rule.id;
+                option.textContent = `${rule.id} - ${rule.name}`;
+                if (rule.detect_type) {
+                    option.textContent += ` (${rule.detect_type})`;
+                }
+                select.appendChild(option);
+            });
+        }
+
+        function renderPointSelect() {
+            const select = document.getElementById('pointSelect');
+            select.innerHTML = '<option value="">请选择巡检点位...</option>';
+            points.forEach(point => {
+                const option = document.createElement('option');
+                option.value = point.id;
+                option.textContent = `${point.id} - ${point.name}`;
+                if (point.location) {
+                    option.textContent += ` (${point.location})`;
+                }
+                select.appendChild(option);
+            });
+        }
+
+        function bindEvents() {
+            document.getElementById('ruleSelect').addEventListener('change', handleRuleChange);
+            document.getElementById('pointSelect').addEventListener('change', handlePointChange);
+
+            document.getElementById('uploadArea').addEventListener('click', () => {
+                document.getElementById('fileInput').click();
+            });
+
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+            document.getElementById('changeImage').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('fileInput').click();
+            });
+
+            document.getElementById('btnDetect').addEventListener('click', startDetection);
+
+            const uploadArea = document.getElementById('uploadArea');
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#667eea';
+                uploadArea.style.background = '#f0f4ff';
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.style.borderColor = '#ccc';
+                uploadArea.style.background = '#fafafa';
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#ccc';
+                uploadArea.style.background = '#fafafa';
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
+            });
+        }
+
+        function handleRuleChange(e) {
+            const ruleId = e.target.value;
+            selectedRule = rules.find(r => r.id === ruleId) || null;
+
+            const ruleInfo = document.getElementById('ruleInfo');
+            if (selectedRule) {
+                document.getElementById('ruleName').textContent = selectedRule.name;
+                document.getElementById('ruleType').textContent = selectedRule.detect_type || '-';
+                ruleInfo.style.display = 'grid';
+                addLog(`已选择规则: ${selectedRule.name}`, 'success');
+            } else {
+                ruleInfo.style.display = 'none';
+            }
+
+            checkCanDetect();
+        }
+
+        function handlePointChange(e) {
+            const pointId = e.target.value;
+            selectedPoint = points.find(p => p.id === pointId) || null;
+
+            const pointInfo = document.getElementById('pointInfo');
+            if (selectedPoint) {
+                document.getElementById('pointName').textContent = selectedPoint.name;
+                document.getElementById('pointLocation').textContent = selectedPoint.location || '-';
+                pointInfo.style.display = 'grid';
+                addLog(`已选择点位: ${selectedPoint.name}`, 'success');
+            } else {
+                pointInfo.style.display = 'none';
+            }
+
+            checkCanDetect();
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                return;
+            }
+
+            selectedFile = file;
+            addLog(`已选择文件: ${file.name}`);
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('uploadArea').style.display = 'none';
+                document.getElementById('imagePreview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            checkCanDetect();
+        }
+
+        function checkCanDetect() {
+            const btn = document.getElementById('btnDetect');
+            btn.disabled = !selectedRule || !selectedPoint || !selectedFile;
+        }
+
+        async function startDetection() {
+            if (!selectedRule || !selectedPoint || !selectedFile) {
+                alert('请选择规则、点位和图片');
+                return;
+            }
+
+            const btn = document.getElementById('btnDetect');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> 检测中...';
+
+            addLog('开始检测...');
+            addLog(`规则: ${selectedRule.name}`);
+            addLog(`点位: ${selectedPoint.name}`);
+
+            try {
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+
+                const base64 = await fileToBase64(selectedFile);
+                const response = await fetch(`${CONFIG.API_BASE_URL}/detect`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        rule_id: selectedRule.id,
+                        point_id: selectedPoint.id,
+                        image_base64: base64
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('检测成功', 'success');
+                    showResult(result.data);
+                } else {
+                    throw new Error(result.error || '检测失败');
+                }
+            } catch (error) {
+                addLog(`检测失败: ${error.message}`, 'error');
+                alert('检测失败: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '开始检测';
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function showResult(data) {
+            const panel = document.getElementById('resultPanel');
+            const content = document.getElementById('resultContent');
+
+            content.innerHTML = `
+                <div class="result-item">
+                    <span>巡检规则</span>
+                    <span>${data.rule_name}</span>
+                </div>
+                <div class="result-item">
+                    <span>巡检点位</span>
+                    <span>${data.point_name}</span>
+                </div>
+                <div class="result-item">
+                    <span>检测目标数</span>
+                    <span>${data.detection_count} 个</span>
+                </div>
+                <div class="result-item">
+                    <span>Aily技能</span>
+                    <span class="${data.aily_triggered ? 'success-badge' : 'error-badge'}">${data.aily_triggered ? '已触发' : '未触发'}</span>
+                </div>
+                ${data.record_id ? `
+                <div class="result-item">
+                    <span>记录ID</span>
+                    <span style="font-size: 12px; color: #667eea;">${data.record_id}</span>
+                </div>
+                ` : ''}
+            `;
+
+            panel.classList.add('show');
+            document.getElementById('statRecords').textContent =
+                parseInt(document.getElementById('statRecords').textContent) + 1;
+        }
+
+        function addLog(message, type = 'info') {
+            const logCard = document.getElementById('logCard');
+            const logContent = document.getElementById('logContent');
+
+            logCard.style.display = 'block';
+
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+
+            logContent.appendChild(entry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+    </script>
+</body>
+</html>

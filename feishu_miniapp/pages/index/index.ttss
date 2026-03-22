@@ -1,0 +1,143 @@
+.container {
+  padding: 20rpx;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+}
+
+/* 统计卡片 */
+.stats-section {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30rpx;
+}
+
+.stats-card {
+  flex: 1;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16rpx;
+  padding: 30rpx 20rpx;
+  margin: 0 10rpx;
+  text-align: center;
+  box-shadow: 0 4rpx 20rpx rgba(102, 126, 234, 0.3);
+}
+
+.stats-number {
+  display: block;
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 10rpx;
+}
+
+.stats-label {
+  display: block;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 快速操作 */
+.quick-actions {
+  margin-bottom: 30rpx;
+}
+
+.action-btn {
+  width: 100%;
+  height: 100rpx;
+  line-height: 100rpx;
+  border-radius: 50rpx;
+  font-size: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  box-shadow: 0 8rpx 30rpx rgba(102, 126, 234, 0.4);
+}
+
+.btn-icon {
+  font-size: 40rpx;
+  margin-right: 16rpx;
+}
+
+.btn-text {
+  font-weight: 600;
+}
+
+/* 巡检点位列表 */
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20rpx;
+  padding-left: 10rpx;
+}
+
+.camera-list {
+  background: #ffffff;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+
+.camera-item {
+  display: flex;
+  align-items: center;
+  padding: 30rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+  transition: background-color 0.3s;
+}
+
+.camera-item:last-child {
+  border-bottom: none;
+}
+
+.camera-item:active {
+  background-color: #f9f9f9;
+}
+
+.camera-icon {
+  width: 80rpx;
+  height: 80rpx;
+  background: #f0f4ff;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  margin-right: 20rpx;
+}
+
+.camera-info {
+  flex: 1;
+}
+
+.camera-name {
+  display: block;
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+  margin-bottom: 8rpx;
+}
+
+.camera-type {
+  display: block;
+  font-size: 24rpx;
+  color: #999;
+}
+
+.camera-arrow {
+  font-size: 40rpx;
+  color: #ccc;
+}
+
+/* 加载和空状态 */
+.loading, .empty {
+  text-align: center;
+  padding: 60rpx;
+  color: #999;
+  font-size: 28rpx;
+}

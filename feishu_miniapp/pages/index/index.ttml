@@ -1,0 +1,54 @@
+<view class="container">
+  <!-- 统计卡片 -->
+  <view class="stats-section">
+    <view class="stats-card">
+      <text class="stats-number">{{stats.totalCameras}}</text>
+      <text class="stats-label">巡检点位</text>
+    </view>
+    <view class="stats-card">
+      <text class="stats-number">{{stats.todayUploads}}</text>
+      <text class="stats-label">今日上传</text>
+    </view>
+    <view class="stats-card">
+      <text class="stats-number">{{stats.pendingTasks}}</text>
+      <text class="stats-label">待处理</text>
+    </view>
+  </view>
+
+  <!-- 快速操作 -->
+  <view class="quick-actions">
+    <button class="action-btn primary" bindtap="quickUpload">
+      <text class="btn-icon">📷</text>
+      <text class="btn-text">拍照上传</text>
+    </button>
+  </view>
+
+  <!-- 巡检点位列表 -->
+  <view class="section-title">巡检点位</view>
+  
+  <view class="camera-list">
+    <block tt:for="{{cameras}}" tt:key="id">
+      <view class="camera-item" bindtap="selectCamera" data-id="{{item.id}}" data-name="{{item.name}}">
+        <view class="camera-icon">
+          <text tt:if="{{item.type === 'keyframe'}}">🎥</text>
+          <text tt:else>📹</text>
+        </view>
+        <view class="camera-info">
+          <text class="camera-name">{{item.name}}</text>
+          <text class="camera-type">{{item.type === 'keyframe' ? '关键帧检测' : '定时截图'}}</text>
+        </view>
+        <view class="camera-arrow">›</view>
+      </view>
+    </block>
+  </view>
+
+  <!-- 加载状态 -->
+  <view tt:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view tt:if="{{!loading && cameras.length === 0}}" class="empty">
+    <text>暂无巡检点位</text>
+  </view>
+</view>

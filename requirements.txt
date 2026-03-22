@@ -1,0 +1,19 @@
+# Core dependencies
+numpy==1.26.4
+opencv-python==4.8.0.76
+torch==2.2.2
+torchvision==0.17.2
+ultralytics==8.2.0
+Flask==3.1.0
+flask-cors==5.0.0
+
+# Feishu API
+requests==2.32.3
+lark-oapi==1.4.10
+pycryptodome==3.23.0
+requests-toolbelt==1.0.0
+
+# Other dependencies
+urllib3<2.0
+apscheduler==3.10.4
+pyautogui==0.9.54

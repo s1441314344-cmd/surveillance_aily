@@ -1,0 +1,38 @@
+<view class="container">
+  <view class="result-card" tt:if="{{result}}">
+    <view class="result-icon success">✓</view>
+    <view class="result-title">上传成功</view>
+    
+    <view class="result-info">
+      <view class="info-item">
+        <text class="info-label">巡检点位</text>
+        <text class="info-value">{{result.camera_name}}</text>
+      </view>
+      
+      <view class="info-item">
+        <text class="info-label">检测目标数</text>
+        <text class="info-value">{{result.detection_count}} 个</text>
+      </view>
+      
+      <view class="info-item">
+        <text class="info-label">上传模式</text>
+        <text class="info-value">{{result.upload_mode === 'aily' ? 'Aily技能' : '多维表格'}}</text>
+      </view>
+      
+      <view class="info-item">
+        <text class="info-label">上传时间</text>
+        <text class="info-value">{{result.timestamp}}</text>
+      </view>
+      
+      <view class="info-item" tt:if="{{result.upload_result.file_id}}">
+        <text class="info-label">Aily文件ID</text>
+        <text class="info-value file-id">{{result.upload_result.file_id}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="action-buttons">
+    <button class="btn secondary" bindtap="uploadAgain">重新上传</button>
+    <button class="btn primary" bindtap="goBack">返回首页</button>
+  </view>
+</view>

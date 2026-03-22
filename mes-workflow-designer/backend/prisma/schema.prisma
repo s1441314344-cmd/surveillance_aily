@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 研发工艺层 ====================
+
+model RecipeTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  version     Int      @default(1)
+  status      String   @default("draft") // draft, published, archived
+  
+  // 关联
+  groups      ProcessGroup[]
+  nodes       ProcessNode[]
+  edges       ProcessEdge[]
+  versions    RecipeVersion[]
+  instances   RecipeInstance[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+  
+  @@index([status])
+  @@index([createdAt])
+}
+
+model RecipeVersion {
+  id          String   @id @default(uuid())
+  recipeId    String
+  version     Int
+  snapshot    String   // JSON string
+  changelog   String?
+  
+  recipe      RecipeTemplate @relation(fields: [recipeId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  createdBy   String
+  
+  @@unique([recipeId, version])
+}
+
+model ProcessGroup {
+  id          String   @id @default(uuid())
+  recipeId    String
+  name        String   // 溶解、调配等
+  color       String   @default("#1890ff") // 主题色
+  
+  // 位置信息
+  positionX   Float    @default(0)
+  positionY   Float    @default(0)
+  width       Float    @default(300)
+  height      Float    @default(200)
+  
+  // 状态
+  isCollapsed Boolean  @default(false)
+  
+  recipe      RecipeTemplate @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  nodes       ProcessNode[]
+  
+  @@index([recipeId])
+}
+
+model ProcessNode {
+  id          String   @id @default(uuid())
+  recipeId    String
+  groupId     String
+  
+  // 基础信息
+  name        String   // 加水、搅拌等
+  type        String   @default("task") // task, gateway, event, start, end
+  
+  // 位置
+  positionX   Float    @default(0)
+  positionY   Float    @default(0)
+  
+  // 引用关系
+  isReference Boolean  @default(false)
+  refNodeId   String?  // 引用的源节点ID
+  refGroupId  String?  // 引用的源组ID
+  
+  // 关联
+  recipe      RecipeTemplate @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  group       ProcessGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parameters  NodeParameter[]
+  
+  // 关联的边
+  sourceEdges ProcessEdge[] @relation("SourceNode")
+  targetEdges ProcessEdge[] @relation("TargetNode")
+  
+  @@index([recipeId])
+  @@index([groupId])
+}
+
+model NodeParameter {
+  id          String   @id @default(uuid())
+  nodeId      String
+  
+  // 参数定义
+  name        String   // 温度、容量等
+  code        String   // temperature, volume
+  type        String   @default("text") // number, range, select, text
+  value       String?  // 参数值（存储为字符串）
+  unit        String?  // 单位
+  options     String?  // 选项值（JSON string）
+  
+  // 验证规则
+  min         Float?
+  max         Float?
+  required    Boolean  @default(false)
+  
+  node        ProcessNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  
+  @@index([nodeId])
+}
+
+model ProcessEdge {
+  id          String   @id @default(uuid())
+  recipeId    String
+  
+  // 连接节点
+  sourceId    String
+  targetId    String
+  
+  // 连线类型
+  type        String   @default("intra-group") // intra-group, inter-group
+  style       String   @default("solid") // solid, dashed
+  
+  // 条件（用于网关）
+  condition   String?
+  
+  recipe      RecipeTemplate @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  source      ProcessNode    @relation("SourceNode", fields: [sourceId], references: [id])
+  target      ProcessNode    @relation("TargetNode", fields: [targetId], references: [id])
+  
+  @@index([recipeId])
+  @@index([sourceId])
+  @@index([targetId])
+}
+
+// ==================== 生产工艺层 ====================
+
+model RecipeInstance {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  
+  // 引用关系
+  templateId      String
+  templateVersion Int      @default(1)
+  
+  // 状态
+  status          String   @default("draft") // draft, active, archived
+  
+  // 关联
+  template        RecipeTemplate   @relation(fields: [templateId], references: [id])
+  processes       ProcessInstance[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String
+  
+  @@index([templateId])
+  @@index([status])
+}
+
+model ProcessInstance {
+  id          String   @id @default(uuid())
+  instanceId  String
+  groupId     String   // 对应的研发组ID
+  name        String
+  
+  // BPMN内容
+  bpmnXml     String   
+  
+  // 关联
+  instance    RecipeInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  nodes       NodeInstance[]
+  edges       EdgeInstance[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([instanceId])
+}
+
+model NodeInstance {
+  id              String   @id @default(uuid())
+  processId       String
+  templateNodeId  String   // 对应的研发节点ID
+  
+  name            String
+  type            String
+  positionX       Float
+  positionY       Float
+  
+  // 关联
+  process         ProcessInstance @relation(fields: [processId], references: [id], onDelete: Cascade)
+  parameters      ParameterInstance[]
+  
+  @@index([processId])
+}
+
+model ParameterInstance {
+  id              String   @id @default(uuid())
+  nodeInstanceId  String
+  templateParamId String   // 对应的研发参数ID
+  
+  name            String
+  inheritedValue  String?  // 继承值
+  currentValue    String?  // 当前值
+  isOverridden    Boolean  @default(false)
+  unit            String?
+  
+  nodeInstance    NodeInstance @relation(fields: [nodeInstanceId], references: [id], onDelete: Cascade)
+  
+  @@index([nodeInstanceId])
+}
+
+model EdgeInstance {
+  id          String   @id @default(uuid())
+  processId   String
+  
+  sourceId    String
+  targetId    String
+  type        String
+  condition   String?
+  
+  process     ProcessInstance @relation(fields: [processId], references: [id], onDelete: Cascade)
+  
+  @@index([processId])
+}
+
+// ==================== 用户与权限 ====================
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      String   @default("rd_engineer") // admin, rd_engineer, prod_engineer
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

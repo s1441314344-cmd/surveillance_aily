@@ -1,0 +1,12 @@
+{
+  "include": ["."],
+  "exclude": [
+    "venv",
+    "__pycache__",
+    ".idea",
+    "build_scripts",
+    "*.spec"
+  ],
+  "pythonVersion": "3.9",
+  "pythonPlatform": "Darwin"
+}
