@@ -11,6 +11,7 @@ class Job(Base, TimestampMixin):
     job_type: Mapped[str] = mapped_column(String(30), nullable=False)
     trigger_mode: Mapped[str] = mapped_column(String(30), nullable=False)
     strategy_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    strategy_name: Mapped[str] = mapped_column(String(120), nullable=False)
     camera_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     model_provider: Mapped[str] = mapped_column(String(50), nullable=False)
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)

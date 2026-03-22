@@ -8,6 +8,7 @@ class JobRead(BaseModel):
     job_type: str
     trigger_mode: str
     strategy_id: str
+    strategy_name: str
     camera_id: str | None = None
     model_provider: str
     model_name: str
@@ -16,6 +17,7 @@ class JobRead(BaseModel):
     completed_items: int
     failed_items: int
     error_message: str | None = None
+    created_at: str | None = None
 
 
 class JobUploadCreateResponse(BaseModel):
