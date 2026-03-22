@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: surveillance-v2-postgres
+    environment:
+      POSTGRES_DB: surveillance_v2
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - surveillance_v2_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d surveillance_v2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: surveillance-v2-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - surveillance_v2_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  surveillance_v2_postgres_data:
+  surveillance_v2_redis_data:
