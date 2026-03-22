@@ -9,7 +9,11 @@ class TaskRecord(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     job_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    strategy_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    strategy_name: Mapped[str] = mapped_column(String(120), nullable=False)
     strategy_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    input_file_asset_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    input_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     input_image_path: Mapped[str] = mapped_column(Text, nullable=False)
     preview_image_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_type: Mapped[str] = mapped_column(String(30), nullable=False)

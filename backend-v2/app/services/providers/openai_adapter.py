@@ -1,13 +1,9 @@
 from app.services.providers.base import ModelProviderAdapter, ProviderRequest, ProviderResponse
+from app.services.providers.mock_response import build_mock_provider_response
 
 
 class OpenAIAdapter(ModelProviderAdapter):
     provider = "openai"
 
     def analyze(self, request: ProviderRequest) -> ProviderResponse:
-        return ProviderResponse(
-            success=False,
-            raw_response="",
-            normalized_json=None,
-            error_message="OpenAI adapter skeleton not implemented yet",
-        )
+        return build_mock_provider_response(self.provider, request)
