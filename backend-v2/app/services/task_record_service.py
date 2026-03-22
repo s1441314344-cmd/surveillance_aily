@@ -42,6 +42,7 @@ def list_task_records(
     strategy_id: str | None = None,
     job_id: str | None = None,
     model_provider: str | None = None,
+    feedback_status: str | None = None,
 ) -> list[TaskRecordRead]:
     stmt = select(TaskRecord).order_by(TaskRecord.created_at.desc(), TaskRecord.id.desc())
     if result_status:
@@ -52,6 +53,8 @@ def list_task_records(
         stmt = stmt.where(TaskRecord.job_id == job_id)
     if model_provider:
         stmt = stmt.where(TaskRecord.model_provider == model_provider)
+    if feedback_status:
+        stmt = stmt.where(TaskRecord.feedback_status == feedback_status)
     return [serialize_task_record(record) for record in db.scalars(stmt)]
 
 

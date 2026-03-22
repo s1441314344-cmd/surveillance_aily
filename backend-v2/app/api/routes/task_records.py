@@ -23,6 +23,7 @@ def list_task_records(
     strategy_id: str | None = None,
     job_id: str | None = None,
     model_provider: str | None = None,
+    feedback_status: str | None = None,
     _: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -32,6 +33,7 @@ def list_task_records(
         strategy_id=strategy_id,
         job_id=job_id,
         model_provider=model_provider,
+        feedback_status=feedback_status,
     )
 
 
@@ -41,6 +43,7 @@ def export_task_records(
     strategy_id: str | None = None,
     job_id: str | None = None,
     model_provider: str | None = None,
+    feedback_status: str | None = None,
     _: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -50,6 +53,7 @@ def export_task_records(
         strategy_id=strategy_id,
         job_id=job_id,
         model_provider=model_provider,
+        feedback_status=feedback_status,
     )
     csv_content = export_task_records_csv(records)
     return PlainTextResponse(
