@@ -39,6 +39,16 @@ export type TaskRecord = {
   created_at: string | null;
 };
 
+export type Feedback = {
+  id: string;
+  record_id: string;
+  judgement: string;
+  corrected_label: string | null;
+  comment: string | null;
+  reviewer: string;
+  created_at: string | null;
+};
+
 export async function uploadJob(payload: { strategyId: string; files: File[] }) {
   const formData = new FormData();
   formData.append('strategy_id', payload.strategyId);
@@ -77,6 +87,7 @@ export async function listTaskRecords(params?: {
   strategyId?: string;
   jobId?: string;
   modelProvider?: string;
+  feedbackStatus?: string;
 }) {
   const response = await apiClient.get<TaskRecord[]>('/api/task-records', {
     params: {
@@ -84,6 +95,7 @@ export async function listTaskRecords(params?: {
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
       model_provider: params?.modelProvider || undefined,
+      feedback_status: params?.feedbackStatus || undefined,
     },
   });
   return response.data;
@@ -106,6 +118,7 @@ export async function exportTaskRecords(params?: {
   strategyId?: string;
   jobId?: string;
   modelProvider?: string;
+  feedbackStatus?: string;
 }) {
   const response = await apiClient.get<Blob>('/api/task-records/export', {
     params: {
@@ -113,8 +126,49 @@ export async function exportTaskRecords(params?: {
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
       model_provider: params?.modelProvider || undefined,
+      feedback_status: params?.feedbackStatus || undefined,
     },
     responseType: 'blob',
+  });
+  return response.data;
+}
+
+export async function listFeedback(params?: { recordId?: string }) {
+  const response = await apiClient.get<Feedback[]>('/api/feedback', {
+    params: {
+      record_id: params?.recordId || undefined,
+    },
+  });
+  return response.data;
+}
+
+export async function createFeedback(payload: {
+  recordId: string;
+  judgement: string;
+  correctedLabel?: string;
+  comment?: string;
+}) {
+  const response = await apiClient.post<Feedback>('/api/feedback', {
+    record_id: payload.recordId,
+    judgement: payload.judgement,
+    corrected_label: payload.correctedLabel || null,
+    comment: payload.comment || null,
+  });
+  return response.data;
+}
+
+export async function updateFeedback(
+  feedbackId: string,
+  payload: {
+    judgement?: string;
+    correctedLabel?: string;
+    comment?: string;
+  },
+) {
+  const response = await apiClient.patch<Feedback>(`/api/feedback/${feedbackId}`, {
+    judgement: payload.judgement,
+    corrected_label: payload.correctedLabel || null,
+    comment: payload.comment || null,
   });
   return response.data;
 }
