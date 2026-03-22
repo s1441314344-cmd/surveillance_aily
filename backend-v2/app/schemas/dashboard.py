@@ -3,6 +3,8 @@ from pydantic import BaseModel
 
 class DashboardSummary(BaseModel):
     total_jobs: int
+    total_records: int
+    pending_review_count: int
     success_rate: float
     anomaly_rate: float
     structured_success_rate: float
