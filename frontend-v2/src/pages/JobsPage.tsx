@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -18,15 +18,23 @@ import {
 } from 'antd';
 import type { RcFile, UploadFile } from 'antd/es/upload/interface';
 import { InboxOutlined } from '@ant-design/icons';
+import { listCameras, listStrategies } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
-import { listStrategies } from '@/shared/api/configCenter';
-import { cancelJob, getJob, Job, listJobs, uploadJob } from '@/shared/api/tasks';
+import { cancelJob, createCameraOnceJob, getJob, Job, listJobs, uploadJob } from '@/shared/api/tasks';
 
 const { Title, Paragraph, Text } = Typography;
 const { Dragger } = Upload;
 
 type UploadFormValues = {
+  taskMode: 'upload' | 'camera_once';
   strategyId: string;
+  cameraId?: string;
+};
+
+const DEFAULT_FORM_VALUES: UploadFormValues = {
+  taskMode: 'upload',
+  strategyId: '',
+  cameraId: undefined,
 };
 
 const statusColorMap: Record<string, string> = {
@@ -50,6 +58,11 @@ export function JobsPage() {
     queryFn: () => listStrategies({ status: 'active' }),
   });
 
+  const camerasQuery = useQuery({
+    queryKey: ['cameras', 'for-jobs'],
+    queryFn: listCameras,
+  });
+
   const jobsQuery = useQuery({
     queryKey: ['jobs', statusFilter],
     queryFn: () =>
@@ -66,8 +79,19 @@ export function JobsPage() {
   });
 
   const strategies = strategyQuery.data ?? [];
+  const cameras = camerasQuery.data ?? [];
   const jobs = jobsQuery.data ?? [];
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
+  const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
+
+  useEffect(() => {
+    if (taskMode === 'camera_once') {
+      setFileList([]);
+      return;
+    }
+
+    form.setFieldValue('cameraId', undefined);
+  }, [form, taskMode]);
 
   const invalidateJobs = () =>
     Promise.all([
@@ -82,11 +106,24 @@ export function JobsPage() {
       await invalidateJobs();
       setSelectedJobId(job.id);
       setFileList([]);
-      form.resetFields();
+      form.setFieldsValue(DEFAULT_FORM_VALUES);
       message.success('上传任务已创建并完成首版分析');
     },
     onError: (error) => {
       message.error(getApiErrorMessage(error, '上传任务创建失败'));
+    },
+  });
+
+  const cameraOnceMutation = useMutation({
+    mutationFn: createCameraOnceJob,
+    onSuccess: async (job) => {
+      await invalidateJobs();
+      setSelectedJobId(job.id);
+      form.setFieldsValue(DEFAULT_FORM_VALUES);
+      message.success('摄像头单次任务已创建并完成首版分析');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '摄像头单次任务创建失败'));
     },
   });
 
@@ -103,6 +140,19 @@ export function JobsPage() {
   });
 
   const handleUploadSubmit = async (values: UploadFormValues) => {
+    if (values.taskMode === 'camera_once') {
+      if (!values.cameraId) {
+        message.warning('请先选择摄像头');
+        return;
+      }
+
+      await cameraOnceMutation.mutateAsync({
+        cameraId: values.cameraId,
+        strategyId: values.strategyId,
+      });
+      return;
+    }
+
     const files = fileList
       .map((item) => item.originFileObj)
       .filter((item): item is RcFile => Boolean(item));
@@ -118,6 +168,15 @@ export function JobsPage() {
     });
   };
 
+  const handleResetInput = () => {
+    if (taskMode === 'upload') {
+      setFileList([]);
+      return;
+    }
+
+    form.setFieldValue('cameraId', undefined);
+  };
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <div>
@@ -125,14 +184,28 @@ export function JobsPage() {
           任务中心
         </Title>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          当前已打通图片上传任务闭环。摄像头单次任务和定时任务会在下一阶段接入。
+          当前已支持图片上传任务和摄像头单次任务。定时任务与异步 worker 会在下一阶段接入。
         </Paragraph>
       </div>
 
       <Row gutter={16} align="stretch">
         <Col xs={24} lg={9}>
-          <Card title="创建上传任务">
-            <Form layout="vertical" form={form} onFinish={handleUploadSubmit}>
+          <Card title="创建任务">
+            <Form
+              layout="vertical"
+              form={form}
+              onFinish={handleUploadSubmit}
+              initialValues={DEFAULT_FORM_VALUES}
+            >
+              <Form.Item label="任务类型" name="taskMode">
+                <Select
+                  options={[
+                    { label: '图片上传', value: 'upload' },
+                    { label: '摄像头单次抽帧', value: 'camera_once' },
+                  ]}
+                />
+              </Form.Item>
+
               <Form.Item
                 label="分析策略"
                 name="strategyId"
@@ -148,27 +221,50 @@ export function JobsPage() {
                 />
               </Form.Item>
 
-              <Form.Item label="上传图片">
-                <Dragger
-                  multiple
-                  accept=".jpg,.jpeg,.png,.bmp,.webp"
-                  fileList={fileList}
-                  beforeUpload={() => false}
-                  onChange={({ fileList: nextFileList }) => setFileList(nextFileList)}
+              {taskMode === 'upload' ? (
+                <Form.Item label="上传图片">
+                  <Dragger
+                    multiple
+                    accept=".jpg,.jpeg,.png,.bmp,.webp"
+                    fileList={fileList}
+                    beforeUpload={() => false}
+                    onChange={({ fileList: nextFileList }) => setFileList(nextFileList)}
+                  >
+                    <p className="ant-upload-drag-icon">
+                      <InboxOutlined />
+                    </p>
+                    <p className="ant-upload-text">点击或拖拽上传单张/多张图片</p>
+                    <p className="ant-upload-hint">支持 JPG、PNG、JPEG、BMP、WEBP</p>
+                  </Dragger>
+                </Form.Item>
+              ) : (
+                <Form.Item
+                  label="选择摄像头"
+                  name="cameraId"
+                  rules={[{ required: true, message: '请选择摄像头' }]}
                 >
-                  <p className="ant-upload-drag-icon">
-                    <InboxOutlined />
-                  </p>
-                  <p className="ant-upload-text">点击或拖拽上传单张/多张图片</p>
-                  <p className="ant-upload-hint">支持 JPG、PNG、JPEG、BMP、WEBP</p>
-                </Dragger>
-              </Form.Item>
+                  <Select
+                    placeholder="请选择一个可用摄像头"
+                    loading={camerasQuery.isLoading}
+                    options={cameras.map((item) => ({
+                      label: `${item.name} (${item.location || item.rtsp_url || '未配置位置'})`,
+                      value: item.id,
+                    }))}
+                  />
+                </Form.Item>
+              )}
 
               <Space wrap>
-                <Button type="primary" htmlType="submit" loading={uploadMutation.isPending}>
-                  提交上传任务
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={uploadMutation.isPending || cameraOnceMutation.isPending}
+                >
+                  {taskMode === 'upload' ? '提交上传任务' : '执行摄像头单次任务'}
                 </Button>
-                <Button onClick={() => setFileList([])}>清空文件</Button>
+                <Button onClick={handleResetInput}>
+                  {taskMode === 'upload' ? '清空文件' : '清空摄像头选择'}
+                </Button>
               </Space>
             </Form>
 
@@ -177,7 +273,11 @@ export function JobsPage() {
               type="info"
               showIcon
               message="当前范围"
-              description="本轮先接入上传任务。摄像头任务和异步 worker 会在下一阶段接入。"
+              description={
+                taskMode === 'upload'
+                  ? '上传任务会立即落库并生成任务记录。'
+                  : '摄像头单次任务会按当前 RTSP 配置抓取一帧并生成记录，定时任务和异步 worker 会在下一阶段接入。'
+              }
             />
           </Card>
         </Col>

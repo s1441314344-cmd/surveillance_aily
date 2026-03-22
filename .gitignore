@@ -89,6 +89,7 @@ mes-workflow-designer/backend/node_modules/
 test_*.py
 debug_*.py
 check_*.py
+!backend-v2/tests/test_*.py
 
 # YOLO Model files (download separately)
 *.pt

@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
-from app.schemas.job import JobCameraOnceCreate, JobRead, JobUploadCreateResponse
+from app.schemas.job import JobCameraOnceCreate, JobRead
 from app.services.job_service import cancel_job as cancel_job_record
+from app.services.job_service import create_camera_once_job as create_camera_once_job_record
 from app.services.job_service import create_upload_job as create_upload_job_record
 from app.services.job_service import get_job_or_404, list_jobs as list_job_records, serialize_job
 from app.services.rbac import ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR
@@ -28,23 +29,16 @@ def create_upload_job(
 @router.post("/cameras/once", response_model=JobRead)
 def create_camera_once_job(
     payload: JobCameraOnceCreate,
-    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    current_user: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
 ):
-    return JobRead(
-        id="job-camera-once-placeholder",
-        job_type="camera_once",
-        trigger_mode="manual",
-        strategy_id=payload.strategy_id,
-        strategy_name="摄像头单次任务待实现",
+    return create_camera_once_job_record(
+        db,
         camera_id=payload.camera_id,
-        model_provider=payload.model_provider or "zhipu",
-        model_name=payload.model_name or "glm-4v-plus",
-        status="queued",
-        total_items=1,
-        completed_items=0,
-        failed_items=0,
-        error_message=None,
-        created_at=None,
+        strategy_id=payload.strategy_id,
+        current_user=current_user,
+        model_provider=payload.model_provider,
+        model_name=payload.model_name,
     )
 
 

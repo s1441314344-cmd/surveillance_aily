@@ -61,6 +61,21 @@ export async function uploadJob(payload: { strategyId: string; files: File[] }) 
   return response.data;
 }
 
+export async function createCameraOnceJob(payload: {
+  cameraId: string;
+  strategyId: string;
+  modelProvider?: string;
+  modelName?: string;
+}) {
+  const response = await apiClient.post<Job>('/api/jobs/cameras/once', {
+    camera_id: payload.cameraId,
+    strategy_id: payload.strategyId,
+    model_provider: payload.modelProvider,
+    model_name: payload.modelName,
+  });
+  return response.data;
+}
+
 export async function listJobs(params?: { status?: string; jobType?: string; strategyId?: string }) {
   const response = await apiClient.get<Job[]>('/api/jobs', {
     params: {
