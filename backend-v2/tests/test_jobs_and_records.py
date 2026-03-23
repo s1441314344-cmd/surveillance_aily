@@ -1,3 +1,6 @@
+from app.core.database import SessionLocal
+from app.models.job import Job
+from app.services.providers.factory import get_provider_adapter
 from app.workers.tasks import process_job
 
 from .test_auth_and_users import auth_headers, login_as_admin
@@ -33,7 +36,11 @@ def test_upload_job_and_task_records_flow(client):
 
     get_job_response = client.get(f"/api/jobs/{job['id']}", headers=headers)
     assert get_job_response.status_code == 200
-    assert get_job_response.json()["id"] == job["id"]
+    job_after_process = get_job_response.json()
+    assert job_after_process["id"] == job["id"]
+    assert job_after_process["status"] == "completed"
+    assert job_after_process["started_at"] is not None
+    assert job_after_process["finished_at"] is not None
 
     list_records_response = client.get("/api/task-records", headers=headers)
     assert list_records_response.status_code == 200
@@ -139,3 +146,60 @@ def test_cancelled_queued_job_will_not_be_processed(client):
     records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
     assert records_response.status_code == 200
     assert records_response.json() == []
+
+
+def test_running_job_collaborative_cancel_stops_following_records(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[
+            ("files", ("helmet-running-1.jpg", b"fake-jpg-content-1", "image/jpeg")),
+            ("files", ("helmet-running-2.jpg", b"fake-jpg-content-2", "image/jpeg")),
+        ],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    base_adapter = get_provider_adapter("zhipu")
+
+    class CancelAfterFirstAnalyzeAdapter:
+        def __init__(self):
+            self.call_count = 0
+
+        def analyze(self, request):
+            self.call_count += 1
+            if self.call_count == 1:
+                with SessionLocal() as db:
+                    db_job = db.get(Job, job["id"])
+                    assert db_job is not None
+                    db_job.status = "cancelled"
+                    db.commit()
+            return base_adapter.analyze(request)
+
+    monkeypatch.setattr(
+        "app.services.job_execution_service.get_provider_adapter",
+        lambda _provider: CancelAfterFirstAnalyzeAdapter(),
+    )
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "cancelled"
+
+    get_job_response = client.get(f"/api/jobs/{job['id']}", headers=headers)
+    assert get_job_response.status_code == 200
+    cancelled_job = get_job_response.json()
+    assert cancelled_job["status"] == "cancelled"
+    assert cancelled_job["started_at"] is not None
+    assert cancelled_job["finished_at"] is not None
+    assert cancelled_job["completed_items"] == 1
+    assert cancelled_job["total_items"] == 2
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["input_filename"] == "helmet-running-1.jpg"

@@ -4,7 +4,8 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
-test_db_path = os.path.join(tempfile.gettempdir(), "surveillance_v2_test.db")
+worker_id = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+test_db_path = os.path.join(tempfile.gettempdir(), f"surveillance_v2_test_{worker_id}_{os.getpid()}.db")
 
 os.environ["APP_ENV"] = "test"
 os.environ["DATABASE_URL"] = f"sqlite:///{test_db_path}"

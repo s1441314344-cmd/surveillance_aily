@@ -40,6 +40,21 @@ celery -A app.core.celery_app.celery_app worker --loglevel=info
 python -m app.schedulers.runner
 ```
 
+## 推荐联调方式
+
+仓库根目录已经提供轻量命令入口，适合日常开发：
+
+```bash
+make v2-help
+make v2-dev
+make v2-api
+make v2-worker
+make v2-scheduler
+make v2-frontend
+```
+
+`make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
+
 ## 异步执行说明
 
 - `POST /api/jobs/uploads` 只负责校验、保存上传文件并创建 `queued` 状态的 Job。
