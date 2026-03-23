@@ -78,6 +78,8 @@ def request(method, path, *, token=None, json_body=None, form_body=None, files=N
             return resp.status, payload
     except urllib.error.HTTPError as exc:
         payload = exc.read().decode()
+        if exc.code in expected:
+            return exc.code, payload
         raise RuntimeError(f"{method} {path} -> {exc.code}: {payload}") from exc
 
 
