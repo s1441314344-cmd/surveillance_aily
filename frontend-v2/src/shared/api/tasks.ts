@@ -170,16 +170,22 @@ export async function listTaskRecords(params?: {
   status?: string;
   strategyId?: string;
   jobId?: string;
+  cameraId?: string;
   modelProvider?: string;
   feedbackStatus?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   const response = await apiClient.get<TaskRecord[]>('/api/task-records', {
     params: {
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
+      camera_id: params?.cameraId || undefined,
       model_provider: params?.modelProvider || undefined,
       feedback_status: params?.feedbackStatus || undefined,
+      created_from: params?.createdFrom || undefined,
+      created_to: params?.createdTo || undefined,
     },
   });
   return response.data;
@@ -201,16 +207,22 @@ export async function exportTaskRecords(params?: {
   status?: string;
   strategyId?: string;
   jobId?: string;
+  cameraId?: string;
   modelProvider?: string;
   feedbackStatus?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   const response = await apiClient.get<Blob>('/api/task-records/export', {
     params: {
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
+      camera_id: params?.cameraId || undefined,
       model_provider: params?.modelProvider || undefined,
       feedback_status: params?.feedbackStatus || undefined,
+      created_from: params?.createdFrom || undefined,
+      created_to: params?.createdTo || undefined,
     },
     responseType: 'blob',
   });
