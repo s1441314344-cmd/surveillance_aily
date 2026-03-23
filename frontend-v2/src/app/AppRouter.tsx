@@ -13,6 +13,7 @@ const RecordsPage = lazy(() => import('@/pages/RecordsPage').then((module) => ({
 const FeedbackPage = lazy(() => import('@/pages/FeedbackPage').then((module) => ({ default: module.FeedbackPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const UsersPage = lazy(() => import('@/pages/UsersPage').then((module) => ({ default: module.UsersPage })));
+const AuditLogsPage = lazy(() => import('@/pages/AuditLogsPage').then((module) => ({ default: module.AuditLogsPage })));
 
 function RouterFallback() {
   return (
@@ -40,6 +41,7 @@ export function AppRouter() {
           <Route path="jobs" element={<JobsPage />} />
           <Route path="records" element={<RecordsPage />} />
           <Route path="feedback" element={<FeedbackPage />} />
+          <Route path="audit-logs" element={<AuditLogsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="users" element={<UsersPage />} />
         </Route>
