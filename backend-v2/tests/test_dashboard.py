@@ -114,3 +114,46 @@ def test_dashboard_summary_trends_and_anomalies(client):
     assert len(anomalies) == 1
     assert anomalies[0]["record_id"] == target_record["id"]
     assert anomalies[0]["strategy_name"] == "安全帽识别"
+
+    filtered_summary_response = client.get(
+        "/api/dashboard/summary",
+        headers=headers,
+        params={"strategy_id": "preset-fire"},
+    )
+    assert filtered_summary_response.status_code == 200
+    filtered_summary = filtered_summary_response.json()
+    assert filtered_summary["total_jobs"] == 1
+    assert filtered_summary["total_records"] == 1
+    assert filtered_summary["pending_review_count"] == 1
+    assert filtered_summary["success_rate"] == 100.0
+    assert filtered_summary["anomaly_rate"] == 0.0
+
+    filtered_trends_response = client.get(
+        "/api/dashboard/trends",
+        headers=headers,
+        params={"strategy_id": "preset-fire"},
+    )
+    assert filtered_trends_response.status_code == 200
+    filtered_trends = filtered_trends_response.json()
+    assert len(filtered_trends) == 1
+    assert filtered_trends[0]["total_jobs"] == 1
+    assert filtered_trends[0]["success_rate"] == 100.0
+
+    filtered_strategies_response = client.get(
+        "/api/dashboard/strategies",
+        headers=headers,
+        params={"strategy_id": "preset-fire"},
+    )
+    assert filtered_strategies_response.status_code == 200
+    filtered_strategies = filtered_strategies_response.json()
+    assert len(filtered_strategies) == 1
+    assert filtered_strategies[0]["strategy_id"] == "preset-fire"
+    assert filtered_strategies[0]["usage_count"] == 1
+
+    filtered_anomalies_response = client.get(
+        "/api/dashboard/anomalies",
+        headers=headers,
+        params={"strategy_id": "preset-fire"},
+    )
+    assert filtered_anomalies_response.status_code == 200
+    assert filtered_anomalies_response.json() == []
