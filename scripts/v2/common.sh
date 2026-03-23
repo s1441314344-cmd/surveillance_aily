@@ -14,6 +14,19 @@ require_cmd() {
   fi
 }
 
+require_python_module() {
+  local module="$1"
+  if ! python3 - <<PY >/dev/null 2>&1
+import importlib
+importlib.import_module("${module}")
+PY
+  then
+    echo "[v2] missing python module: ${module}" >&2
+    echo "[v2] run 'make v2-setup' or install backend-v2/requirements.txt first" >&2
+    exit 1
+  fi
+}
+
 ensure_backend_env() {
   if [[ ! -f "${BACKEND_DIR}/.env" && -f "${BACKEND_DIR}/.env.example" ]]; then
     cp "${BACKEND_DIR}/.env.example" "${BACKEND_DIR}/.env"

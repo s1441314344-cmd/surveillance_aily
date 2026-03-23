@@ -43,3 +43,4 @@ celery_app.conf.task_default_queue = "surveillance-v2"
 celery_app.conf.task_serializer = "json"
 celery_app.conf.result_serializer = "json"
 celery_app.conf.accept_content = ["json"]
+celery_app.conf.imports = ("app.workers.tasks",)

@@ -1,9 +1,12 @@
-.PHONY: help v2-help v2-deps-up v2-deps-down v2-api v2-worker v2-scheduler v2-frontend v2-dev
+.PHONY: help v2-help v2-setup v2-deps-up v2-deps-down v2-api v2-worker v2-scheduler v2-frontend v2-dev
 
 help: v2-help
 
 v2-help:
 	@./scripts/v2/help.sh
+
+v2-setup:
+	@./scripts/v2/setup.sh
 
 v2-deps-up:
 	@./scripts/v2/deps-up.sh

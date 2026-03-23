@@ -19,7 +19,7 @@ V2 按“先拆 backlog，再建工程骨架”的方式推进，当前仓库已
 ## 本地联调前置条件
 
 - `docker` / `docker compose`
-- `python3`，并已在当前环境安装 `backend-v2/requirements.txt`
+- `python3`
 - `node` / `npm`
 
 ## 推荐联调命令
@@ -28,6 +28,12 @@ V2 按“先拆 backlog，再建工程骨架”的方式推进，当前仓库已
 
 ```bash
 make v2-help
+```
+
+首次准备环境：
+
+```bash
+make v2-setup
 ```
 
 启动依赖并准备联调：
@@ -44,6 +50,8 @@ make v2-worker
 make v2-scheduler
 make v2-frontend
 ```
+
+默认已放行 `5174-5178` 的本地前端端口，兼容 Vite 在端口占用时自动回退。
 
 如需单独控制依赖：
 
@@ -65,15 +73,15 @@ docker compose -f docker-compose.v2.yml up -d postgres redis
 ```bash
 cd backend-v2
 cp .env.example .env
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python3 -m pip install -r requirements.txt
+python3 -m uvicorn app.main:app --reload --port 8000
 ```
 
 3. 启动 worker
 
 ```bash
 cd backend-v2
-celery -A app.core.celery_app.celery_app worker --loglevel=info
+python3 -m celery -A app.core.celery_app.celery_app worker --loglevel=info
 ```
 
 4. 启动前端

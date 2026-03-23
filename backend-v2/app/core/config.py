@@ -1,7 +1,22 @@
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+    "http://localhost:5176",
+    "http://127.0.0.1:5176",
+    "http://localhost:5177",
+    "http://127.0.0.1:5177",
+    "http://localhost:5178",
+    "http://127.0.0.1:5178",
+]
 
 
 class Settings(BaseSettings):
@@ -17,7 +32,7 @@ class Settings(BaseSettings):
     celery_enabled: bool = True
     scheduler_poll_interval_seconds: int = 30
     storage_root: str = "./data/storage"
-    cors_origins: list[str] = ["http://localhost:5174", "http://127.0.0.1:5174"]
+    cors_origins: Annotated[list[str], NoDecode] = DEFAULT_CORS_ORIGINS
     bootstrap_admin_username: str = "admin"
     bootstrap_admin_password: str = "admin123456"
     bootstrap_admin_display_name: str = "开发管理员"

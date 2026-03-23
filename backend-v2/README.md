@@ -7,7 +7,7 @@
 1. 安装依赖
 
 ```bash
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
 2. 复制环境变量
@@ -25,13 +25,13 @@ docker compose -f ../docker-compose.v2.yml up -d postgres redis
 4. 启动 API
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+python3 -m uvicorn app.main:app --reload --port 8000
 ```
 
 5. 启动 worker
 
 ```bash
-celery -A app.core.celery_app.celery_app worker --loglevel=info
+python3 -m celery -A app.core.celery_app.celery_app worker --loglevel=info
 ```
 
 6. 启动 scheduler
@@ -46,6 +46,7 @@ python -m app.schedulers.runner
 
 ```bash
 make v2-help
+make v2-setup
 make v2-dev
 make v2-api
 make v2-worker
@@ -54,6 +55,8 @@ make v2-frontend
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
+
+默认 `CORS_ORIGINS` 已覆盖 `localhost/127.0.0.1` 的 `5174-5178` 端口，兼容 Vite 开发端口回退。
 
 ## 异步执行说明
 
