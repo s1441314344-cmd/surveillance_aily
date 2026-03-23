@@ -129,6 +129,91 @@ if len(upload_records) != 2:
     raise RuntimeError(f"expected 2 upload records, got {len(upload_records)}")
 print("[v2-smoke] upload async flow ok")
 
+non_retryable_status, non_retryable_payload = request(
+    "POST",
+    f"/api/jobs/{upload_job_id}/retry",
+    token=token,
+    expected=(409,),
+)
+if non_retryable_status != 409:
+    raise RuntimeError(f"expected 409 for non-retryable job, got {non_retryable_status}")
+if "not retryable" not in non_retryable_payload:
+    raise RuntimeError(f"unexpected non-retryable response: {non_retryable_payload}")
+print("[v2-smoke] non-retryable status guard ok")
+
+failed_camera_name = f"Smoke Failed Camera {uuid.uuid4().hex[:6]}"
+failed_camera = get_json(
+    "POST",
+    "/api/cameras",
+    token=token,
+    json_body={
+        "name": failed_camera_name,
+        "location": "smoke-failed",
+        "ip_address": "127.0.0.1",
+        "port": 554,
+        "protocol": "rtsp",
+        "username": "operator",
+        "password": "secret123",
+        "rtsp_url": "bad-rtsp-url",
+        "frame_frequency_seconds": 15,
+        "resolution": "720p",
+        "jpeg_quality": 80,
+        "storage_path": "./data/storage/cameras/smoke-failed",
+    },
+)
+
+failed_job = get_json(
+    "POST",
+    "/api/jobs/cameras/once",
+    token=token,
+    json_body={
+        "camera_id": failed_camera["id"],
+        "strategy_id": "preset-fire",
+    },
+)
+failed_job_id = failed_job["id"]
+
+failed_terminal = None
+for _ in range(20):
+    failed_terminal = get_json("GET", f"/api/jobs/{failed_job_id}", token=token)
+    if failed_terminal["status"] in {"completed", "failed", "cancelled"}:
+        break
+    time.sleep(1)
+
+if failed_terminal["status"] != "failed":
+    raise RuntimeError(f"expected failed job for retry smoke, got: {failed_terminal}")
+
+retry_job = get_json(
+    "POST",
+    f"/api/jobs/{failed_job_id}/retry",
+    token=token,
+)
+retry_job_id = retry_job["id"]
+if retry_job_id == failed_job_id:
+    raise RuntimeError("retry should create a new job id")
+
+retry_terminal = None
+for _ in range(20):
+    retry_terminal = get_json("GET", f"/api/jobs/{retry_job_id}", token=token)
+    if retry_terminal["status"] in {"completed", "failed", "cancelled"}:
+        break
+    time.sleep(1)
+
+if retry_terminal["status"] != "failed":
+    raise RuntimeError(f"expected retried job to fail with bad camera source, got: {retry_terminal}")
+
+retry_records = get_json(
+    "GET",
+    "/api/task-records",
+    token=token,
+    query={"job_id": retry_job_id},
+)
+if len(retry_records) != 1:
+    raise RuntimeError(f"expected 1 retried record, got {len(retry_records)}")
+if retry_records[0]["result_status"] != "failed":
+    raise RuntimeError(f"expected failed retried record, got: {retry_records[0]}")
+print("[v2-smoke] failed->retry async flow ok")
+
 camera_name = f"Smoke Camera {uuid.uuid4().hex[:6]}"
 camera = get_json(
     "POST",

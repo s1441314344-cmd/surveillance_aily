@@ -59,7 +59,7 @@ make v2-frontend
 make v2-smoke
 ```
 
-该命令会基于正在运行的 API / worker / scheduler 执行上传任务和定时任务的 smoke 验证。
+该命令会基于正在运行的 API / worker / scheduler 执行上传任务、失败任务重试和定时任务的 smoke 验证。
 
 如需单独控制依赖：
 
