@@ -29,6 +29,7 @@ import { getApiErrorMessage } from '@/shared/api/errors';
 
 const { Paragraph, Text, Title } = Typography;
 const { TextArea } = Input;
+const CREATE_STRATEGY_ID = '__create__';
 
 type StrategyFormValues = {
   name: string;
@@ -73,23 +74,19 @@ export function StrategiesPage() {
       }),
   });
 
-  const strategies = strategyQuery.data ?? [];
+  const strategies = useMemo(() => strategyQuery.data ?? [], [strategyQuery.data]);
+  const effectiveSelectedStrategyId = useMemo(() => {
+    if (selectedStrategyId === CREATE_STRATEGY_ID) {
+      return null;
+    }
+
+    const exists = selectedStrategyId && strategies.some((item) => item.id === selectedStrategyId);
+    return exists ? selectedStrategyId : strategies[0]?.id ?? null;
+  }, [selectedStrategyId, strategies]);
   const activeStrategy = useMemo(
-    () => strategies.find((item) => item.id === selectedStrategyId) ?? null,
-    [strategies, selectedStrategyId],
+    () => strategies.find((item) => item.id === effectiveSelectedStrategyId) ?? null,
+    [effectiveSelectedStrategyId, strategies],
   );
-
-  useEffect(() => {
-    if (!strategies.length) {
-      setSelectedStrategyId(null);
-      return;
-    }
-
-    const exists = strategies.some((item) => item.id === selectedStrategyId);
-    if (!exists) {
-      setSelectedStrategyId(strategies[0].id);
-    }
-  }, [strategies, selectedStrategyId]);
 
   useEffect(() => {
     if (!activeStrategy) {
@@ -174,7 +171,7 @@ export function StrategiesPage() {
   });
 
   const resetForCreate = () => {
-    setSelectedStrategyId(null);
+    setSelectedStrategyId(CREATE_STRATEGY_ID);
     form.setFieldsValue({
       name: '',
       scene_description: '',
@@ -213,8 +210,8 @@ export function StrategiesPage() {
       status: values.status,
     };
 
-    if (selectedStrategyId) {
-      await updateMutation.mutateAsync({ strategyId: selectedStrategyId, payload });
+    if (effectiveSelectedStrategyId) {
+      await updateMutation.mutateAsync({ strategyId: effectiveSelectedStrategyId, payload });
       return;
     }
 
@@ -222,7 +219,7 @@ export function StrategiesPage() {
   };
 
   const handleValidate = async () => {
-    if (!selectedStrategyId) {
+    if (!effectiveSelectedStrategyId) {
       message.info('请先保存策略，再执行服务端 Schema 校验');
       return;
     }
@@ -230,7 +227,7 @@ export function StrategiesPage() {
     try {
       const raw = form.getFieldValue('response_schema_text') ?? '{}';
       const schema = JSON.parse(raw);
-      await validateMutation.mutateAsync({ strategyId: selectedStrategyId, schema });
+      await validateMutation.mutateAsync({ strategyId: effectiveSelectedStrategyId, schema });
     } catch {
       message.error('JSON Schema 不是合法 JSON');
     }
@@ -281,7 +278,7 @@ export function StrategiesPage() {
                       cursor: 'pointer',
                       paddingInline: 12,
                       borderRadius: 12,
-                      background: item.id === selectedStrategyId ? '#f0f7ff' : 'transparent',
+                      background: item.id === effectiveSelectedStrategyId ? '#f0f7ff' : 'transparent',
                     }}
                     onClick={() => setSelectedStrategyId(item.id)}
                   >
@@ -305,7 +302,7 @@ export function StrategiesPage() {
 
         <Col xs={24} lg={16}>
           <Card
-            title={selectedStrategyId ? '编辑策略' : '新建策略'}
+            title={effectiveSelectedStrategyId ? '编辑策略' : '新建策略'}
             extra={
               activeStrategy ? (
                 <Space>
@@ -399,7 +396,7 @@ export function StrategiesPage() {
                   htmlType="submit"
                   loading={createMutation.isPending || updateMutation.isPending}
                 >
-                  {selectedStrategyId ? '保存修改' : '创建策略'}
+                  {effectiveSelectedStrategyId ? '保存修改' : '创建策略'}
                 </Button>
                 <Button onClick={handleValidate} loading={validateMutation.isPending}>
                   校验 Schema

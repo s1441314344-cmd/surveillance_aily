@@ -30,22 +30,44 @@ export type AnomalyCase = {
   created_at: string;
 };
 
-export async function getDashboardSummary() {
-  const response = await apiClient.get<DashboardSummary>('/api/dashboard/summary');
+export type DashboardQueryParams = {
+  strategyId?: string;
+  modelProvider?: string;
+  createdFrom?: string;
+  createdTo?: string;
+};
+
+const buildDashboardQueryParams = (params?: DashboardQueryParams) => ({
+  strategy_id: params?.strategyId || undefined,
+  model_provider: params?.modelProvider || undefined,
+  created_from: params?.createdFrom || undefined,
+  created_to: params?.createdTo || undefined,
+});
+
+export async function getDashboardSummary(params?: DashboardQueryParams) {
+  const response = await apiClient.get<DashboardSummary>('/api/dashboard/summary', {
+    params: buildDashboardQueryParams(params),
+  });
   return response.data;
 }
 
-export async function getDashboardTrends() {
-  const response = await apiClient.get<DashboardTrendPoint[]>('/api/dashboard/trends');
+export async function getDashboardTrends(params?: DashboardQueryParams) {
+  const response = await apiClient.get<DashboardTrendPoint[]>('/api/dashboard/trends', {
+    params: buildDashboardQueryParams(params),
+  });
   return response.data;
 }
 
-export async function getDashboardStrategies() {
-  const response = await apiClient.get<StrategyUsagePoint[]>('/api/dashboard/strategies');
+export async function getDashboardStrategies(params?: DashboardQueryParams) {
+  const response = await apiClient.get<StrategyUsagePoint[]>('/api/dashboard/strategies', {
+    params: buildDashboardQueryParams(params),
+  });
   return response.data;
 }
 
-export async function getDashboardAnomalies() {
-  const response = await apiClient.get<AnomalyCase[]>('/api/dashboard/anomalies');
+export async function getDashboardAnomalies(params?: DashboardQueryParams) {
+  const response = await apiClient.get<AnomalyCase[]>('/api/dashboard/anomalies', {
+    params: buildDashboardQueryParams(params),
+  });
   return response.data;
 }

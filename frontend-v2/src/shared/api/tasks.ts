@@ -7,6 +7,7 @@ export type Job = {
   strategy_id: string;
   strategy_name: string;
   camera_id: string | null;
+  schedule_id: string | null;
   model_provider: string;
   model_name: string;
   status: string;
@@ -14,7 +15,23 @@ export type Job = {
   completed_items: number;
   failed_items: number;
   error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   created_at: string | null;
+};
+
+export type JobSchedule = {
+  id: string;
+  camera_id: string;
+  strategy_id: string;
+  schedule_type: string;
+  schedule_value: string;
+  status: string;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  last_error: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 export type TaskRecord = {
@@ -76,12 +93,84 @@ export async function createCameraOnceJob(payload: {
   return response.data;
 }
 
-export async function listJobs(params?: { status?: string; jobType?: string; strategyId?: string }) {
+export async function listJobSchedules(params?: {
+  status?: string;
+  cameraId?: string;
+  strategyId?: string;
+}) {
+  const response = await apiClient.get<JobSchedule[]>('/api/job-schedules', {
+    params: {
+      status: params?.status || undefined,
+      camera_id: params?.cameraId || undefined,
+      strategy_id: params?.strategyId || undefined,
+    },
+  });
+  return response.data;
+}
+
+export async function createJobSchedule(payload: {
+  cameraId: string;
+  strategyId: string;
+  scheduleType: string;
+  scheduleValue: string;
+}) {
+  const response = await apiClient.post<JobSchedule>('/api/job-schedules', {
+    camera_id: payload.cameraId,
+    strategy_id: payload.strategyId,
+    schedule_type: payload.scheduleType,
+    schedule_value: payload.scheduleValue,
+  });
+  return response.data;
+}
+
+export async function updateJobSchedule(
+  scheduleId: string,
+  payload: {
+    cameraId?: string;
+    strategyId?: string;
+    scheduleType?: string;
+    scheduleValue?: string;
+    status?: string;
+  },
+) {
+  const response = await apiClient.patch<JobSchedule>(`/api/job-schedules/${scheduleId}`, {
+    camera_id: payload.cameraId,
+    strategy_id: payload.strategyId,
+    schedule_type: payload.scheduleType,
+    schedule_value: payload.scheduleValue,
+    status: payload.status,
+  });
+  return response.data;
+}
+
+export async function updateJobScheduleStatus(scheduleId: string, status: string) {
+  const response = await apiClient.patch<JobSchedule>(`/api/job-schedules/${scheduleId}/status`, {
+    status,
+  });
+  return response.data;
+}
+
+export async function deleteJobSchedule(scheduleId: string) {
+  const response = await apiClient.delete<{ deleted: boolean }>(`/api/job-schedules/${scheduleId}`);
+  return response.data;
+}
+
+export async function listJobs(params?: {
+  status?: string;
+  jobType?: string;
+  strategyId?: string;
+  triggerMode?: string;
+  cameraId?: string;
+  scheduleId?: string;
+}) {
   const response = await apiClient.get<Job[]>('/api/jobs', {
     params: {
       status: params?.status || undefined,
       job_type: params?.jobType || undefined,
       strategy_id: params?.strategyId || undefined,
+      trigger_mode: params?.triggerMode || undefined,
+      camera_id: params?.cameraId || undefined,
+      schedule_id: params?.scheduleId || undefined,
     },
   });
   return response.data;
@@ -97,20 +186,31 @@ export async function cancelJob(jobId: string) {
   return response.data;
 }
 
+export async function retryJob(jobId: string) {
+  const response = await apiClient.post<Job>(`/api/jobs/${jobId}/retry`);
+  return response.data;
+}
+
 export async function listTaskRecords(params?: {
   status?: string;
   strategyId?: string;
   jobId?: string;
+  cameraId?: string;
   modelProvider?: string;
   feedbackStatus?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   const response = await apiClient.get<TaskRecord[]>('/api/task-records', {
     params: {
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
+      camera_id: params?.cameraId || undefined,
       model_provider: params?.modelProvider || undefined,
       feedback_status: params?.feedbackStatus || undefined,
+      created_from: params?.createdFrom || undefined,
+      created_to: params?.createdTo || undefined,
     },
   });
   return response.data;
@@ -132,16 +232,22 @@ export async function exportTaskRecords(params?: {
   status?: string;
   strategyId?: string;
   jobId?: string;
+  cameraId?: string;
   modelProvider?: string;
   feedbackStatus?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   const response = await apiClient.get<Blob>('/api/task-records/export', {
     params: {
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
+      camera_id: params?.cameraId || undefined,
       model_provider: params?.modelProvider || undefined,
       feedback_status: params?.feedbackStatus || undefined,
+      created_from: params?.createdFrom || undefined,
+      created_to: params?.createdTo || undefined,
     },
     responseType: 'blob',
   });

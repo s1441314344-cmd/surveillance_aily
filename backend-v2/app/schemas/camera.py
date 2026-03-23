@@ -51,3 +51,20 @@ class CameraStatusRead(BaseModel):
     alert_status: str
     last_error: str | None = None
     last_checked_at: str | None = None
+
+
+class CameraDiagnosticRead(BaseModel):
+    camera_id: str
+    camera_name: str
+    protocol: str
+    stream_url_masked: str | None = None
+    success: bool
+    capture_mode: str
+    latency_ms: int
+    frame_size_bytes: int | None = None
+    mime_type: str | None = None
+    width: int | None = None
+    height: int | None = None
+    snapshot_path: str | None = None
+    error_message: str | None = None
+    checked_at: str

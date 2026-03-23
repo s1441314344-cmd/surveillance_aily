@@ -1,3 +1,8 @@
+from datetime import datetime, timedelta
+
+from app.services.scheduler_service import run_due_job_schedules_once
+from app.workers.tasks import process_job
+
 from .test_auth_and_users import auth_headers, login_as_admin
 
 
@@ -17,6 +22,9 @@ def test_dashboard_summary_trends_and_anomalies(client):
     assert upload_job_response.status_code == 200
 
     upload_job = upload_job_response.json()
+    assert upload_job["status"] == "queued"
+    assert process_job(upload_job["id"])["status"] == "completed"
+
     upload_records_response = client.get(f"/api/task-records?job_id={upload_job['id']}", headers=headers)
     assert upload_records_response.status_code == 200
     upload_records = upload_records_response.json()
@@ -56,14 +64,24 @@ def test_dashboard_summary_trends_and_anomalies(client):
     camera = create_camera_response.json()
 
     camera_job_response = client.post(
-        "/api/jobs/cameras/once",
+        "/api/job-schedules",
         headers=headers,
         json={
             "camera_id": camera["id"],
             "strategy_id": "preset-fire",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "15",
         },
     )
     assert camera_job_response.status_code == 200
+    schedule = camera_job_response.json()
+
+    created_job_ids = run_due_job_schedules_once(
+        now=(datetime.fromisoformat(schedule["next_run_at"]) + timedelta(seconds=1)),
+        dispatch_jobs=False,
+    )
+    assert len(created_job_ids) == 1
+    assert process_job(created_job_ids[0])["status"] == "completed"
 
     summary_response = client.get("/api/dashboard/summary", headers=headers)
     assert summary_response.status_code == 200
@@ -96,3 +114,46 @@ def test_dashboard_summary_trends_and_anomalies(client):
     assert len(anomalies) == 1
     assert anomalies[0]["record_id"] == target_record["id"]
     assert anomalies[0]["strategy_name"] == "安全帽识别"
+
+    filtered_summary_response = client.get(
+        "/api/dashboard/summary",
+        headers=headers,
+        params={"strategy_id": "preset-fire"},
+    )
+    assert filtered_summary_response.status_code == 200
+    filtered_summary = filtered_summary_response.json()
+    assert filtered_summary["total_jobs"] == 1
+    assert filtered_summary["total_records"] == 1
+    assert filtered_summary["pending_review_count"] == 1
+    assert filtered_summary["success_rate"] == 100.0
+    assert filtered_summary["anomaly_rate"] == 0.0
+
+    filtered_trends_response = client.get(
+        "/api/dashboard/trends",
+        headers=headers,
+        params={"strategy_id": "preset-fire"},
+    )
+    assert filtered_trends_response.status_code == 200
+    filtered_trends = filtered_trends_response.json()
+    assert len(filtered_trends) == 1
+    assert filtered_trends[0]["total_jobs"] == 1
+    assert filtered_trends[0]["success_rate"] == 100.0
+
+    filtered_strategies_response = client.get(
+        "/api/dashboard/strategies",
+        headers=headers,
+        params={"strategy_id": "preset-fire"},
+    )
+    assert filtered_strategies_response.status_code == 200
+    filtered_strategies = filtered_strategies_response.json()
+    assert len(filtered_strategies) == 1
+    assert filtered_strategies[0]["strategy_id"] == "preset-fire"
+    assert filtered_strategies[0]["usage_count"] == 1
+
+    filtered_anomalies_response = client.get(
+        "/api/dashboard/anomalies",
+        headers=headers,
+        params={"strategy_id": "preset-fire"},
+    )
+    assert filtered_anomalies_response.status_code == 200
+    assert filtered_anomalies_response.json() == []

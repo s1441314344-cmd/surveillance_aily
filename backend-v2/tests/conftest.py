@@ -4,11 +4,13 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
-test_db_path = os.path.join(tempfile.gettempdir(), "surveillance_v2_test.db")
+worker_id = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+test_db_path = os.path.join(tempfile.gettempdir(), f"surveillance_v2_test_{worker_id}_{os.getpid()}.db")
 
 os.environ["APP_ENV"] = "test"
 os.environ["DATABASE_URL"] = f"sqlite:///{test_db_path}"
 os.environ["SECRET_KEY"] = "test-secret-key"
+os.environ["CELERY_ENABLED"] = "false"
 os.environ["BOOTSTRAP_ADMIN_USERNAME"] = "admin"
 os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "admin123456"
 os.environ["BOOTSTRAP_ADMIN_DISPLAY_NAME"] = "测试管理员"

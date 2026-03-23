@@ -1,0 +1,90 @@
+{
+  "version": "v1",
+  "description": "智能巡检系统 V2 模型评估样本集示例。该文件用于说明样本清单结构，expected_json 仅作占位示例，正式评估时应替换为人工标注结果。",
+  "samples": [
+    {
+      "sample_id": "helmet-demo-01",
+      "image_path": "../../test_media/test_cam_1.jpg",
+      "prompt": "请识别图片中的安全帽佩戴情况，并仅返回 JSON。",
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "has_violation": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "summary",
+          "has_violation"
+        ]
+      },
+      "expected_json": {
+        "has_violation": false
+      },
+      "compare_fields": [
+        "has_violation"
+      ],
+      "tags": [
+        "helmet",
+        "demo"
+      ]
+    },
+    {
+      "sample_id": "fire-demo-01",
+      "image_path": "../../test_media/test_cam_2.jpg",
+      "prompt": "请识别图片中是否存在火情或烟雾，并仅返回 JSON。",
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "has_fire": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "summary",
+          "has_fire"
+        ]
+      },
+      "expected_json": {
+        "has_fire": false
+      },
+      "compare_fields": [
+        "has_fire"
+      ],
+      "tags": [
+        "fire",
+        "demo"
+      ]
+    },
+    {
+      "sample_id": "ocr-demo-01",
+      "image_path": "../../test_media/test_cam_3.jpg",
+      "prompt": "请识别图片中的日期或编号，并仅返回 JSON。",
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "recognized_text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "recognized_text"
+        ]
+      },
+      "tags": [
+        "ocr",
+        "demo"
+      ]
+    }
+  ]
+}

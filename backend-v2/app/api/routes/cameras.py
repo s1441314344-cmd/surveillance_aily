@@ -4,11 +4,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
-from app.schemas.camera import CameraCreate, CameraRead, CameraStatusRead, CameraUpdate
+from app.schemas.camera import CameraCreate, CameraDiagnosticRead, CameraRead, CameraStatusRead, CameraUpdate
 from app.services.camera_service import (
     check_camera_status as check_camera_status_record,
     create_camera as create_camera_record,
     delete_camera as delete_camera_record,
+    diagnose_camera as diagnose_camera_record,
     get_camera_or_404,
     get_camera_status as get_camera_status_record,
     list_cameras as list_camera_records,
@@ -85,3 +86,14 @@ def check_camera_status(
 ):
     camera = get_camera_or_404(db, camera_id)
     return check_camera_status_record(db, camera)
+
+
+@router.post("/{camera_id}/diagnose", response_model=CameraDiagnosticRead)
+def diagnose_camera(
+    camera_id: str,
+    save_snapshot: bool = True,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return diagnose_camera_record(db, camera, save_snapshot=save_snapshot)

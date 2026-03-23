@@ -5,8 +5,9 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.security import encrypt_secret
+from app.services.camera_capture_service import diagnose_camera_capture
 from app.models.camera import Camera, CameraStatusLog
-from app.schemas.camera import CameraCreate, CameraRead, CameraStatusRead, CameraUpdate
+from app.schemas.camera import CameraCreate, CameraDiagnosticRead, CameraRead, CameraStatusRead, CameraUpdate
 from app.services.ids import generate_id
 from app.services.storage import ensure_storage_root
 
@@ -49,6 +50,25 @@ def serialize_camera_status(status_log: CameraStatusLog | None, camera_id: str) 
             if status_log.created_at is not None
             else None
         ),
+    )
+
+
+def serialize_camera_diagnostic(diagnostic) -> CameraDiagnosticRead:
+    return CameraDiagnosticRead(
+        camera_id=diagnostic.camera_id,
+        camera_name=diagnostic.camera_name,
+        protocol=diagnostic.protocol,
+        stream_url_masked=diagnostic.stream_url_masked,
+        success=diagnostic.success,
+        capture_mode=diagnostic.capture_mode,
+        latency_ms=diagnostic.latency_ms,
+        frame_size_bytes=diagnostic.frame_size_bytes,
+        mime_type=diagnostic.mime_type,
+        width=diagnostic.width,
+        height=diagnostic.height,
+        snapshot_path=diagnostic.snapshot_path,
+        error_message=diagnostic.error_message,
+        checked_at=diagnostic.checked_at.astimezone(timezone.utc).isoformat(),
     )
 
 
@@ -138,6 +158,20 @@ def check_camera_status(db: Session, camera: Camera) -> CameraStatusRead:
     db.commit()
     db.refresh(status_log)
     return serialize_camera_status(status_log, camera.id)
+
+
+def diagnose_camera(db: Session, camera: Camera, *, save_snapshot: bool = True) -> CameraDiagnosticRead:
+    diagnostic = diagnose_camera_capture(camera, save_snapshot=save_snapshot)
+    status_log = CameraStatusLog(
+        id=generate_id(),
+        camera_id=camera.id,
+        connection_status="online" if diagnostic.success else "offline",
+        alert_status="normal" if diagnostic.success else "error",
+        last_error=diagnostic.error_message,
+    )
+    db.add(status_log)
+    db.commit()
+    return serialize_camera_diagnostic(diagnostic)
 
 
 def _evaluate_camera_status(camera: Camera) -> tuple[str, str, str | None]:

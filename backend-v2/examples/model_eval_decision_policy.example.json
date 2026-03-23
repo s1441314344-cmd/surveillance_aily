@@ -1,0 +1,12 @@
+{
+  "decisions": [
+    {
+      "baseline_target": "zhipu:glm-4v-plus",
+      "challenger_target": "openai:gpt-5-mini",
+      "min_accuracy_gain": 3.0,
+      "min_structured_success_rate": 99.0,
+      "max_latency_ratio": 1.5,
+      "max_cost_ratio": 3.0
+    }
+  ]
+}

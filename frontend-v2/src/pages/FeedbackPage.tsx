@@ -56,7 +56,6 @@ export function FeedbackPage() {
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>('unreviewed');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const strategyQuery = useQuery({
     queryKey: ['strategies', 'all-for-feedback'],
@@ -72,53 +71,52 @@ export function FeedbackPage() {
       }),
   });
 
+  const records = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data]);
+  const effectiveSelectedRecordId = useMemo(() => {
+    if (!records.length) {
+      return null;
+    }
+
+    const hasSelectedRecord = selectedRecordId && records.some((item) => item.id === selectedRecordId);
+    return hasSelectedRecord ? selectedRecordId : records[0].id;
+  }, [records, selectedRecordId]);
+
   const recordDetailQuery = useQuery({
-    queryKey: ['task-record-detail', selectedRecordId],
-    queryFn: () => getTaskRecord(selectedRecordId as string),
-    enabled: Boolean(selectedRecordId),
+    queryKey: ['task-record-detail', effectiveSelectedRecordId],
+    queryFn: () => getTaskRecord(effectiveSelectedRecordId as string),
+    enabled: Boolean(effectiveSelectedRecordId),
   });
 
   const imageQuery = useQuery({
-    queryKey: ['task-record-image', selectedRecordId],
-    queryFn: () => fetchTaskRecordImage(selectedRecordId as string),
-    enabled: Boolean(selectedRecordId),
+    queryKey: ['task-record-image', effectiveSelectedRecordId],
+    queryFn: () => fetchTaskRecordImage(effectiveSelectedRecordId as string),
+    enabled: Boolean(effectiveSelectedRecordId),
   });
 
   const feedbackQuery = useQuery({
-    queryKey: ['feedback-record', selectedRecordId],
-    queryFn: () => listFeedback({ recordId: selectedRecordId as string }),
-    enabled: Boolean(selectedRecordId),
+    queryKey: ['feedback-record', effectiveSelectedRecordId],
+    queryFn: () => listFeedback({ recordId: effectiveSelectedRecordId as string }),
+    enabled: Boolean(effectiveSelectedRecordId),
   });
 
   const selectedRecord = recordDetailQuery.data ?? null;
   const currentFeedback = useMemo(() => feedbackQuery.data?.[0] ?? null, [feedbackQuery.data]);
-  const records = recordsQuery.data ?? [];
+  const imagePreviewUrl = useMemo(
+    () => (imageQuery.data ? URL.createObjectURL(imageQuery.data) : null),
+    [imageQuery.data],
+  );
+
+  useEffect(
+    () => () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    },
+    [imagePreviewUrl],
+  );
 
   useEffect(() => {
-    if (!records.length) {
-      setSelectedRecordId(null);
-      return;
-    }
-
-    const hasSelectedRecord = selectedRecordId && records.some((item) => item.id === selectedRecordId);
-    if (!hasSelectedRecord) {
-      setSelectedRecordId(records[0].id);
-    }
-  }, [records, selectedRecordId]);
-
-  useEffect(() => {
-    if (!imageQuery.data) {
-      setImagePreviewUrl(null);
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(imageQuery.data);
-    setImagePreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [imageQuery.data]);
-
-  useEffect(() => {
-    if (!selectedRecordId) {
+    if (!effectiveSelectedRecordId) {
       form.resetFields();
       return;
     }
@@ -133,19 +131,19 @@ export function FeedbackPage() {
     }
 
     form.resetFields();
-  }, [currentFeedback, form, selectedRecordId]);
+  }, [currentFeedback, effectiveSelectedRecordId, form]);
 
   const invalidateReviewData = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['task-records'] }),
-      queryClient.invalidateQueries({ queryKey: ['task-record-detail', selectedRecordId] }),
-      queryClient.invalidateQueries({ queryKey: ['feedback-record', selectedRecordId] }),
+      queryClient.invalidateQueries({ queryKey: ['task-record-detail', effectiveSelectedRecordId] }),
+      queryClient.invalidateQueries({ queryKey: ['feedback-record', effectiveSelectedRecordId] }),
     ]);
   };
 
   const reviewMutation = useMutation({
     mutationFn: async (values: FeedbackFormValues) => {
-      if (!selectedRecordId) {
+      if (!effectiveSelectedRecordId) {
         throw new Error('missing-record-id');
       }
 
@@ -158,7 +156,7 @@ export function FeedbackPage() {
       }
 
       return createFeedback({
-        recordId: selectedRecordId,
+        recordId: effectiveSelectedRecordId,
         judgement: values.judgement,
         correctedLabel: values.correctedLabel,
         comment: values.comment,

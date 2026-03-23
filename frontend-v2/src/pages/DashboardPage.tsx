@@ -1,5 +1,22 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Card, Col, Empty, Progress, Row, Space, Statistic, Table, Typography } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Empty,
+  Input,
+  Progress,
+  Row,
+  Select,
+  Space,
+  Statistic,
+  Table,
+  Typography,
+} from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { listModelProviders, listStrategies } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import {
   getDashboardAnomalies,
@@ -10,28 +27,62 @@ import {
 
 const { Paragraph, Text, Title } = Typography;
 
+const parseDateFilter = (value: string) => {
+  if (!value) {
+    return undefined;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  return date.toISOString();
+};
+
 export function DashboardPage() {
+  const navigate = useNavigate();
+  const [strategyFilter, setStrategyFilter] = useState<string>('all');
+  const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
+  const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
+  const [createdToFilter, setCreatedToFilter] = useState<string>('');
+
+  const queryFilters = {
+    strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
+    modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
+    createdFrom: parseDateFilter(createdFromFilter),
+    createdTo: parseDateFilter(createdToFilter),
+  };
+
+  const strategyQuery = useQuery({
+    queryKey: ['strategies', 'all-for-dashboard'],
+    queryFn: () => listStrategies(),
+  });
+
+  const modelProviderQuery = useQuery({
+    queryKey: ['model-providers', 'all-for-dashboard'],
+    queryFn: () => listModelProviders(),
+  });
+
   const summaryQuery = useQuery({
-    queryKey: ['dashboard', 'summary'],
-    queryFn: getDashboardSummary,
+    queryKey: ['dashboard', 'summary', queryFilters],
+    queryFn: () => getDashboardSummary(queryFilters),
     refetchInterval: 15000,
   });
 
   const trendsQuery = useQuery({
-    queryKey: ['dashboard', 'trends'],
-    queryFn: getDashboardTrends,
+    queryKey: ['dashboard', 'trends', queryFilters],
+    queryFn: () => getDashboardTrends(queryFilters),
     refetchInterval: 15000,
   });
 
   const strategiesQuery = useQuery({
-    queryKey: ['dashboard', 'strategies'],
-    queryFn: getDashboardStrategies,
+    queryKey: ['dashboard', 'strategies', queryFilters],
+    queryFn: () => getDashboardStrategies(queryFilters),
     refetchInterval: 15000,
   });
 
   const anomaliesQuery = useQuery({
-    queryKey: ['dashboard', 'anomalies'],
-    queryFn: getDashboardAnomalies,
+    queryKey: ['dashboard', 'anomalies', queryFilters],
+    queryFn: () => getDashboardAnomalies(queryFilters),
     refetchInterval: 15000,
   });
 
@@ -49,6 +100,51 @@ export function DashboardPage() {
           基于任务、记录和人工复核数据生成当前运行概览。准确率指标仅统计已复核记录。
         </Paragraph>
       </div>
+
+      <Card size="small" title="筛选条件">
+        <Space wrap>
+          <Select
+            size="small"
+            value={strategyFilter}
+            onChange={setStrategyFilter}
+            options={[
+              { label: '全部策略', value: 'all' },
+              ...(strategyQuery.data ?? []).map((item) => ({
+                label: item.name,
+                value: item.id,
+              })),
+            ]}
+            style={{ width: 180 }}
+          />
+          <Select
+            size="small"
+            value={modelProviderFilter}
+            onChange={setModelProviderFilter}
+            options={[
+              { label: '全部模型提供方', value: 'all' },
+              ...(modelProviderQuery.data ?? []).map((item) => ({
+                label: item.display_name || item.provider,
+                value: item.provider,
+              })),
+            ]}
+            style={{ width: 180 }}
+          />
+          <Input
+            size="small"
+            type="datetime-local"
+            value={createdFromFilter}
+            onChange={(event) => setCreatedFromFilter(event.target.value)}
+            style={{ width: 200 }}
+          />
+          <Input
+            size="small"
+            type="datetime-local"
+            value={createdToFilter}
+            onChange={(event) => setCreatedToFilter(event.target.value)}
+            style={{ width: 200 }}
+          />
+        </Space>
+      </Card>
 
       {dashboardError ? (
         <Alert
@@ -170,6 +266,9 @@ export function DashboardPage() {
               rowKey="record_id"
               size="small"
               pagination={false}
+              onRow={(record) => ({
+                onClick: () => navigate(`/records?recordId=${record.record_id}`),
+              })}
               locale={{ emptyText: <Empty description="暂无异常案例" /> }}
               dataSource={anomaliesQuery.data ?? []}
               columns={[
@@ -189,6 +288,22 @@ export function DashboardPage() {
                   dataIndex: 'summary',
                   render: (value: string) => (
                     <Text style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{value}</Text>
+                  ),
+                },
+                {
+                  title: '操作',
+                  width: 100,
+                  render: (_, record) => (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`/records?recordId=${record.record_id}`);
+                      }}
+                    >
+                      查看详情
+                    </Button>
                   ),
                 },
               ]}

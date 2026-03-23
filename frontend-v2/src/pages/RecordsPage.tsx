@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   App,
@@ -7,6 +7,7 @@ import {
   Col,
   Drawer,
   Empty,
+  Input,
   Row,
   Select,
   Space,
@@ -14,8 +15,9 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import { useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '@/shared/api/errors';
-import { listStrategies } from '@/shared/api/configCenter';
+import { listCameras, listModelProviders, listStrategies } from '@/shared/api/configCenter';
 import {
   exportTaskRecords,
   fetchTaskRecordImage,
@@ -32,24 +34,64 @@ const statusColorMap: Record<string, string> = {
   schema_invalid: 'orange',
 };
 
+const parseDateFilter = (value: string) => {
+  if (!value) {
+    return undefined;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  return date.toISOString();
+};
+
 export function RecordsPage() {
   const { message } = App.useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [cameraFilter, setCameraFilter] = useState<string>('all');
+  const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
+  const [feedbackFilter, setFeedbackFilter] = useState<string>('all');
+  const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
+  const [createdToFilter, setCreatedToFilter] = useState<string>('');
+  const selectedRecordId = searchParams.get('recordId');
 
   const strategyQuery = useQuery({
     queryKey: ['strategies', 'all-for-records'],
     queryFn: () => listStrategies(),
   });
 
+  const cameraQuery = useQuery({
+    queryKey: ['cameras', 'all-for-records'],
+    queryFn: () => listCameras(),
+  });
+
+  const modelProviderQuery = useQuery({
+    queryKey: ['model-providers', 'all-for-records'],
+    queryFn: () => listModelProviders(),
+  });
+
   const recordsQuery = useQuery({
-    queryKey: ['task-records', statusFilter, strategyFilter],
+    queryKey: [
+      'task-records',
+      statusFilter,
+      strategyFilter,
+      cameraFilter,
+      modelProviderFilter,
+      feedbackFilter,
+      createdFromFilter,
+      createdToFilter,
+    ],
     queryFn: () =>
       listTaskRecords({
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
+        cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
+        modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
+        feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
+        createdFrom: parseDateFilter(createdFromFilter),
+        createdTo: parseDateFilter(createdToFilter),
       }),
   });
 
@@ -65,22 +107,42 @@ export function RecordsPage() {
     enabled: Boolean(selectedRecordId),
   });
 
-  useEffect(() => {
-    if (!imageQuery.data) {
-      setImagePreviewUrl(null);
-      return;
-    }
+  const imagePreviewUrl = useMemo(
+    () => (imageQuery.data ? URL.createObjectURL(imageQuery.data) : null),
+    [imageQuery.data],
+  );
 
-    const objectUrl = URL.createObjectURL(imageQuery.data);
-    setImagePreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [imageQuery.data]);
+  useEffect(
+    () => () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    },
+    [imagePreviewUrl],
+  );
+
+  const handleSelectRecord = (recordId: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('recordId', recordId);
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleCloseDetail = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('recordId');
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const handleExport = async () => {
     try {
       const blob = await exportTaskRecords({
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
+        cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
+        modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
+        feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
+        createdFrom: parseDateFilter(createdFromFilter),
+        createdTo: parseDateFilter(createdToFilter),
       });
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -104,7 +166,7 @@ export function RecordsPage() {
           任务记录
         </Title>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          查看上传任务生成的记录、结构化 JSON 和原图预览，并支持按筛选条件导出 CSV。
+          查看上传任务生成的记录、结构化 JSON 和原图预览，并支持按状态/策略/摄像头/模型/反馈/时间导出 CSV。
         </Paragraph>
       </div>
 
@@ -136,6 +198,58 @@ export function RecordsPage() {
               ]}
               style={{ width: 150 }}
             />
+            <Select
+              size="small"
+              value={cameraFilter}
+              onChange={setCameraFilter}
+              options={[
+                { label: '全部摄像头', value: 'all' },
+                ...(cameraQuery.data ?? []).map((item) => ({
+                  label: item.name,
+                  value: item.id,
+                })),
+              ]}
+              style={{ width: 170 }}
+            />
+            <Select
+              size="small"
+              value={modelProviderFilter}
+              onChange={setModelProviderFilter}
+              options={[
+                { label: '全部模型提供方', value: 'all' },
+                ...(modelProviderQuery.data ?? []).map((item) => ({
+                  label: item.display_name || item.provider,
+                  value: item.provider,
+                })),
+              ]}
+              style={{ width: 180 }}
+            />
+            <Select
+              size="small"
+              value={feedbackFilter}
+              onChange={setFeedbackFilter}
+              options={[
+                { label: '全部反馈状态', value: 'all' },
+                { label: '未复核', value: 'unreviewed' },
+                { label: '正确', value: 'correct' },
+                { label: '错误', value: 'incorrect' },
+              ]}
+              style={{ width: 140 }}
+            />
+            <Input
+              size="small"
+              type="datetime-local"
+              value={createdFromFilter}
+              onChange={(event) => setCreatedFromFilter(event.target.value)}
+              style={{ width: 190 }}
+            />
+            <Input
+              size="small"
+              type="datetime-local"
+              value={createdToFilter}
+              onChange={(event) => setCreatedToFilter(event.target.value)}
+              style={{ width: 190 }}
+            />
             <Button size="small" onClick={handleExport}>
               导出 CSV
             </Button>
@@ -149,7 +263,7 @@ export function RecordsPage() {
             loading={recordsQuery.isLoading}
             pagination={{ pageSize: 8 }}
             onRow={(record) => ({
-              onClick: () => setSelectedRecordId(record.id),
+              onClick: () => handleSelectRecord(record.id),
             })}
             columns={[
               {
@@ -190,7 +304,7 @@ export function RecordsPage() {
         open={Boolean(selectedRecordId)}
         width={720}
         title="记录详情"
-        onClose={() => setSelectedRecordId(null)}
+        onClose={handleCloseDetail}
       >
         {detail ? (
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
