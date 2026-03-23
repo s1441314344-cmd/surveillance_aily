@@ -57,12 +57,68 @@ read -r -a SOAK_ARGS <<<"${SOAK_ARGS_RAW}"
 timestamp="$(date +%Y%m%d-%H%M%S)"
 log_dir="${ROOT_DIR}/data/preflight-logs/${timestamp}"
 mkdir -p "${log_dir}"
+started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+smoke_status="skipped"
+perf_status="skipped"
+soak_status="skipped"
+e2e_status="skipped"
+
+smoke_log_path="${log_dir}/smoke.log"
+perf_json_path="${log_dir}/perf.json"
+soak_json_path="${log_dir}/soak.json"
+summary_json_path="${log_dir}/summary.json"
 
 api_pid=""
 worker_pid=""
 scheduler_pid=""
 
+write_summary() {
+  local exit_code="$1"
+  local finished_at
+  local overall_status
+  finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  if [[ "${exit_code}" -eq 0 ]]; then
+    overall_status="passed"
+  else
+    overall_status="failed"
+  fi
+
+  python3 - <<PY
+import json
+from pathlib import Path
+
+summary = {
+    "started_at": "${started_at}",
+    "finished_at": "${finished_at}",
+    "api_base": "${api_base:-}",
+    "result": "${overall_status}",
+    "exit_code": int("${exit_code}"),
+    "checks": {
+        "smoke": {
+            "status": "${smoke_status}",
+            "log_path": "${smoke_log_path}",
+        },
+        "perf": {
+            "status": "${perf_status}",
+            "report_path": "${perf_json_path}",
+        },
+        "soak": {
+            "status": "${soak_status}",
+            "report_path": "${soak_json_path}",
+        },
+        "e2e": {
+            "status": "${e2e_status}",
+        },
+    },
+}
+Path("${summary_json_path}").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+PY
+}
+
 cleanup() {
+  local exit_code="$?"
+  write_summary "${exit_code}"
   set +e
   if [[ -n "${scheduler_pid}" ]] && kill -0 "${scheduler_pid}" >/dev/null 2>&1; then
     kill "${scheduler_pid}" >/dev/null 2>&1
@@ -121,18 +177,39 @@ if ! curl -fsS "${api_base}/api/health" >/dev/null 2>&1; then
 fi
 
 echo "[v2-preflight] running smoke"
-V2_API_BASE_URL="${api_base}" V2_SMOKE_SCHEDULE_WAIT_SECONDS="${SMOKE_SCHEDULE_WAIT_SECONDS}" make v2-smoke
+if V2_API_BASE_URL="${api_base}" V2_SMOKE_SCHEDULE_WAIT_SECONDS="${SMOKE_SCHEDULE_WAIT_SECONDS}" make v2-smoke | tee "${smoke_log_path}"; then
+  smoke_status="passed"
+else
+  smoke_status="failed"
+  exit 1
+fi
 
 echo "[v2-preflight] running perf: ${PERF_ARGS_RAW}"
-./scripts/v2/perf.sh --api-base "${api_base}" "${PERF_ARGS[@]}"
+if ./scripts/v2/perf.sh --api-base "${api_base}" --output-json "${perf_json_path}" "${PERF_ARGS[@]}"; then
+  perf_status="passed"
+else
+  perf_status="failed"
+  exit 1
+fi
 
 echo "[v2-preflight] running soak: ${SOAK_ARGS_RAW}"
-./scripts/v2/soak.sh --api-base "${api_base}" "${SOAK_ARGS[@]}"
+if ./scripts/v2/soak.sh --api-base "${api_base}" --output-json "${soak_json_path}" "${SOAK_ARGS[@]}"; then
+  soak_status="passed"
+else
+  soak_status="failed"
+  exit 1
+fi
 
 if [[ "${WITH_E2E}" == "true" ]]; then
   echo "[v2-preflight] running e2e"
-  make v2-e2e
+  if make v2-e2e; then
+    e2e_status="passed"
+  else
+    e2e_status="failed"
+    exit 1
+  fi
 fi
 
 echo "[v2-preflight] all checks passed"
 echo "[v2-preflight] logs: ${log_dir}"
+echo "[v2-preflight] summary: ${summary_json_path}"

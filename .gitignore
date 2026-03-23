@@ -101,3 +101,4 @@ check_*.py
 # Detection results (local test data)
 data/detections/*
 data/storage/
+data/preflight-logs/
