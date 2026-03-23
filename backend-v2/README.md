@@ -52,11 +52,14 @@ make v2-api
 make v2-worker
 make v2-scheduler
 make v2-frontend
+make v2-smoke
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
 
 默认 `CORS_ORIGINS` 已覆盖 `localhost/127.0.0.1` 的 `5174-5178` 端口，兼容 Vite 开发端口回退。
+
+`make v2-smoke` 会对运行中的栈执行一次“上传异步链路 + 定时调度链路”的冒烟验收。
 
 ## 异步执行说明
 

@@ -1,4 +1,4 @@
-.PHONY: help v2-help v2-setup v2-deps-up v2-deps-down v2-api v2-worker v2-scheduler v2-frontend v2-dev
+.PHONY: help v2-help v2-setup v2-deps-up v2-deps-down v2-api v2-worker v2-scheduler v2-frontend v2-dev v2-smoke
 
 help: v2-help
 
@@ -28,3 +28,6 @@ v2-frontend:
 
 v2-dev:
 	@./scripts/v2/dev.sh
+
+v2-smoke:
+	@./scripts/v2/smoke.sh

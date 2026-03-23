@@ -53,6 +53,14 @@ make v2-frontend
 
 默认已放行 `5174-5178` 的本地前端端口，兼容 Vite 在端口占用时自动回退。
 
+如需验证运行中的完整异步闭环：
+
+```bash
+make v2-smoke
+```
+
+该命令会基于正在运行的 API / worker / scheduler 执行上传任务和定时任务的 smoke 验证。
+
 如需单独控制依赖：
 
 ```bash

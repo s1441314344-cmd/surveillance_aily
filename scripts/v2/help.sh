@@ -11,6 +11,7 @@ Smart Inspection V2 local commands:
   make v2-scheduler    # run scheduler process
   make v2-frontend     # run frontend dev server
   make v2-dev          # deps-up + startup hint
+  make v2-smoke        # verify upload + scheduled async flows against running stack
   make v2-deps-down    # stop postgres + redis
 
 Recommended flow:
