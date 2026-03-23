@@ -53,6 +53,8 @@ make v2-worker
 make v2-scheduler
 make v2-frontend
 make v2-smoke
+make v2-e2e
+make v2-perf
 make v2-backfill
 make v2-eval
 make v2-camera-check
@@ -64,6 +66,10 @@ make v2-camera-validate
 默认 `CORS_ORIGINS` 已覆盖 `localhost/127.0.0.1` 的 `5174-5178` 端口，兼容 Vite 开发端口回退。
 
 `make v2-smoke` 会对运行中的栈执行一次“上传异步链路 + 失败任务重试链路 + 定时调度链路”的冒烟验收。
+
+`make v2-e2e` 会执行 Playwright 基线回归（登录 + 核心页面导航）。
+
+`make v2-perf` 会执行上传任务并发探测并输出创建时延、任务完成率和吞吐摘要。
 
 `make v2-backfill` 会对旧版 `SQLite` 数据执行一次 dry-run 回填评估，输出将要迁移的 cameras / strategies / schedules / jobs / task_records / file_assets 数量，以及缺失文件和未纳入核心迁移的 legacy 提示。
 

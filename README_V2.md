@@ -74,6 +74,13 @@ cd frontend-v2
 npx playwright install chromium
 ```
 
+如需做上传任务性能探测（并发提交 + 完成率 + 时延统计）：
+
+```bash
+make v2-perf
+./scripts/v2/perf.sh --jobs 50 --concurrency 10 --files-per-job 2 --api-base http://127.0.0.1:8000
+```
+
 如需单独控制依赖：
 
 ```bash
