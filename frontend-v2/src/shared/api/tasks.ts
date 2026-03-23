@@ -123,6 +123,26 @@ export async function createJobSchedule(payload: {
   return response.data;
 }
 
+export async function updateJobSchedule(
+  scheduleId: string,
+  payload: {
+    cameraId?: string;
+    strategyId?: string;
+    scheduleType?: string;
+    scheduleValue?: string;
+    status?: string;
+  },
+) {
+  const response = await apiClient.patch<JobSchedule>(`/api/job-schedules/${scheduleId}`, {
+    camera_id: payload.cameraId,
+    strategy_id: payload.strategyId,
+    schedule_type: payload.scheduleType,
+    schedule_value: payload.scheduleValue,
+    status: payload.status,
+  });
+  return response.data;
+}
+
 export async function updateJobScheduleStatus(scheduleId: string, status: string) {
   const response = await apiClient.patch<JobSchedule>(`/api/job-schedules/${scheduleId}/status`, {
     status,

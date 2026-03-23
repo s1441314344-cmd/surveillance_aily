@@ -9,6 +9,7 @@ import {
   Descriptions,
   Form,
   Input,
+  Modal,
   Popconfirm,
   Row,
   Select,
@@ -33,6 +34,7 @@ import {
   listJobs,
   listJobSchedules,
   retryJob,
+  updateJobSchedule,
   updateJobScheduleStatus,
   uploadJob,
 } from '@/shared/api/tasks';
@@ -45,6 +47,12 @@ type UploadFormValues = {
   strategyId: string;
   cameraId?: string;
   scheduleType?: 'interval_minutes' | 'daily_time';
+  intervalMinutes?: number;
+  dailyTime?: string;
+};
+
+type EditScheduleFormValues = {
+  scheduleType: 'interval_minutes' | 'daily_time';
   intervalMinutes?: number;
   dailyTime?: string;
 };
@@ -90,12 +98,14 @@ export function JobsPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<UploadFormValues>();
+  const [scheduleEditForm] = Form.useForm<EditScheduleFormValues>();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [triggerModeFilter, setTriggerModeFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<JobSchedule | null>(null);
 
   const strategyQuery = useQuery({
     queryKey: ['strategies', 'active'],
@@ -140,6 +150,7 @@ export function JobsPage() {
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
   const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
+  const editScheduleType = Form.useWatch('scheduleType', scheduleEditForm) ?? 'interval_minutes';
 
   const invalidateJobs = () =>
     Promise.all([
@@ -206,6 +217,20 @@ export function JobsPage() {
     },
     onError: (error) => {
       message.error(getApiErrorMessage(error, '计划状态更新失败'));
+    },
+  });
+
+  const updateScheduleMutation = useMutation({
+    mutationFn: ({ scheduleId, payload }: { scheduleId: string; payload: { scheduleType: string; scheduleValue: string } }) =>
+      updateJobSchedule(scheduleId, payload),
+    onSuccess: async () => {
+      await invalidateSchedules();
+      message.success('计划配置已更新');
+      setEditingSchedule(null);
+      scheduleEditForm.resetFields();
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '计划配置更新失败'));
     },
   });
 
@@ -336,6 +361,44 @@ export function JobsPage() {
         dailyTime: DEFAULT_FORM_VALUES.dailyTime,
       });
     }
+  };
+
+  const handleOpenScheduleEditor = (schedule: JobSchedule) => {
+    setEditingSchedule(schedule);
+    scheduleEditForm.setFieldsValue({
+      scheduleType: schedule.schedule_type as EditScheduleFormValues['scheduleType'],
+      intervalMinutes:
+        schedule.schedule_type === 'interval_minutes' ? Number(schedule.schedule_value || 1) : undefined,
+      dailyTime: schedule.schedule_type === 'daily_time' ? schedule.schedule_value : undefined,
+    });
+  };
+
+  const handleCloseScheduleEditor = () => {
+    setEditingSchedule(null);
+    scheduleEditForm.resetFields();
+  };
+
+  const handleSubmitScheduleEdit = async (values: EditScheduleFormValues) => {
+    if (!editingSchedule) {
+      return;
+    }
+
+    const scheduleValue =
+      values.scheduleType === 'daily_time'
+        ? values.dailyTime?.trim()
+        : String(values.intervalMinutes ?? '').trim();
+    if (!scheduleValue) {
+      message.warning('请补充完整的计划配置');
+      return;
+    }
+
+    await updateScheduleMutation.mutateAsync({
+      scheduleId: editingSchedule.id,
+      payload: {
+        scheduleType: values.scheduleType,
+        scheduleValue,
+      },
+    });
   };
 
   return (
@@ -752,6 +815,13 @@ export function JobsPage() {
                 <Space size={8}>
                   <Button
                     size="small"
+                    onClick={() => handleOpenScheduleEditor(record)}
+                    disabled={updateScheduleMutation.isPending}
+                  >
+                    编辑
+                  </Button>
+                  <Button
+                    size="small"
                     onClick={() =>
                       scheduleStatusMutation.mutate({
                         scheduleId: record.id,
@@ -783,6 +853,54 @@ export function JobsPage() {
           ]}
         />
       </Card>
+
+      <Modal
+        open={Boolean(editingSchedule)}
+        title="编辑定时计划"
+        onCancel={handleCloseScheduleEditor}
+        onOk={() => scheduleEditForm.submit()}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={updateScheduleMutation.isPending}
+      >
+        <Form
+          form={scheduleEditForm}
+          layout="vertical"
+          onFinish={handleSubmitScheduleEdit}
+          initialValues={{ scheduleType: 'interval_minutes' }}
+        >
+          <Form.Item
+            label="计划类型"
+            name="scheduleType"
+            rules={[{ required: true, message: '请选择计划类型' }]}
+          >
+            <Select
+              options={[
+                { label: '按分钟间隔执行', value: 'interval_minutes' },
+                { label: '每日固定时间', value: 'daily_time' },
+              ]}
+            />
+          </Form.Item>
+
+          {editScheduleType === 'interval_minutes' ? (
+            <Form.Item
+              label="执行间隔(分钟)"
+              name="intervalMinutes"
+              rules={[{ required: true, message: '请输入执行间隔' }]}
+            >
+              <Input type="number" min={1} placeholder="例如 15" />
+            </Form.Item>
+          ) : (
+            <Form.Item
+              label="每日执行时间"
+              name="dailyTime"
+              rules={[{ required: true, message: '请输入每日执行时间' }]}
+            >
+              <Input placeholder="例如 08:30" />
+            </Form.Item>
+          )}
+        </Form>
+      </Modal>
     </Space>
   );
 }
