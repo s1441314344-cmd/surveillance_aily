@@ -80,6 +80,10 @@ cloudflared.tgz
 # Node (for MES workflow designer frontend)
 mes-workflow-designer/frontend/node_modules/
 mes-workflow-designer/backend/node_modules/
+frontend-v2/node_modules/
+frontend-v2/dist/
+frontend-v2/playwright-report/
+frontend-v2/test-results/
 
 # PyInstaller
 *.manifest
@@ -97,3 +101,4 @@ check_*.py
 # Detection results (local test data)
 data/detections/*
 data/storage/
+data/preflight-logs/

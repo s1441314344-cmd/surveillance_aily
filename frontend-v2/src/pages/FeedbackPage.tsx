@@ -176,7 +176,7 @@ export function FeedbackPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           人工复核
@@ -267,10 +267,10 @@ export function FeedbackPage() {
         </Col>
 
         <Col xs={24} xl={14}>
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <Card title="复核详情">
               {selectedRecord ? (
-                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Space orientation="vertical" size={16} style={{ width: '100%' }}>
                   <Row gutter={16}>
                     <Col xs={24} md={12}>
                       <Card size="small" title="原始图片">
@@ -287,7 +287,7 @@ export function FeedbackPage() {
                     </Col>
                     <Col xs={24} md={12}>
                       <Card size="small" title="记录摘要">
-                        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                        <Space orientation="vertical" size={8} style={{ width: '100%' }}>
                           <Text>记录 ID：{selectedRecord.id}</Text>
                           <Text>任务 ID：{selectedRecord.job_id}</Text>
                           <Text>策略：{selectedRecord.strategy_name}</Text>
@@ -349,46 +349,49 @@ export function FeedbackPage() {
                 ) : null
               }
             >
-              {selectedRecord ? (
-                <Form<FeedbackFormValues> layout="vertical" form={form} onFinish={handleSubmit}>
-                  <Form.Item
-                    label="复核结论"
-                    name="judgement"
-                    rules={[{ required: true, message: '请选择复核结论' }]}
-                  >
-                    <Radio.Group
-                      optionType="button"
-                      buttonStyle="solid"
-                      options={[
-                        { label: '正确', value: 'correct' },
-                        { label: '错误', value: 'incorrect' },
-                      ]}
-                    />
-                  </Form.Item>
+              <Form<FeedbackFormValues>
+                layout="vertical"
+                form={form}
+                onFinish={handleSubmit}
+                disabled={!selectedRecord}
+                style={{ display: selectedRecord ? 'block' : 'none' }}
+              >
+                <Form.Item
+                  label="复核结论"
+                  name="judgement"
+                  rules={[{ required: true, message: '请选择复核结论' }]}
+                >
+                  <Radio.Group
+                    optionType="button"
+                    buttonStyle="solid"
+                    options={[
+                      { label: '正确', value: 'correct' },
+                      { label: '错误', value: 'incorrect' },
+                    ]}
+                  />
+                </Form.Item>
 
-                  <Form.Item label="修正标签" name="correctedLabel">
-                    <Input placeholder="例如 no_fire、no_helmet、ocr_unclear" />
-                  </Form.Item>
+                <Form.Item label="修正标签" name="correctedLabel">
+                  <Input placeholder="例如 no_fire、no_helmet、ocr_unclear" />
+                </Form.Item>
 
-                  <Form.Item label="备注" name="comment">
-                    <TextArea
-                      rows={4}
-                      placeholder="补充人工判断依据、现场信息或后续处理建议"
-                      showCount
-                      maxLength={300}
-                    />
-                  </Form.Item>
+                <Form.Item label="备注" name="comment">
+                  <TextArea
+                    rows={4}
+                    placeholder="补充人工判断依据、现场信息或后续处理建议"
+                    showCount
+                    maxLength={300}
+                  />
+                </Form.Item>
 
-                  <Space>
-                    <Button type="primary" htmlType="submit" loading={reviewMutation.isPending}>
-                      {currentFeedback ? '更新复核结果' : '提交复核结果'}
-                    </Button>
-                    <Button onClick={() => form.resetFields()}>重置表单</Button>
-                  </Space>
-                </Form>
-              ) : (
-                <Empty description="请选择一条记录后再进行复核" />
-              )}
+                <Space>
+                  <Button type="primary" htmlType="submit" loading={reviewMutation.isPending}>
+                    {currentFeedback ? '更新复核结果' : '提交复核结果'}
+                  </Button>
+                  <Button onClick={() => form.resetFields()}>重置表单</Button>
+                </Space>
+              </Form>
+              {!selectedRecord ? <Empty description="请选择一条记录后再进行复核" /> : null}
             </Card>
           </Space>
         </Col>

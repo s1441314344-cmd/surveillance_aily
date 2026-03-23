@@ -1,4 +1,4 @@
-import { Card, List, Tag, Typography } from 'antd';
+import { Card, Space, Tag, Typography } from 'antd';
 
 const { Paragraph, Title } = Typography;
 
@@ -17,11 +17,13 @@ export function PagePlaceholder({ title, description, bullets, phase = 'Phase 1'
         {title}
       </Title>
       <Paragraph type="secondary">{description}</Paragraph>
-      <List
-        size="small"
-        dataSource={bullets}
-        renderItem={(item) => <List.Item>{item}</List.Item>}
-      />
+      <Space orientation="vertical" size={8}>
+        {bullets.map((item) => (
+          <Paragraph key={item} style={{ marginBottom: 0 }}>
+            - {item}
+          </Paragraph>
+        ))}
+      </Space>
     </Card>
   );
 }

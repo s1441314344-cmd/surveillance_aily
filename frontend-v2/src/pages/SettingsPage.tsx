@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Card, Col, Empty, Form, Input, List, Row, Select, Space, Spin, Tag, Typography } from 'antd';
+import { App, Button, Card, Col, Empty, Form, Input, Row, Select, Space, Spin, Tag, Typography } from 'antd';
 import { listModelProviders, updateModelProvider } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 
@@ -84,7 +84,7 @@ export function SettingsPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           模型与系统设置
@@ -100,19 +100,28 @@ export function SettingsPage() {
             {providerQuery.isLoading ? (
               <Spin />
             ) : providers.length ? (
-              <List
-                dataSource={providers}
-                renderItem={(item) => (
-                  <List.Item
+              <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                {providers.map((item) => (
+                  <div
+                    key={item.provider}
+                    role="button"
+                    tabIndex={0}
                     style={{
                       cursor: 'pointer',
-                      paddingInline: 12,
+                      padding: 12,
                       borderRadius: 12,
-                      background: item.provider === effectiveSelectedProvider ? '#f0f7ff' : 'transparent',
+                      border: '1px solid #f0f0f0',
+                      background: item.provider === effectiveSelectedProvider ? '#f0f7ff' : '#fff',
                     }}
                     onClick={() => setSelectedProvider(item.provider)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedProvider(item.provider);
+                      }
+                    }}
                   >
-                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
                       <Space>
                         <Text strong>{item.display_name}</Text>
                         <Tag color={item.status === 'active' ? 'green' : 'default'}>{item.status}</Tag>
@@ -120,9 +129,9 @@ export function SettingsPage() {
                       <Text type="secondary">{item.default_model}</Text>
                       <Text type="secondary">{item.api_key_masked || '尚未配置 API Key'}</Text>
                     </Space>
-                  </List.Item>
-                )}
-              />
+                  </div>
+                ))}
+              </Space>
             ) : (
               <Empty description="暂无模型提供方" />
             )}

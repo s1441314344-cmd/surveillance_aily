@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -21,7 +21,7 @@ import {
 } from 'antd';
 import type { RcFile, UploadFile } from 'antd/es/upload/interface';
 import { InboxOutlined } from '@ant-design/icons';
-import { listCameras, listStrategies } from '@/shared/api/configCenter';
+import { listCameras, listStrategies, type Camera, type Strategy } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import {
   cancelJob,
@@ -89,6 +89,10 @@ const triggerModeLabelMap: Record<string, string> = {
   schedule: '定时触发',
 };
 const retryableJobStatus = new Set(['failed', 'cancelled']);
+const EMPTY_STRATEGIES: Strategy[] = [];
+const EMPTY_CAMERAS: Camera[] = [];
+const EMPTY_JOBS: Job[] = [];
+const EMPTY_JOB_SCHEDULES: JobSchedule[] = [];
 
 function formatDateTime(value: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
@@ -102,9 +106,11 @@ export function JobsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [triggerModeFilter, setTriggerModeFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
+  const [scheduleFilter, setScheduleFilter] = useState<string>('all');
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
   const [scheduleCameraFilter, setScheduleCameraFilter] = useState<string>('all');
   const [scheduleStrategyFilter, setScheduleStrategyFilter] = useState<string>('all');
+  const [editScheduleType, setEditScheduleType] = useState<EditScheduleFormValues['scheduleType']>('interval_minutes');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<JobSchedule | null>(null);
@@ -120,12 +126,13 @@ export function JobsPage() {
   });
 
   const jobsQuery = useQuery({
-    queryKey: ['jobs', statusFilter, triggerModeFilter, cameraFilter],
+    queryKey: ['jobs', statusFilter, triggerModeFilter, cameraFilter, scheduleFilter],
     queryFn: () =>
       listJobs({
         status: statusFilter === 'all' ? undefined : statusFilter,
         triggerMode: triggerModeFilter === 'all' ? undefined : triggerModeFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
+        scheduleId: scheduleFilter === 'all' ? undefined : scheduleFilter,
       }),
     refetchInterval: 5000,
   });
@@ -147,14 +154,30 @@ export function JobsPage() {
     enabled: Boolean(selectedJobId),
   });
 
-  const strategies = strategyQuery.data ?? [];
-  const cameras = camerasQuery.data ?? [];
-  const jobs = jobsQuery.data ?? [];
-  const schedules = schedulesQuery.data ?? [];
+  const strategies = strategyQuery.data ?? EMPTY_STRATEGIES;
+  const cameras = camerasQuery.data ?? EMPTY_CAMERAS;
+  const jobs = jobsQuery.data ?? EMPTY_JOBS;
+  const schedules = schedulesQuery.data ?? EMPTY_JOB_SCHEDULES;
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
   const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
-  const editScheduleType = Form.useWatch('scheduleType', scheduleEditForm) ?? 'interval_minutes';
+  const scheduleFilterOptions = useMemo(
+    () => [
+      { label: '全部计划', value: 'all' },
+      ...schedules.map((item) => ({
+        label: `${formatDateTime(item.next_run_at)} · ${item.id.slice(0, 8)}`,
+        value: item.id,
+      })),
+    ],
+    [schedules],
+  );
+
+  useEffect(() => {
+    const selectedStrategyId = form.getFieldValue('strategyId');
+    if (!selectedStrategyId && strategies.length > 0) {
+      form.setFieldValue('strategyId', strategies[0].id);
+    }
+  }, [form, strategies]);
 
   const invalidateJobs = () =>
     Promise.all([
@@ -368,6 +391,7 @@ export function JobsPage() {
   };
 
   const handleOpenScheduleEditor = (schedule: JobSchedule) => {
+    setEditScheduleType(schedule.schedule_type as EditScheduleFormValues['scheduleType']);
     setEditingSchedule(schedule);
     scheduleEditForm.setFieldsValue({
       scheduleType: schedule.schedule_type as EditScheduleFormValues['scheduleType'],
@@ -379,6 +403,7 @@ export function JobsPage() {
 
   const handleCloseScheduleEditor = () => {
     setEditingSchedule(null);
+    setEditScheduleType('interval_minutes');
     scheduleEditForm.resetFields();
   };
 
@@ -406,7 +431,7 @@ export function JobsPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           任务中心
@@ -541,7 +566,7 @@ export function JobsPage() {
               style={{ marginTop: 16 }}
               type="info"
               showIcon
-              message="当前范围"
+              title="当前范围"
               description={
                 taskMode === 'upload'
                   ? '上传图片会先保存输入文件并创建 queued 任务，后续由异步 worker 执行分析。'
@@ -595,6 +620,18 @@ export function JobsPage() {
                     })),
                   ]}
                   style={{ width: 170 }}
+                />
+                <Select
+                  size="small"
+                  value={scheduleFilter}
+                  onChange={(value) => {
+                    setScheduleFilter(value);
+                    if (value !== 'all') {
+                      setTriggerModeFilter('schedule');
+                    }
+                  }}
+                  options={scheduleFilterOptions}
+                  style={{ width: 190 }}
                 />
               </Space>
             }
@@ -847,6 +884,16 @@ export function JobsPage() {
                 <Space size={8}>
                   <Button
                     size="small"
+                    onClick={() => {
+                      setTriggerModeFilter('schedule');
+                      setScheduleFilter(record.id);
+                      setSelectedJobId(null);
+                    }}
+                  >
+                    查看任务
+                  </Button>
+                  <Button
+                    size="small"
                     onClick={() => handleOpenScheduleEditor(record)}
                     disabled={updateScheduleMutation.isPending}
                   >
@@ -888,6 +935,7 @@ export function JobsPage() {
 
       <Modal
         open={Boolean(editingSchedule)}
+        forceRender
         title="编辑定时计划"
         onCancel={handleCloseScheduleEditor}
         onOk={() => scheduleEditForm.submit()}
@@ -899,6 +947,11 @@ export function JobsPage() {
           form={scheduleEditForm}
           layout="vertical"
           onFinish={handleSubmitScheduleEdit}
+          onValuesChange={(changedValues: Partial<EditScheduleFormValues>) => {
+            if (changedValues.scheduleType) {
+              setEditScheduleType(changedValues.scheduleType);
+            }
+          }}
           initialValues={{ scheduleType: 'interval_minutes' }}
         >
           <Form.Item

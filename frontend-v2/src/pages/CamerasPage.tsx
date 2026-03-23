@@ -203,7 +203,7 @@ export function CamerasPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           摄像头中心
@@ -227,7 +227,7 @@ export function CamerasPage() {
             {cameraQuery.isLoading ? (
               <Spin />
             ) : cameras.length ? (
-              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <Space orientation="vertical" size={12} style={{ width: '100%' }}>
                 {cameras.map((camera: Camera) => (
                   <Card
                     key={camera.id}
@@ -238,7 +238,7 @@ export function CamerasPage() {
                     }}
                     onClick={() => setSelectedCameraId(camera.id)}
                   >
-                    <Space direction="vertical" size={4}>
+                    <Space orientation="vertical" size={4}>
                       <Space>
                         <Text strong>{camera.name}</Text>
                         <Tag>{camera.protocol.toUpperCase()}</Tag>
@@ -256,7 +256,7 @@ export function CamerasPage() {
         </Col>
 
         <Col xs={24} lg={16}>
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <Card
               title={effectiveSelectedCameraId ? '编辑摄像头' : '新建摄像头'}
               extra={

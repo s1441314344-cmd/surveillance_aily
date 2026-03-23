@@ -11,6 +11,7 @@ from app.services.job_service import cancel_job as cancel_job_record
 from app.services.job_service import create_camera_once_job as create_camera_once_job_record
 from app.services.job_service import create_upload_job as create_upload_job_record
 from app.services.job_service import get_job_or_404, list_jobs as list_job_records, serialize_job
+from app.services.job_service import run_job_inline as run_job_inline_record
 from app.services.job_service import retry_job as retry_job_record
 from app.services.rbac import ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR
 
@@ -90,3 +91,12 @@ def retry_job(
     db: Session = Depends(get_db),
 ):
     return retry_job_record(db, source_job=get_job_or_404(db, job_id), current_user=current_user)
+
+
+@router.post("/{job_id}/run", response_model=JobRead)
+def run_job_inline(
+    job_id: str,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    return run_job_inline_record(db, job=get_job_or_404(db, job_id))

@@ -11,6 +11,13 @@ npm run dev
 
 默认开发端口：`5174`
 
+## E2E 回归
+
+```bash
+npx playwright install chromium
+npm run e2e
+```
+
 ## 当前包含
 
 - 应用布局骨架

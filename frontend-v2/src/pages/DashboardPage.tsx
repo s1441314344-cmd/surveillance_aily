@@ -91,7 +91,7 @@ export function DashboardPage() {
     summaryQuery.error || trendsQuery.error || strategiesQuery.error || anomaliesQuery.error;
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           总览看板
@@ -150,7 +150,7 @@ export function DashboardPage() {
         <Alert
           type="error"
           showIcon
-          message="看板数据加载失败"
+          title="看板数据加载失败"
           description={getApiErrorMessage(dashboardError, '请稍后重试')}
         />
       ) : null}
@@ -191,7 +191,7 @@ export function DashboardPage() {
 
         <Col xs={24} xl={9}>
           <Card title="运行质量" loading={summaryQuery.isLoading} style={{ height: '100%' }}>
-            <Space direction="vertical" size={18} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={18} style={{ width: '100%' }}>
               <div>
                 <Text strong>任务成功率</Text>
                 <Progress percent={summary?.success_rate ?? 0} strokeColor="#1677ff" />

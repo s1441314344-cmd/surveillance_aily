@@ -61,6 +61,40 @@ make v2-smoke
 
 该命令会基于正在运行的 API / worker / scheduler 执行上传任务、失败任务重试和定时任务的 smoke 验证。
 
+如需执行前端 E2E 基线回归（登录 + 核心页面可达）：
+
+```bash
+make v2-e2e
+```
+
+首次使用 Playwright 时如需安装浏览器：
+
+```bash
+cd frontend-v2
+npx playwright install chromium
+```
+
+如需做上传任务性能探测（并发提交 + 完成率 + 时延统计）：
+
+```bash
+make v2-perf
+./scripts/v2/perf.sh --jobs 50 --concurrency 10 --files-per-job 2 --api-base http://127.0.0.1:8000
+```
+
+如需做多轮稳定性回归（检查任务是否出现长期未收敛）：
+
+```bash
+make v2-soak
+./scripts/v2/soak.sh --rounds 5 --jobs-per-round 20 --concurrency 8 --poll-timeout-seconds 180
+```
+
+如需一键执行上线前核心检查（自动拉起本地进程并执行 smoke + perf + soak）：
+
+```bash
+make v2-preflight
+./scripts/v2/preflight.sh --with-e2e
+```
+
 如需单独控制依赖：
 
 ```bash

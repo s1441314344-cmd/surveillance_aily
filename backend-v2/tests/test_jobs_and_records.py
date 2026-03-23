@@ -84,6 +84,35 @@ def test_upload_job_rejects_unsupported_file_extension(client):
     assert "Unsupported file format" in create_job_response.json()["detail"]
 
 
+def test_run_job_inline_endpoint_processes_queued_job(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-run-inline.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    queued_job = create_job_response.json()
+    assert queued_job["status"] == "queued"
+
+    run_inline_response = client.post(f"/api/jobs/{queued_job['id']}/run", headers=headers)
+    assert run_inline_response.status_code == 200
+    processed_job = run_inline_response.json()
+    assert processed_job["id"] == queued_job["id"]
+    assert processed_job["status"] == "completed"
+    assert processed_job["started_at"] is not None
+    assert processed_job["finished_at"] is not None
+
+    records_response = client.get(f"/api/task-records?job_id={queued_job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["job_id"] == queued_job["id"]
+
+
 def test_upload_job_rejects_unsupported_content_type(client):
     login_data = login_as_admin(client)
     headers = auth_headers(login_data["access_token"])

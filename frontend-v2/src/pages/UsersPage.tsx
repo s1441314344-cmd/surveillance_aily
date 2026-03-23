@@ -106,7 +106,7 @@ export function UsersPage() {
       title: '用户',
       key: 'user',
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text strong>{record.display_name}</Text>
           <Text type="secondary">{record.username}</Text>
         </Space>
@@ -157,7 +157,7 @@ export function UsersPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           用户与权限
@@ -171,7 +171,7 @@ export function UsersPage() {
         <Alert
           type="warning"
           showIcon
-          message="当前账号不是系统管理员"
+          title="当前账号不是系统管理员"
           description="你可以查看系统其它模块，但用户与权限管理仅对 system_admin 开放。"
         />
       ) : null}
@@ -184,17 +184,17 @@ export function UsersPage() {
         </Col>
         <Col xs={24} sm={12} xl={6}>
           <Card>
-            <Statistic title="启用用户" value={userStats.active} valueStyle={{ color: '#389e0d' }} />
+            <Statistic title="启用用户" value={userStats.active} styles={{ content: { color: '#389e0d' } }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} xl={6}>
           <Card>
-            <Statistic title="停用用户" value={userStats.inactive} valueStyle={{ color: '#8c8c8c' }} />
+            <Statistic title="停用用户" value={userStats.inactive} styles={{ content: { color: '#8c8c8c' } }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} xl={6}>
           <Card>
-            <Statistic title="管理员数量" value={userStats.admins} valueStyle={{ color: '#cf1322' }} />
+            <Statistic title="管理员数量" value={userStats.admins} styles={{ content: { color: '#cf1322' } }} />
           </Card>
         </Col>
       </Row>
@@ -246,11 +246,11 @@ export function UsersPage() {
                 />
               </Form.Item>
 
-              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <Space orientation="vertical" size={12} style={{ width: '100%' }}>
                 <Alert
                   type="info"
                   showIcon
-                  message="角色建议"
+                  title="角色建议"
                   description="普通查看账号建议默认使用“分析查看者”；只有负责配置或运维的人再额外分配管理角色。"
                 />
                 <Button type="primary" htmlType="submit" block loading={createMutation.isPending}>

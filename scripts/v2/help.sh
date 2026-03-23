@@ -12,6 +12,10 @@ Smart Inspection V2 local commands:
   make v2-frontend     # run frontend dev server
   make v2-dev          # deps-up + startup hint
   make v2-smoke        # verify upload/schedule async flows plus failed-job retry against running stack
+  make v2-e2e          # run Playwright E2E baseline (auto start test api + frontend)
+  make v2-perf         # run upload-job performance probe and print latency/throughput summary
+  make v2-soak         # run multi-round async queue soak test and detect unresolved jobs
+  make v2-preflight    # run smoke + perf + soak in one command with managed local processes
   make v2-backfill     # dry-run legacy SQLite -> V2 backfill report
   make v2-eval         # run model evaluation dataset against provider adapters
   make v2-camera-check # run deep RTSP/mock camera diagnostic

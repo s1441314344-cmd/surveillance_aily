@@ -1,4 +1,5 @@
 import {
+  AuditOutlined,
   CameraOutlined,
   DashboardOutlined,
   FileSearchOutlined,
@@ -23,6 +24,7 @@ const menuItems = [
   { key: '/jobs', icon: <ScheduleOutlined />, label: '任务中心' },
   { key: '/records', icon: <FileSearchOutlined />, label: '任务记录' },
   { key: '/feedback', icon: <SafetyCertificateOutlined />, label: '人工复核' },
+  { key: '/audit-logs', icon: <AuditOutlined />, label: '操作审计' },
   { key: '/settings', icon: <SettingOutlined />, label: '模型与设置' },
   { key: '/users', icon: <TeamOutlined />, label: '用户与权限' },
 ];
@@ -32,11 +34,17 @@ export function AppLayout() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const canViewAuditLogs = user?.roles.includes('system_admin') ?? false;
+
+  const filteredMenuItems = useMemo(
+    () => menuItems.filter((item) => (item.key === '/audit-logs' ? canViewAuditLogs : true)),
+    [canViewAuditLogs],
+  );
 
   const selectedKeys = useMemo(() => {
-    const matched = menuItems.find((item) => location.pathname.startsWith(item.key));
+    const matched = filteredMenuItems.find((item) => location.pathname.startsWith(item.key));
     return matched ? [matched.key] : ['/dashboard'];
-  }, [location.pathname]);
+  }, [filteredMenuItems, location.pathname]);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -50,7 +58,7 @@ export function AppLayout() {
         <Menu
           mode="inline"
           selectedKeys={selectedKeys}
-          items={menuItems}
+          items={filteredMenuItems}
           onClick={({ key }) => navigate(key)}
           style={{ borderInlineEnd: 0 }}
         />
@@ -66,7 +74,7 @@ export function AppLayout() {
             paddingInline: 24,
           }}
         >
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text strong>V2 平台骨架</Text>
             <Text type="secondary">当前阶段：Backlog 拆分后初始化工程</Text>
           </Space>
