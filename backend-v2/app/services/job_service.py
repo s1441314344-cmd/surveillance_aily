@@ -264,6 +264,15 @@ def retry_job(
     return serialize_job(new_job)
 
 
+def run_job_inline(db: Session, *, job: Job) -> JobRead:
+    from app.services.job_execution_service import process_job as process_job_now
+
+    process_job_now(job.id)
+    db.expire_all()
+    refreshed_job = get_job_or_404(db, job.id)
+    return serialize_job(refreshed_job)
+
+
 def _save_upload_inputs(db: Session, *, job_id: str, files: list[UploadFile]) -> list[FileAsset]:
     storage = FileStorageService()
     assets: list[FileAsset] = []
