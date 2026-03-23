@@ -18,6 +18,7 @@ from app.services.model_evaluation_service import (
     build_targets,
     evaluate_model_targets,
     load_pricing_table,
+    save_evaluation_markdown_report,
     save_evaluation_report,
 )
 from app.core.database import SessionLocal
@@ -58,6 +59,16 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional output path for the generated JSON report.",
     )
+    parser.add_argument(
+        "--markdown-output",
+        default=None,
+        help="Optional output path for the generated Markdown report.",
+    )
+    parser.add_argument(
+        "--report-title",
+        default="智能巡检系统 V2 模型评估报告",
+        help="Markdown report title when --markdown-output is provided.",
+    )
     return parser.parse_args()
 
 
@@ -86,9 +97,16 @@ def main() -> int:
     )
     report.pricing_path = str(Path(args.pricing).expanduser().resolve()) if args.pricing else None
 
+    payload = {"summary": report.to_dict()["summaries"]}
     if args.output:
         output_path = save_evaluation_report(report, args.output)
-        print(json.dumps({"report_path": str(output_path), "summary": report.to_dict()["summaries"]}, ensure_ascii=False, indent=2))
+        payload["report_path"] = str(output_path)
+    if args.markdown_output:
+        markdown_path = save_evaluation_markdown_report(report, args.markdown_output, title=args.report_title)
+        payload["markdown_report_path"] = str(markdown_path)
+
+    if args.output or args.markdown_output:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
     print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))

@@ -14,6 +14,7 @@ Smart Inspection V2 local commands:
   make v2-smoke        # verify upload + scheduled async flows against running stack
   make v2-backfill     # dry-run legacy SQLite -> V2 backfill report
   make v2-eval         # run model evaluation dataset against provider adapters
+  make v2-camera-check # run deep RTSP/mock camera diagnostic
   make v2-deps-down    # stop postgres + redis
 
 Recommended flow:
@@ -32,4 +33,8 @@ Backfill examples:
 Evaluation examples:
   make v2-eval
   ./scripts/v2/evaluate.sh --target zhipu:glm-4v-plus --target openai:gpt-5-mini --repeats 3
+
+Camera diagnostic examples:
+  ./scripts/v2/camera-check.sh --rtsp-url rtsp://mock/diag
+  ./scripts/v2/camera-check.sh --camera-id <camera-id>
 EOF

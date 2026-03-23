@@ -55,6 +55,7 @@ make v2-frontend
 make v2-smoke
 make v2-backfill
 make v2-eval
+make v2-camera-check
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
@@ -68,6 +69,8 @@ make v2-eval
 `PROVIDER_MOCK_FALLBACK_ENABLED=true` 时，如果模型提供方未配置可用密钥，adapter 会回退到本地 mock 输出，方便开发和测试；生产环境建议关闭该开关，并在“模型提供方管理”中配置真实 API Key。
 
 `make v2-eval` 会读取样本集清单，按 provider/model 执行多轮评估，输出准确率、结构化成功率、稳定性、平均时延和成本估算。
+
+`make v2-camera-check` 会执行深度摄像头诊断，尝试真实抓帧并输出时延、图片大小、像素尺寸、错误信息和诊断快照路径。
 
 ## 异步执行说明
 
@@ -129,7 +132,8 @@ make v2-eval
   --pricing ./data/model_pricing.example.json \
   --target zhipu:glm-4v-plus \
   --target openai:gpt-5-mini \
-  --output ./data/eval-report.json
+  --output ./data/eval-report.json \
+  --markdown-output ./data/eval-report.md
 ```
 
 数据文件说明：
@@ -137,6 +141,29 @@ make v2-eval
 - 样本清单示例：[model_eval_dataset.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/data/model_eval_dataset.example.json)
 - 价格表示例：[model_pricing.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/data/model_pricing.example.json)
 - 指标默认包括：请求成功率、结构化成功率、准确率、稳定性、平均时延、Token 用量、成本估算
+
+## 摄像头深度诊断
+
+检查一个 ad-hoc RTSP 地址：
+
+```bash
+./scripts/v2/camera-check.sh --rtsp-url rtsp://mock/diag --name demo-camera
+```
+
+检查已配置的摄像头：
+
+```bash
+./scripts/v2/camera-check.sh --camera-id <camera-id>
+```
+
+诊断输出内容包括：
+
+- 是否抓帧成功
+- 诊断时延
+- 图片大小和像素尺寸
+- 已脱敏的 RTSP 地址
+- 诊断快照保存路径
+- 失败时的错误信息
 
 ## 当前包含
 
@@ -156,6 +183,7 @@ make v2-eval
 - `/api/model-providers`
 - `/api/strategies`
 - `/api/cameras`
+- `/api/cameras/{id}/diagnose`
 - `/api/jobs`
 - `/api/job-schedules`
 - `/api/task-records`

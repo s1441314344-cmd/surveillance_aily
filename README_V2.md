@@ -85,6 +85,14 @@ make v2-backfill
 ```bash
 make v2-eval
 ./scripts/v2/evaluate.sh --target zhipu:glm-4v-plus --target openai:gpt-5-mini --repeats 3
+./scripts/v2/evaluate.sh --output /tmp/eval.json --markdown-output /tmp/eval.md
+```
+
+如需执行摄像头深度诊断：
+
+```bash
+make v2-camera-check
+./scripts/v2/camera-check.sh --rtsp-url rtsp://mock/diag --name demo-camera
 ```
 
 ## 本地启动顺序
@@ -124,4 +132,5 @@ npm run dev
 - 已完成：V2 backlog 拆分、前后端基础骨架、核心路由占位、本地依赖编排、统一异步任务链路、独立 scheduler 进程、本地联调脚本、历史数据回填 dry-run / apply 工具
 - 已补充：OpenAI / 智谱 provider adapter 真实调用实现，开发环境可通过 `PROVIDER_MOCK_FALLBACK_ENABLED=true` 保持无密钥可联调
 - 已补充：模型样本评估脚本、示例样本清单、价格表和指标汇总输出
-- 下一步建议：进入“联调与验证”小周期，优先完成 RTSP 真流验证、真实样本评估报告沉淀和系统级回归
+- 已补充：RTSP 深度诊断 CLI / API、评估 Markdown 报告导出
+- 下一步建议：进入“联调与验证”小周期，优先完成真实摄像头白名单验证、真实业务样本报告沉淀和系统级回归

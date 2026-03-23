@@ -5,6 +5,7 @@ from app.services.model_evaluation_service import (
     EvaluationTarget,
     evaluate_model_targets,
     load_evaluation_dataset,
+    render_evaluation_markdown,
 )
 from app.services.providers.base import ProviderResponse
 
@@ -91,6 +92,12 @@ def test_evaluate_model_targets_builds_summary_metrics(monkeypatch, tmp_path):
     assert zhipu_summary.stability_rate == 50.0
     assert zhipu_summary.estimated_total_cost == 0.0004
     assert zhipu_summary.sample_accuracy == {"sample-1": False, "sample-2": True}
+
+    markdown = render_evaluation_markdown(report, title="测试评估报告")
+    assert "# 测试评估报告" in markdown
+    assert "| openai:gpt-5-mini | 100.0% | 100.0% | 100.0% | 100.0% |" in markdown
+    assert "| zhipu:glm-4v-plus | 100.0% | 100.0% | 75.0% | 50.0% |" in markdown
+    assert "| sample-1 | mismatch |" in markdown
 
 
 def create_dataset_fixture(tmp_path: Path) -> Path:

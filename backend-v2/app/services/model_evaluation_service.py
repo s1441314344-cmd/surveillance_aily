@@ -183,6 +183,85 @@ def save_evaluation_report(report: EvaluationReport, output_path: str | Path) ->
     return path
 
 
+def render_evaluation_markdown(
+    report: EvaluationReport,
+    *,
+    title: str = "智能巡检系统 V2 模型评估报告",
+) -> str:
+    lines = [
+        f"# {title}",
+        "",
+        f"- 数据集: `{report.dataset_path}`",
+        f"- 评估目标: {', '.join(report.targets) if report.targets else 'N/A'}",
+        f"- 重复轮次: `{report.repeats}`",
+        f"- 并发数: `{report.max_workers}`",
+    ]
+    if report.pricing_path:
+        lines.append(f"- 价格表: `{report.pricing_path}`")
+    lines.extend(
+        [
+            "",
+            "## 汇总结果",
+            "",
+            "| Target | Success Rate | Structured Rate | Accuracy Rate | Stability Rate | Avg Latency (ms) | Avg Cost |",
+            "|---|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+
+    for summary in report.summaries:
+        lines.append(
+            "| {target} | {success} | {structured} | {accuracy} | {stability} | {latency} | {cost} |".format(
+                target=summary.target,
+                success=_format_percent(summary.request_success_rate),
+                structured=_format_percent(summary.structured_success_rate),
+                accuracy=_format_percent(summary.accuracy_rate),
+                stability=_format_percent(summary.stability_rate),
+                latency=summary.average_latency_ms,
+                cost=_format_cost(summary.estimated_average_cost),
+            )
+        )
+
+    for summary in report.summaries:
+        lines.extend(
+            [
+                "",
+                f"## {summary.target}",
+                "",
+                f"- 总运行次数: `{summary.total_runs}`",
+                f"- 样本数: `{summary.total_samples}`",
+                f"- 请求成功率: `{_format_percent(summary.request_success_rate)}`",
+                f"- 结构化成功率: `{_format_percent(summary.structured_success_rate)}`",
+                f"- 准确率: `{_format_percent(summary.accuracy_rate)}`",
+                f"- 稳定性: `{_format_percent(summary.stability_rate)}`",
+                f"- 平均时延: `{summary.average_latency_ms} ms`",
+                f"- 最大时延: `{summary.max_latency_ms} ms`",
+                f"- Token 用量: input=`{summary.total_input_tokens}` output=`{summary.total_output_tokens}` total=`{summary.total_tokens}`",
+                f"- 总成本估算: `{_format_cost(summary.estimated_total_cost)}`",
+                "",
+                "### 样本准确性",
+                "",
+                "| Sample | Accuracy |",
+                "|---|---|",
+            ]
+        )
+        for sample_id, sample_accuracy in summary.sample_accuracy.items():
+            lines.append(f"| {sample_id} | {_format_accuracy_status(sample_accuracy)} |")
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def save_evaluation_markdown_report(
+    report: EvaluationReport,
+    output_path: str | Path,
+    *,
+    title: str = "智能巡检系统 V2 模型评估报告",
+) -> Path:
+    path = Path(output_path).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_evaluation_markdown(report, title=title), encoding="utf-8")
+    return path
+
+
 def _evaluate_single_run(*, target: EvaluationTarget, sample: EvaluationSample, repeat_index: int) -> EvaluationRunResult:
     adapter = get_provider_adapter(target.provider)
     started_at = time.perf_counter()
@@ -397,3 +476,23 @@ def _rate(numerator: int, denominator: int) -> float:
     if denominator <= 0:
         return 0.0
     return round((numerator / denominator) * 100, 2)
+
+
+def _format_percent(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value}%"
+
+
+def _format_cost(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"${value:.8f}"
+
+
+def _format_accuracy_status(value: bool | None) -> str:
+    if value is True:
+        return "match"
+    if value is False:
+        return "mismatch"
+    return "n/a"
