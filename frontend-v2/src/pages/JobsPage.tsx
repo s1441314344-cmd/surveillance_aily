@@ -105,6 +105,7 @@ export function JobsPage() {
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
   const [scheduleCameraFilter, setScheduleCameraFilter] = useState<string>('all');
   const [scheduleStrategyFilter, setScheduleStrategyFilter] = useState<string>('all');
+  const [editScheduleType, setEditScheduleType] = useState<EditScheduleFormValues['scheduleType']>('interval_minutes');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<JobSchedule | null>(null);
@@ -154,7 +155,6 @@ export function JobsPage() {
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
   const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
-  const editScheduleType = Form.useWatch('scheduleType', scheduleEditForm) ?? 'interval_minutes';
 
   const invalidateJobs = () =>
     Promise.all([
@@ -368,6 +368,7 @@ export function JobsPage() {
   };
 
   const handleOpenScheduleEditor = (schedule: JobSchedule) => {
+    setEditScheduleType(schedule.schedule_type as EditScheduleFormValues['scheduleType']);
     setEditingSchedule(schedule);
     scheduleEditForm.setFieldsValue({
       scheduleType: schedule.schedule_type as EditScheduleFormValues['scheduleType'],
@@ -379,6 +380,7 @@ export function JobsPage() {
 
   const handleCloseScheduleEditor = () => {
     setEditingSchedule(null);
+    setEditScheduleType('interval_minutes');
     scheduleEditForm.resetFields();
   };
 
@@ -406,7 +408,7 @@ export function JobsPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           任务中心
@@ -541,7 +543,7 @@ export function JobsPage() {
               style={{ marginTop: 16 }}
               type="info"
               showIcon
-              message="当前范围"
+              title="当前范围"
               description={
                 taskMode === 'upload'
                   ? '上传图片会先保存输入文件并创建 queued 任务，后续由异步 worker 执行分析。'
@@ -888,6 +890,7 @@ export function JobsPage() {
 
       <Modal
         open={Boolean(editingSchedule)}
+        forceRender
         title="编辑定时计划"
         onCancel={handleCloseScheduleEditor}
         onOk={() => scheduleEditForm.submit()}
@@ -899,6 +902,11 @@ export function JobsPage() {
           form={scheduleEditForm}
           layout="vertical"
           onFinish={handleSubmitScheduleEdit}
+          onValuesChange={(changedValues: Partial<EditScheduleFormValues>) => {
+            if (changedValues.scheduleType) {
+              setEditScheduleType(changedValues.scheduleType);
+            }
+          }}
           initialValues={{ scheduleType: 'interval_minutes' }}
         >
           <Form.Item

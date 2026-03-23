@@ -42,7 +42,7 @@ export function LoginPage() {
   return (
     <div className="login-shell">
       <Card className="login-card">
-        <Space direction="vertical" size={16}>
+        <Space orientation="vertical" size={16}>
           <Title level={2} style={{ marginBottom: 0 }}>
             智能巡检系统 V2
           </Title>
@@ -52,7 +52,7 @@ export function LoginPage() {
           <Alert
             type="info"
             showIcon
-            message="默认账号"
+            title="默认账号"
             description="用户名：admin，密码：admin123456"
           />
           <Form

@@ -74,7 +74,7 @@ export function AppLayout() {
             paddingInline: 24,
           }}
         >
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text strong>V2 平台骨架</Text>
             <Text type="secondary">当前阶段：Backlog 拆分后初始化工程</Text>
           </Space>

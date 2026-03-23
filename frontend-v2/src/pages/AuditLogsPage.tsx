@@ -81,7 +81,7 @@ export function AuditLogsPage() {
       {
         title: '请求',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Tag color="blue">{record.http_method}</Tag>
             <Text code>{record.request_path}</Text>
           </Space>
@@ -91,7 +91,7 @@ export function AuditLogsPage() {
         title: '结果',
         width: 120,
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Tag color={record.success ? 'green' : 'red'}>{record.success ? '成功' : '失败'}</Tag>
             <Text type="secondary">{record.status_code}</Text>
           </Space>
@@ -128,7 +128,7 @@ export function AuditLogsPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           操作审计日志
@@ -142,7 +142,7 @@ export function AuditLogsPage() {
         <Alert
           type="warning"
           showIcon
-          message="当前账号无权限查看审计日志"
+          title="当前账号无权限查看审计日志"
           description="审计日志仅开放给 system_admin。"
         />
       ) : (

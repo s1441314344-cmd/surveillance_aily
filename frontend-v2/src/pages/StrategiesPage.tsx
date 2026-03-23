@@ -8,7 +8,6 @@ import {
   Empty,
   Form,
   Input,
-  List,
   Row,
   Select,
   Space,
@@ -234,7 +233,7 @@ export function StrategiesPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           策略中心
@@ -270,19 +269,28 @@ export function StrategiesPage() {
             {strategyQuery.isLoading ? (
               <Spin />
             ) : strategies.length ? (
-              <List
-                dataSource={strategies}
-                renderItem={(item: Strategy) => (
-                  <List.Item
+              <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                {strategies.map((item: Strategy) => (
+                  <div
+                    key={item.id}
+                    role="button"
+                    tabIndex={0}
                     style={{
                       cursor: 'pointer',
-                      paddingInline: 12,
+                      padding: 12,
                       borderRadius: 12,
-                      background: item.id === effectiveSelectedStrategyId ? '#f0f7ff' : 'transparent',
+                      border: '1px solid #f0f0f0',
+                      background: item.id === effectiveSelectedStrategyId ? '#f0f7ff' : '#fff',
                     }}
                     onClick={() => setSelectedStrategyId(item.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedStrategyId(item.id);
+                      }
+                    }}
                   >
-                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
                       <Space>
                         <Text strong>{item.name}</Text>
                         {item.is_preset ? <Tag color="purple">预设</Tag> : null}
@@ -291,9 +299,9 @@ export function StrategiesPage() {
                       <Text type="secondary">{item.model_provider} / {item.model_name}</Text>
                       <Text type="secondary">版本 v{item.version}</Text>
                     </Space>
-                  </List.Item>
-                )}
-              />
+                  </div>
+                ))}
+              </Space>
             ) : (
               <Empty description="当前筛选条件下暂无策略" />
             )}

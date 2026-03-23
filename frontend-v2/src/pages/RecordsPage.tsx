@@ -160,7 +160,7 @@ export function RecordsPage() {
   const detail = recordDetailQuery.data;
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ marginBottom: 0 }}>
           任务记录
@@ -302,12 +302,12 @@ export function RecordsPage() {
 
       <Drawer
         open={Boolean(selectedRecordId)}
-        width={720}
+        size="large"
         title="记录详情"
         onClose={handleCloseDetail}
       >
         {detail ? (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Card size="small" title="原始图片">
@@ -324,7 +324,7 @@ export function RecordsPage() {
               </Col>
               <Col xs={24} md={12}>
                 <Card size="small" title="基础信息">
-                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                  <Space orientation="vertical" size={8} style={{ width: '100%' }}>
                     <Text>记录 ID：{detail.id}</Text>
                     <Text>任务 ID：{detail.job_id}</Text>
                     <Text>策略：{detail.strategy_name}</Text>
