@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
@@ -28,3 +28,31 @@ def init_database() -> None:
     from app.models.base import Base
 
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_schema_columns()
+
+
+def ensure_runtime_schema_columns() -> None:
+    runtime_schema_patches = {
+        "jobs": {
+            "schedule_id": "VARCHAR(36)",
+            "celery_task_id": "VARCHAR(100)",
+            "started_at": "TIMESTAMP",
+            "finished_at": "TIMESTAMP",
+        },
+        "job_schedules": {
+            "next_run_at": "TIMESTAMP",
+            "last_run_at": "TIMESTAMP",
+            "last_error": "TEXT",
+        },
+    }
+
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        for table_name, columns in runtime_schema_patches.items():
+            if table_name not in inspector.get_table_names():
+                continue
+            existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, column_type in columns.items():
+                if column_name in existing_columns:
+                    continue
+                connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"))

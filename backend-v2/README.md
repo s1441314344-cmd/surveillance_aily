@@ -1,6 +1,6 @@
 # backend-v2
 
-V2 后端工程骨架，采用 FastAPI + SQLAlchemy + Alembic + Redis + Celery。
+智能巡检系统 V2 后端，采用 FastAPI + SQLAlchemy + Redis + Celery，并通过独立 scheduler 进程触发定时任务。
 
 ## 本地启动
 
@@ -34,6 +34,20 @@ uvicorn app.main:app --reload --port 8000
 celery -A app.core.celery_app.celery_app worker --loglevel=info
 ```
 
+6. 启动 scheduler
+
+```bash
+python -m app.schedulers.runner
+```
+
+## 异步执行说明
+
+- `POST /api/jobs/uploads` 只负责校验、保存上传文件并创建 `queued` 状态的 Job。
+- `POST /api/jobs/cameras/once` 只负责校验输入并创建 `queued` 状态的 Job。
+- Celery worker 通过 `jobs.process(job_id)` 执行抓帧、模型调用、Schema 校验和记录写入。
+- scheduler 进程负责扫描到期的 `job_schedules`，创建 `camera_schedule` Job，并派发到 worker。
+- `task_records`、`feedback`、`dashboard` 继续复用统一的任务闭环。
+
 ## 当前包含
 
 - FastAPI 应用骨架
@@ -41,6 +55,7 @@ celery -A app.core.celery_app.celery_app worker --loglevel=info
 - SQLAlchemy 模型骨架
 - Alembic 骨架
 - Celery/Redis 骨架
+- APScheduler 独立调度进程
 - Provider Adapter 骨架
 - 健康检查和主要业务路由占位
 

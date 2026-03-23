@@ -26,7 +26,11 @@ def serialize_job_schedule(schedule: JobSchedule) -> JobScheduleRead:
         schedule_type=schedule.schedule_type,
         schedule_value=schedule.schedule_value,
         status=schedule.status,
-        next_run_at=_serialize_datetime(compute_next_run_at(schedule)),
+        next_run_at=_serialize_datetime(schedule.next_run_at),
+        last_run_at=_serialize_datetime(schedule.last_run_at),
+        last_error=schedule.last_error,
+        created_at=_serialize_datetime(schedule.created_at),
+        updated_at=_serialize_datetime(schedule.updated_at),
     )
 
 
@@ -60,6 +64,7 @@ def create_job_schedule(db: Session, payload: JobScheduleCreate) -> JobScheduleR
     get_camera_or_404(db, payload.camera_id)
     strategy = get_strategy_or_404(db, payload.strategy_id)
     _ensure_strategy_active(strategy.status)
+    current_time = _ensure_aware(datetime.now(timezone.utc))
 
     schedule = JobSchedule(
         id=generate_id(),
@@ -68,6 +73,9 @@ def create_job_schedule(db: Session, payload: JobScheduleCreate) -> JobScheduleR
         schedule_type=payload.schedule_type,
         schedule_value=payload.schedule_value,
         status=SCHEDULE_STATUS_ACTIVE,
+        next_run_at=calculate_next_run_at(payload.schedule_type, payload.schedule_value, current_time),
+        last_run_at=None,
+        last_error=None,
     )
     db.add(schedule)
     db.commit()
@@ -77,6 +85,7 @@ def create_job_schedule(db: Session, payload: JobScheduleCreate) -> JobScheduleR
 
 def update_job_schedule(db: Session, schedule: JobSchedule, payload: JobScheduleUpdate) -> JobScheduleRead:
     updates = payload.model_dump(exclude_unset=True)
+    current_time = _ensure_aware(datetime.now(timezone.utc))
 
     if "camera_id" in updates and updates["camera_id"] is not None:
         get_camera_or_404(db, updates["camera_id"])
@@ -94,6 +103,11 @@ def update_job_schedule(db: Session, schedule: JobSchedule, payload: JobSchedule
     for field_name, value in updates.items():
         setattr(schedule, field_name, value)
 
+    if schedule.status == SCHEDULE_STATUS_ACTIVE:
+        schedule.next_run_at = calculate_next_run_at(schedule.schedule_type, schedule.schedule_value, current_time)
+    else:
+        schedule.next_run_at = None
+
     db.commit()
     db.refresh(schedule)
     return serialize_job_schedule(schedule)
@@ -102,32 +116,28 @@ def update_job_schedule(db: Session, schedule: JobSchedule, payload: JobSchedule
 def update_job_schedule_status(db: Session, schedule: JobSchedule, next_status: str) -> JobScheduleRead:
     _validate_schedule_status(next_status)
     schedule.status = next_status
+    current_time = _ensure_aware(datetime.now(timezone.utc))
+    if next_status == SCHEDULE_STATUS_ACTIVE:
+        schedule.next_run_at = calculate_next_run_at(schedule.schedule_type, schedule.schedule_value, current_time)
+    else:
+        schedule.next_run_at = None
     db.commit()
     db.refresh(schedule)
     return serialize_job_schedule(schedule)
 
 
-def compute_next_run_at(schedule: JobSchedule, now: datetime | None = None) -> datetime | None:
-    if schedule.status != SCHEDULE_STATUS_ACTIVE:
-        return None
+def calculate_next_run_at(schedule_type: str, schedule_value: str, current_time: datetime) -> datetime:
+    current_time = _ensure_aware(current_time)
 
-    current_time = _ensure_aware(now or datetime.now(timezone.utc))
-    if schedule.schedule_type == SCHEDULE_TYPE_INTERVAL_MINUTES:
-        interval_minutes = int(schedule.schedule_value)
-        anchor = _ensure_aware(schedule.created_at or current_time)
-        elapsed_seconds = max(0, (current_time - anchor).total_seconds())
-        step_seconds = interval_minutes * 60
-        completed_steps = int(elapsed_seconds // step_seconds)
-        return anchor + timedelta(seconds=(completed_steps + 1) * step_seconds)
+    if schedule_type == SCHEDULE_TYPE_INTERVAL_MINUTES:
+        interval_minutes = int(schedule_value)
+        return current_time + timedelta(minutes=interval_minutes)
 
-    if schedule.schedule_type == SCHEDULE_TYPE_DAILY_TIME:
-        hour, minute = _parse_daily_time(schedule.schedule_value)
-        candidate = current_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if candidate <= current_time:
-            candidate = candidate + timedelta(days=1)
-        return candidate
-
-    return None
+    hour, minute = _parse_daily_time(schedule_value)
+    candidate = current_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate <= current_time:
+        candidate = candidate + timedelta(days=1)
+    return candidate
 
 
 def _validate_schedule_type_and_value(schedule_type: str, schedule_value: str) -> None:

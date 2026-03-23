@@ -7,6 +7,7 @@ export type Job = {
   strategy_id: string;
   strategy_name: string;
   camera_id: string | null;
+  schedule_id: string | null;
   model_provider: string;
   model_name: string;
   status: string;
@@ -14,6 +15,8 @@ export type Job = {
   completed_items: number;
   failed_items: number;
   error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   created_at: string | null;
 };
 
@@ -25,6 +28,10 @@ export type JobSchedule = {
   schedule_value: string;
   status: string;
   next_run_at: string | null;
+  last_run_at: string | null;
+  last_error: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 export type TaskRecord = {
@@ -123,12 +130,22 @@ export async function updateJobScheduleStatus(scheduleId: string, status: string
   return response.data;
 }
 
-export async function listJobs(params?: { status?: string; jobType?: string; strategyId?: string }) {
+export async function listJobs(params?: {
+  status?: string;
+  jobType?: string;
+  strategyId?: string;
+  triggerMode?: string;
+  cameraId?: string;
+  scheduleId?: string;
+}) {
   const response = await apiClient.get<Job[]>('/api/jobs', {
     params: {
       status: params?.status || undefined,
       job_type: params?.jobType || undefined,
       strategy_id: params?.strategyId || undefined,
+      trigger_mode: params?.triggerMode || undefined,
+      camera_id: params?.cameraId || undefined,
+      schedule_id: params?.scheduleId || undefined,
     },
   });
   return response.data;

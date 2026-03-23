@@ -47,10 +47,21 @@ def list_jobs(
     status: str | None = None,
     job_type: str | None = None,
     strategy_id: str | None = None,
+    trigger_mode: str | None = None,
+    camera_id: str | None = None,
+    schedule_id: str | None = None,
     _: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return list_job_records(db, status_filter=status, job_type=job_type, strategy_id=strategy_id)
+    return list_job_records(
+        db,
+        status_filter=status,
+        job_type=job_type,
+        strategy_id=strategy_id,
+        trigger_mode=trigger_mode,
+        camera_id=camera_id,
+        schedule_id=schedule_id,
+    )
 
 
 @router.get("/{job_id}", response_model=JobRead)

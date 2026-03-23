@@ -9,6 +9,7 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.20
 celery==5.5.3
 redis==6.4.0
+APScheduler==3.10.4
 jsonschema==4.25.1
 httpx==0.28.1
 pytest==8.4.2

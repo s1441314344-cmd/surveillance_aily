@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     refresh_token_expire_minutes: int = 60 * 24 * 7
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/surveillance_v2"
     redis_url: str = "redis://localhost:6379/0"
+    celery_enabled: bool = True
+    scheduler_poll_interval_seconds: int = 30
     storage_root: str = "./data/storage"
     cors_origins: list[str] = ["http://localhost:5174", "http://127.0.0.1:5174"]
     bootstrap_admin_username: str = "admin"

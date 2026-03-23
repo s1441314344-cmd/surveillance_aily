@@ -1,3 +1,5 @@
+from app.workers.tasks import process_job
+
 from .test_auth_and_users import auth_headers, login_as_admin
 
 
@@ -13,6 +15,10 @@ def test_feedback_create_update_and_record_status(client):
     )
     assert create_job_response.status_code == 200
     job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "completed"
 
     records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
     assert records_response.status_code == 200

@@ -1,3 +1,5 @@
+from app.workers.tasks import process_job
+
 from .test_auth_and_users import auth_headers, login_as_admin
 
 
@@ -18,9 +20,12 @@ def test_upload_job_and_task_records_flow(client):
     job = create_job_response.json()
     assert job["strategy_id"] == "preset-helmet"
     assert job["strategy_name"] == "安全帽识别"
-    assert job["status"] == "completed"
+    assert job["status"] == "queued"
     assert job["total_items"] == 2
-    assert job["completed_items"] == 2
+    assert job["completed_items"] == 0
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "completed"
 
     list_jobs_response = client.get("/api/jobs", headers=headers)
     assert list_jobs_response.status_code == 200
@@ -89,8 +94,11 @@ def test_camera_once_job_creates_camera_record(client):
     job = create_job_response.json()
     assert job["job_type"] == "camera_once"
     assert job["camera_id"] == camera["id"]
-    assert job["status"] == "completed"
-    assert job["completed_items"] == 1
+    assert job["status"] == "queued"
+    assert job["completed_items"] == 0
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "completed"
 
     records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
     assert records_response.status_code == 200
@@ -105,3 +113,29 @@ def test_camera_once_job_creates_camera_record(client):
     image_response = client.get(f"/api/task-records/{record['id']}/image", headers=headers)
     assert image_response.status_code == 200
     assert image_response.content
+
+
+def test_cancelled_queued_job_will_not_be_processed(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-cancel.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    cancel_response = client.post(f"/api/jobs/{job['id']}/cancel", headers=headers)
+    assert cancel_response.status_code == 200
+    assert cancel_response.json()["status"] == "cancelled"
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "cancelled"
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    assert records_response.json() == []

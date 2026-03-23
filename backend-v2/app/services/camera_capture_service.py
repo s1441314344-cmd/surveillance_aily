@@ -30,15 +30,45 @@ class CameraFrame:
     mime_type: str
 
 
-def capture_camera_frame(camera: Camera) -> CameraFrame:
-    rtsp_url = (camera.rtsp_url or "").strip()
+@dataclass
+class CameraCaptureConfig:
+    id: str
+    name: str
+    rtsp_url: str | None
+    resolution: str
+    jpeg_quality: int
+
+
+def camera_to_capture_config(camera: Camera) -> CameraCaptureConfig:
+    return CameraCaptureConfig(
+        id=camera.id,
+        name=camera.name,
+        rtsp_url=camera.rtsp_url,
+        resolution=camera.resolution,
+        jpeg_quality=camera.jpeg_quality,
+    )
+
+
+def snapshot_to_capture_config(snapshot: dict) -> CameraCaptureConfig:
+    return CameraCaptureConfig(
+        id=str(snapshot.get("id") or ""),
+        name=str(snapshot.get("name") or "camera"),
+        rtsp_url=snapshot.get("rtsp_url"),
+        resolution=str(snapshot.get("resolution") or "1080p"),
+        jpeg_quality=int(snapshot.get("jpeg_quality") or 80),
+    )
+
+
+def capture_camera_frame(camera: Camera | CameraCaptureConfig) -> CameraFrame:
+    capture_config = camera if isinstance(camera, CameraCaptureConfig) else camera_to_capture_config(camera)
+    rtsp_url = (capture_config.rtsp_url or "").strip()
     if not rtsp_url:
         raise CameraCaptureError("RTSP URL is missing")
 
     if rtsp_url.startswith("rtsp://mock/"):
         return CameraFrame(
             content=MOCK_FRAME_PNG,
-            original_name=f"{_build_file_stem(camera.name)}-{camera.id[:8]}.png",
+            original_name=f"{_build_file_stem(capture_config.name)}-{capture_config.id[:8]}.png",
             mime_type="image/png",
         )
 
@@ -62,11 +92,11 @@ def capture_camera_frame(camera: Camera) -> CameraFrame:
             "1",
         ]
 
-        scale_filter = RESOLUTION_SCALE_MAP.get((camera.resolution or "").lower())
+        scale_filter = RESOLUTION_SCALE_MAP.get((capture_config.resolution or "").lower())
         if scale_filter:
             command.extend(["-vf", scale_filter])
 
-        command.extend(["-q:v", str(_to_ffmpeg_quality(camera.jpeg_quality)), str(output_path)])
+        command.extend(["-q:v", str(_to_ffmpeg_quality(capture_config.jpeg_quality)), str(output_path)])
 
         try:
             result = subprocess.run(
@@ -91,7 +121,7 @@ def capture_camera_frame(camera: Camera) -> CameraFrame:
 
     return CameraFrame(
         content=content,
-        original_name=f"{_build_file_stem(camera.name)}-{camera.id[:8]}.jpg",
+        original_name=f"{_build_file_stem(capture_config.name)}-{capture_config.id[:8]}.jpg",
         mime_type="image/jpeg",
     )
 

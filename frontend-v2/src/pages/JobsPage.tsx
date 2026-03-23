@@ -73,6 +73,15 @@ const scheduleTypeLabelMap: Record<string, string> = {
   daily_time: '每日固定时间',
 };
 
+const triggerModeLabelMap: Record<string, string> = {
+  manual: '手动触发',
+  schedule: '定时触发',
+};
+
+function formatDateTime(value: string | null) {
+  return value ? new Date(value).toLocaleString() : '-';
+}
+
 export function JobsPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -161,7 +170,7 @@ export function JobsPage() {
       setSelectedJobId(job.id);
       setFileList([]);
       form.setFieldsValue(DEFAULT_FORM_VALUES);
-      message.success('上传任务已创建并完成首版分析');
+      message.success('上传任务已进入队列');
     },
     onError: (error) => {
       message.error(getApiErrorMessage(error, '上传任务创建失败'));
@@ -174,7 +183,7 @@ export function JobsPage() {
       await invalidateJobs();
       setSelectedJobId(job.id);
       form.setFieldsValue(DEFAULT_FORM_VALUES);
-      message.success('摄像头单次任务已创建并完成首版分析');
+      message.success('摄像头单次任务已进入队列');
     },
     onError: (error) => {
       message.error(getApiErrorMessage(error, '摄像头单次任务创建失败'));
@@ -297,7 +306,7 @@ export function JobsPage() {
           任务中心
         </Title>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          当前已支持图片上传、摄像头单次任务和定时任务计划配置。异步 worker 调度会在下一阶段继续收口。
+          图片上传、摄像头单次任务和定时计划已统一进入异步队列，由 worker 执行分析，scheduler 负责触发到期计划。
         </Paragraph>
       </div>
 
@@ -428,10 +437,10 @@ export function JobsPage() {
               message="当前范围"
               description={
                 taskMode === 'upload'
-                  ? '上传任务会立即落库并生成任务记录。'
+                  ? '上传图片会先保存输入文件并创建 queued 任务，后续由异步 worker 执行分析。'
                   : taskMode === 'camera_once'
-                    ? '摄像头单次任务会按当前 RTSP 配置抓取一帧并生成记录。'
-                    : '定时任务计划当前支持按分钟间隔和每日固定时间两种模式，可统一在计划列表中启停。'
+                    ? '摄像头单次任务会先进入队列，worker 再按当前 RTSP 配置抓帧并写入记录。'
+                    : '定时任务计划支持按分钟间隔和每日固定时间触发，独立 scheduler 会按 next_run_at 生成执行任务。'
               }
             />
           </Card>
@@ -481,6 +490,11 @@ export function JobsPage() {
                   dataIndex: 'job_type',
                 },
                 {
+                  title: '触发方式',
+                  dataIndex: 'trigger_mode',
+                  render: (value: string) => triggerModeLabelMap[value] ?? value,
+                },
+                {
                   title: '状态',
                   dataIndex: 'status',
                   render: (value: string) => <Tag color={statusColorMap[value] ?? 'default'}>{value}</Tag>,
@@ -492,7 +506,7 @@ export function JobsPage() {
                 {
                   title: '创建时间',
                   dataIndex: 'created_at',
-                  render: (value: string | null) => value ? new Date(value).toLocaleString() : '-',
+                  render: formatDateTime,
                 },
               ]}
             />
@@ -501,14 +515,35 @@ export function JobsPage() {
               <Card size="small" title="任务详情" style={{ marginTop: 16 }}>
                 <Descriptions column={1} size="small" bordered>
                   <Descriptions.Item label="任务 ID">{selectedJob.id}</Descriptions.Item>
+                  <Descriptions.Item label="任务类型">{selectedJob.job_type}</Descriptions.Item>
+                  <Descriptions.Item label="触发方式">
+                    {triggerModeLabelMap[selectedJob.trigger_mode] ?? selectedJob.trigger_mode}
+                  </Descriptions.Item>
                   <Descriptions.Item label="策略">
                     {selectedJob.strategy_name} ({selectedJob.strategy_id})
+                  </Descriptions.Item>
+                  <Descriptions.Item label="摄像头">
+                    {selectedJob.camera_id
+                      ? (cameras.find((item) => item.id === selectedJob.camera_id)?.name ?? selectedJob.camera_id)
+                      : '无'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="计划 ID">
+                    {selectedJob.schedule_id ? <Text code>{selectedJob.schedule_id}</Text> : '无'}
                   </Descriptions.Item>
                   <Descriptions.Item label="模型">
                     {selectedJob.model_provider} / {selectedJob.model_name}
                   </Descriptions.Item>
                   <Descriptions.Item label="状态">
                     <Tag color={statusColorMap[selectedJob.status] ?? 'default'}>{selectedJob.status}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="创建时间">
+                    {formatDateTime(selectedJob.created_at)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="开始时间">
+                    {formatDateTime(selectedJob.started_at)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="完成时间">
+                    {formatDateTime(selectedJob.finished_at)}
                   </Descriptions.Item>
                   <Descriptions.Item label="完成情况">
                     {selectedJob.completed_items} / {selectedJob.total_items}，失败 {selectedJob.failed_items}
@@ -588,7 +623,18 @@ export function JobsPage() {
             {
               title: '下次执行',
               dataIndex: 'next_run_at',
-              render: (value: string | null) => (value ? new Date(value).toLocaleString() : '-'),
+              render: formatDateTime,
+            },
+            {
+              title: '最近执行',
+              dataIndex: 'last_run_at',
+              render: formatDateTime,
+            },
+            {
+              title: '最近错误',
+              dataIndex: 'last_error',
+              render: (value: string | null) =>
+                value ? <Text type="danger">{value}</Text> : <Text type="secondary">无</Text>,
             },
             {
               title: '状态',
