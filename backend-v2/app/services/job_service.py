@@ -21,6 +21,7 @@ from app.services.strategy_service import build_strategy_snapshot, get_strategy_
 settings = get_settings()
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/webp"}
 JOB_STATUS_COMPLETED = "completed"
 JOB_STATUS_FAILED = "failed"
 JOB_STATUS_CANCELLED = "cancelled"
@@ -360,15 +361,37 @@ def _revoke_job_processing(celery_task_id: str | None) -> None:
 
 def _validate_upload_files(files: list[UploadFile]) -> None:
     invalid_files: list[str] = []
-    for file in files:
-        suffix = Path(file.filename or "").suffix.lower()
-        if suffix not in ALLOWED_IMAGE_EXTENSIONS:
-            invalid_files.append(file.filename or "unnamed")
+    invalid_content_types: list[str] = []
+    empty_files: list[str] = []
 
+    for file in files:
+        filename = file.filename or "unnamed"
+        suffix = Path(filename).suffix.lower()
+        if suffix not in ALLOWED_IMAGE_EXTENSIONS:
+            invalid_files.append(filename)
+
+        content_type = (file.content_type or "").lower().strip()
+        if content_type and content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+            invalid_content_types.append(f"{filename}({content_type})")
+
+        stream_position = file.file.tell()
+        first_byte = file.file.read(1)
+        file.file.seek(stream_position)
+        if first_byte == b"":
+            empty_files.append(filename)
+
+    errors: list[str] = []
     if invalid_files:
+        errors.append(f"Unsupported file format: {', '.join(invalid_files)}")
+    if invalid_content_types:
+        errors.append(f"Unsupported content type: {', '.join(invalid_content_types)}")
+    if empty_files:
+        errors.append(f"Empty file is not allowed: {', '.join(empty_files)}")
+
+    if errors:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file format: {', '.join(invalid_files)}",
+            detail="; ".join(errors),
         )
 
 

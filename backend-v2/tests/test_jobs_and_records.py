@@ -68,6 +68,48 @@ def test_upload_job_and_task_records_flow(client):
     assert "record_id,job_id,created_at" in export_response.text
 
 
+def test_upload_job_rejects_unsupported_file_extension(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet.txt", b"plain-text", "text/plain"))],
+    )
+    assert create_job_response.status_code == 400
+    assert "Unsupported file format" in create_job_response.json()["detail"]
+
+
+def test_upload_job_rejects_unsupported_content_type(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet.jpg", b"fake-jpg-content", "application/json"))],
+    )
+    assert create_job_response.status_code == 400
+    assert "Unsupported content type" in create_job_response.json()["detail"]
+
+
+def test_upload_job_rejects_empty_file(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-empty.jpg", b"", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 400
+    assert "Empty file is not allowed" in create_job_response.json()["detail"]
+
+
 def test_camera_once_job_creates_camera_record(client):
     login_data = login_as_admin(client)
     headers = auth_headers(login_data["access_token"])

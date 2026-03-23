@@ -101,6 +101,20 @@ login = get_json(
 token = login["access_token"]
 print("[v2-smoke] login ok")
 
+invalid_upload_status, invalid_upload_payload = request(
+    "POST",
+    "/api/jobs/uploads",
+    token=token,
+    form_body={"strategy_id": "preset-helmet"},
+    files=[("files", "smoke-invalid.txt", b"not-image", "text/plain")],
+    expected=(400,),
+)
+if invalid_upload_status != 400:
+    raise RuntimeError(f"expected 400 for invalid upload, got {invalid_upload_status}")
+if "Unsupported file format" not in invalid_upload_payload:
+    raise RuntimeError(f"unexpected invalid upload response: {invalid_upload_payload}")
+print("[v2-smoke] invalid upload guard ok")
+
 upload_job = get_json(
     "POST",
     "/api/jobs/uploads",
