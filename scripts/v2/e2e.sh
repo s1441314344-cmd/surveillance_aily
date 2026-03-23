@@ -6,4 +6,4 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 require_cmd npm
 
 cd "${FRONTEND_DIR}"
-npm run e2e -- "$@"
+env -u NO_COLOR npm run e2e -- "$@"
