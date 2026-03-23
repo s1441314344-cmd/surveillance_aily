@@ -10,11 +10,14 @@ SMOKE_SCHEDULE_WAIT_SECONDS="${V2_SMOKE_SCHEDULE_WAIT_SECONDS:-95}"
 
 python3 - <<PY
 import json
+import csv
+import io
 import sys
 import time
 import uuid
 import urllib.request
 import urllib.parse
+from datetime import datetime, timedelta
 
 api_base = "${API_BASE_URL}".rstrip("/")
 max_schedule_wait = int("${SMOKE_SCHEDULE_WAIT_SECONDS}")
@@ -273,6 +276,55 @@ schedule_records = get_json(
 if len(schedule_records) != 1:
     raise RuntimeError(f"expected 1 scheduled record, got {len(schedule_records)}")
 
+record_created_at_raw = schedule_records[0].get("created_at")
+if not record_created_at_raw:
+    raise RuntimeError("scheduled record missing created_at")
+
+created_at = datetime.fromisoformat(record_created_at_raw.replace("Z", "+00:00"))
+created_from = (created_at - timedelta(seconds=5)).isoformat()
+created_to = (created_at + timedelta(seconds=5)).isoformat()
+
+filtered_records = get_json(
+    "GET",
+    "/api/task-records",
+    token=token,
+    query={
+        "camera_id": camera["id"],
+        "created_from": created_from,
+        "created_to": created_to,
+    },
+)
+if not any(item["id"] == schedule_records[0]["id"] for item in filtered_records):
+    raise RuntimeError("camera/time filtered records do not include scheduled record")
+
+_, export_payload = request(
+    "GET",
+    "/api/task-records/export",
+    token=token,
+    query={
+        "camera_id": camera["id"],
+        "created_from": created_from,
+        "created_to": created_to,
+    },
+)
+export_rows = list(csv.DictReader(io.StringIO(export_payload)))
+if not any(row["record_id"] == schedule_records[0]["id"] for row in export_rows):
+    raise RuntimeError("camera/time filtered export does not include scheduled record")
+
+_, export_empty_payload = request(
+    "GET",
+    "/api/task-records/export",
+    token=token,
+    query={
+        "camera_id": camera["id"],
+        "created_from": (created_at + timedelta(minutes=5)).isoformat(),
+    },
+)
+export_empty_rows = list(csv.DictReader(io.StringIO(export_empty_payload)))
+if export_empty_rows:
+    raise RuntimeError("expected empty export rows for out-of-range query")
+
+print("[v2-smoke] task-record filter/export flow ok")
 print("[v2-smoke] scheduled async flow ok")
 print("[v2-smoke] success")
 PY
