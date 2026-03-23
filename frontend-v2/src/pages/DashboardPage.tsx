@@ -1,6 +1,21 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Card, Col, Empty, Input, Progress, Row, Select, Space, Statistic, Table, Typography } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Empty,
+  Input,
+  Progress,
+  Row,
+  Select,
+  Space,
+  Statistic,
+  Table,
+  Typography,
+} from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { listModelProviders, listStrategies } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import {
@@ -24,6 +39,7 @@ const parseDateFilter = (value: string) => {
 };
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
   const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
@@ -250,6 +266,9 @@ export function DashboardPage() {
               rowKey="record_id"
               size="small"
               pagination={false}
+              onRow={(record) => ({
+                onClick: () => navigate(`/records?recordId=${record.record_id}`),
+              })}
               locale={{ emptyText: <Empty description="暂无异常案例" /> }}
               dataSource={anomaliesQuery.data ?? []}
               columns={[
@@ -269,6 +288,22 @@ export function DashboardPage() {
                   dataIndex: 'summary',
                   render: (value: string) => (
                     <Text style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{value}</Text>
+                  ),
+                },
+                {
+                  title: '操作',
+                  width: 100,
+                  render: (_, record) => (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`/records?recordId=${record.record_id}`);
+                      }}
+                    >
+                      查看详情
+                    </Button>
                   ),
                 },
               ]}

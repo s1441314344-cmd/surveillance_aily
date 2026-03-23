@@ -15,6 +15,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import { useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import { listCameras, listModelProviders, listStrategies } from '@/shared/api/configCenter';
 import {
@@ -46,6 +47,7 @@ const parseDateFilter = (value: string) => {
 
 export function RecordsPage() {
   const { message } = App.useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
@@ -53,7 +55,7 @@ export function RecordsPage() {
   const [feedbackFilter, setFeedbackFilter] = useState<string>('all');
   const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
   const [createdToFilter, setCreatedToFilter] = useState<string>('');
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const selectedRecordId = searchParams.get('recordId');
 
   const strategyQuery = useQuery({
     queryKey: ['strategies', 'all-for-records'],
@@ -118,6 +120,18 @@ export function RecordsPage() {
     },
     [imagePreviewUrl],
   );
+
+  const handleSelectRecord = (recordId: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('recordId', recordId);
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleCloseDetail = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('recordId');
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const handleExport = async () => {
     try {
@@ -249,7 +263,7 @@ export function RecordsPage() {
             loading={recordsQuery.isLoading}
             pagination={{ pageSize: 8 }}
             onRow={(record) => ({
-              onClick: () => setSelectedRecordId(record.id),
+              onClick: () => handleSelectRecord(record.id),
             })}
             columns={[
               {
@@ -290,7 +304,7 @@ export function RecordsPage() {
         open={Boolean(selectedRecordId)}
         width={720}
         title="记录详情"
-        onClose={() => setSelectedRecordId(null)}
+        onClose={handleCloseDetail}
       >
         {detail ? (
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
