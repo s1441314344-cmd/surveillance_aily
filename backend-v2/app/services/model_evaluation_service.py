@@ -69,6 +69,16 @@ class EvaluationTargetSummary:
 
 
 @dataclass
+class EvaluationDecision:
+    baseline_target: str
+    challenger_target: str
+    recommendation: str
+    summary: str
+    reasons: list[str]
+    metrics: dict[str, float | None]
+
+
+@dataclass
 class EvaluationReport:
     dataset_path: str
     targets: list[str]
@@ -77,6 +87,7 @@ class EvaluationReport:
     pricing_path: str | None
     summaries: list[EvaluationTargetSummary]
     results: list[EvaluationRunResult]
+    decisions: list[EvaluationDecision] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -87,6 +98,7 @@ class EvaluationReport:
             "pricing_path": self.pricing_path,
             "summaries": [asdict(item) for item in self.summaries],
             "results": [asdict(item) for item in self.results],
+            "decisions": [asdict(item) for item in self.decisions],
         }
 
 
@@ -114,6 +126,13 @@ def load_pricing_table(pricing_path: str | Path | None) -> dict:
     if not pricing_path:
         return {}
     path = Path(pricing_path).expanduser().resolve()
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_decision_policy(policy_path: str | Path | None) -> dict:
+    if not policy_path:
+        return {}
+    path = Path(policy_path).expanduser().resolve()
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -198,6 +217,8 @@ def render_evaluation_markdown(
     ]
     if report.pricing_path:
         lines.append(f"- 价格表: `{report.pricing_path}`")
+    if report.decisions:
+        lines.append(f"- 迁移判定组数: `{len(report.decisions)}`")
     lines.extend(
         [
             "",
@@ -220,6 +241,23 @@ def render_evaluation_markdown(
                 cost=_format_cost(summary.estimated_average_cost),
             )
         )
+
+    if report.decisions:
+        lines.extend(["", "## 迁移建议", ""])
+        for decision in report.decisions:
+            lines.extend(
+                [
+                    f"### {decision.challenger_target} vs {decision.baseline_target}",
+                    "",
+                    f"- 建议: `{decision.recommendation}`",
+                    f"- 摘要: {decision.summary}",
+                    "",
+                    "#### 依据",
+                    "",
+                ]
+            )
+            for reason in decision.reasons:
+                lines.append(f"- {reason}")
 
     for summary in report.summaries:
         lines.extend(
@@ -260,6 +298,94 @@ def save_evaluation_markdown_report(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_evaluation_markdown(report, title=title), encoding="utf-8")
     return path
+
+
+def build_migration_decisions(report: EvaluationReport, policy: dict) -> list[EvaluationDecision]:
+    summary_map = {item.target: item for item in report.summaries}
+    decisions: list[EvaluationDecision] = []
+    for item in policy.get("decisions") or []:
+        baseline_target = str(item["baseline_target"])
+        challenger_target = str(item["challenger_target"])
+        baseline = summary_map.get(baseline_target)
+        challenger = summary_map.get(challenger_target)
+        if baseline is None or challenger is None:
+            decisions.append(
+                EvaluationDecision(
+                    baseline_target=baseline_target,
+                    challenger_target=challenger_target,
+                    recommendation="insufficient_data",
+                    summary="缺少基线或候选模型评估结果，暂不输出切换建议。",
+                    reasons=[
+                        f"baseline exists={baseline is not None}",
+                        f"challenger exists={challenger is not None}",
+                    ],
+                    metrics={},
+                )
+            )
+            continue
+
+        min_accuracy_gain = float(item.get("min_accuracy_gain") or 0)
+        min_structured_success_rate = float(item.get("min_structured_success_rate") or 0)
+        max_latency_ratio = float(item.get("max_latency_ratio") or 999999)
+        max_cost_ratio = float(item.get("max_cost_ratio") or 999999)
+
+        baseline_accuracy = baseline.accuracy_rate
+        challenger_accuracy = challenger.accuracy_rate
+        accuracy_gain = (
+            round(challenger_accuracy - baseline_accuracy, 2)
+            if baseline_accuracy is not None and challenger_accuracy is not None
+            else None
+        )
+        latency_ratio = _safe_ratio(challenger.average_latency_ms, baseline.average_latency_ms)
+        cost_ratio = _safe_ratio(challenger.estimated_average_cost, baseline.estimated_average_cost)
+
+        structured_ok = challenger.structured_success_rate >= min_structured_success_rate
+        accuracy_ok = accuracy_gain is not None and accuracy_gain >= min_accuracy_gain
+        latency_ok = latency_ratio is None or latency_ratio <= max_latency_ratio
+        cost_ok = cost_ratio is None or cost_ratio <= max_cost_ratio
+
+        reasons = [
+            f"challenger structured success={challenger.structured_success_rate}% (threshold {min_structured_success_rate}%)",
+            f"accuracy gain={accuracy_gain if accuracy_gain is not None else 'N/A'} (threshold {min_accuracy_gain})",
+            f"latency ratio={latency_ratio if latency_ratio is not None else 'N/A'} (max {max_latency_ratio})",
+            f"cost ratio={cost_ratio if cost_ratio is not None else 'N/A'} (max {max_cost_ratio})",
+        ]
+        metrics = {
+            "baseline_accuracy_rate": baseline_accuracy,
+            "challenger_accuracy_rate": challenger_accuracy,
+            "accuracy_gain": accuracy_gain,
+            "baseline_structured_success_rate": baseline.structured_success_rate,
+            "challenger_structured_success_rate": challenger.structured_success_rate,
+            "latency_ratio": latency_ratio,
+            "cost_ratio": cost_ratio,
+        }
+
+        if structured_ok and accuracy_ok and latency_ok and cost_ok:
+            recommendation = "switch_primary_to_challenger"
+            summary = "候选模型达到精度增益和稳定性门槛，可进入切主灰度。"
+        elif (
+            challenger_accuracy is not None
+            and baseline_accuracy is not None
+            and challenger_accuracy < baseline_accuracy
+        ) or not structured_ok:
+            recommendation = "keep_baseline_primary"
+            summary = "候选模型未达到核心门槛，建议继续保留基线模型为主栈。"
+        else:
+            recommendation = "keep_dual_stack"
+            summary = "候选模型具备继续评估价值，但尚不足以直接切主，建议维持双栈。"
+
+        decisions.append(
+            EvaluationDecision(
+                baseline_target=baseline_target,
+                challenger_target=challenger_target,
+                recommendation=recommendation,
+                summary=summary,
+                reasons=reasons,
+                metrics=metrics,
+            )
+        )
+
+    return decisions
 
 
 def _evaluate_single_run(*, target: EvaluationTarget, sample: EvaluationSample, repeat_index: int) -> EvaluationRunResult:
@@ -496,3 +622,11 @@ def _format_accuracy_status(value: bool | None) -> str:
     if value is False:
         return "mismatch"
     return "n/a"
+
+
+def _safe_ratio(left: float | None, right: float | None) -> float | None:
+    if left is None or right is None:
+        return None
+    if right == 0:
+        return None
+    return round(left / right, 4)

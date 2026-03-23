@@ -56,6 +56,7 @@ make v2-smoke
 make v2-backfill
 make v2-eval
 make v2-camera-check
+make v2-camera-validate
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
@@ -71,6 +72,8 @@ make v2-camera-check
 `make v2-eval` 会读取样本集清单，按 provider/model 执行多轮评估，输出准确率、结构化成功率、稳定性、平均时延和成本估算。
 
 `make v2-camera-check` 会执行深度摄像头诊断，尝试真实抓帧并输出时延、图片大小、像素尺寸、错误信息和诊断快照路径。
+
+`make v2-camera-validate` 会按白名单清单批量执行摄像头诊断，输出 JSON / Markdown 报告，并根据期望门槛给出通过/失败结果。
 
 ## 异步执行说明
 
@@ -136,11 +139,32 @@ make v2-eval
   --markdown-output ./data/eval-report.md
 ```
 
+带迁移判定策略的评估示例：
+
+```bash
+./scripts/v2/evaluate.sh \
+  --dataset ./data/model_eval_dataset.example.json \
+  --pricing ./data/model_pricing.example.json \
+  --decision-policy ./examples/model_eval_decision_policy.example.json \
+  --target zhipu:glm-4v-plus \
+  --target openai:gpt-5-mini \
+  --output ./data/eval-report.json \
+  --markdown-output ./data/eval-report.md
+```
+
 数据文件说明：
 
 - 样本清单示例：[model_eval_dataset.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/data/model_eval_dataset.example.json)
 - 价格表示例：[model_pricing.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/data/model_pricing.example.json)
+- 迁移判定策略示例：[model_eval_decision_policy.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/examples/model_eval_decision_policy.example.json)
 - 指标默认包括：请求成功率、结构化成功率、准确率、稳定性、平均时延、Token 用量、成本估算
+
+判定输出说明：
+
+- `switch_primary_to_challenger`: 候选模型达到切主门槛
+- `keep_dual_stack`: 候选模型值得继续灰度，但暂不切主
+- `keep_baseline_primary`: 候选模型未达到核心门槛
+- `insufficient_data`: 缺少必要评估结果，无法形成判定
 
 ## 摄像头深度诊断
 
@@ -164,6 +188,29 @@ make v2-eval
 - 已脱敏的 RTSP 地址
 - 诊断快照保存路径
 - 失败时的错误信息
+
+## 摄像头白名单验证
+
+验证示例清单：
+
+```bash
+make v2-camera-validate
+```
+
+手工指定清单并导出报告：
+
+```bash
+./scripts/v2/camera-validate.sh \
+  --manifest ./examples/camera_whitelist_manifest.example.json \
+  --output ./data/camera-whitelist.json \
+  --markdown-output ./data/camera-whitelist.md
+```
+
+说明：
+
+- 纯 `rtsp_url` 清单可直接运行，不强依赖数据库
+- 如果清单使用 `camera_id` 引用已配置摄像头，则需要先启动数据库并完成初始化
+- 示例清单见：[camera_whitelist_manifest.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/examples/camera_whitelist_manifest.example.json)
 
 ## 当前包含
 

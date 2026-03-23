@@ -3,6 +3,7 @@ from pathlib import Path
 
 from app.services.model_evaluation_service import (
     EvaluationTarget,
+    build_migration_decisions,
     evaluate_model_targets,
     load_evaluation_dataset,
     render_evaluation_markdown,
@@ -98,6 +99,68 @@ def test_evaluate_model_targets_builds_summary_metrics(monkeypatch, tmp_path):
     assert "| openai:gpt-5-mini | 100.0% | 100.0% | 100.0% | 100.0% |" in markdown
     assert "| zhipu:glm-4v-plus | 100.0% | 100.0% | 75.0% | 50.0% |" in markdown
     assert "| sample-1 | mismatch |" in markdown
+
+
+def test_build_migration_decisions_returns_switch_recommendation(monkeypatch, tmp_path):
+    dataset_path = create_dataset_fixture(tmp_path)
+
+    class FakeAdapter:
+        def __init__(self, provider: str):
+            self.provider = provider
+
+        def analyze(self, request):
+            sample_name = Path(request.image_paths[0]).stem
+            if self.provider == "openai":
+                flag = True if sample_name == "sample-1" else False
+            else:
+                flag = False
+
+            return ProviderResponse(
+                success=True,
+                raw_response=json.dumps({"flag": flag}, ensure_ascii=False),
+                normalized_json={"flag": flag},
+                error_message=None,
+                usage={"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+            )
+
+    monkeypatch.setattr(
+        "app.services.model_evaluation_service.get_provider_adapter",
+        lambda provider: FakeAdapter(provider),
+    )
+
+    report = evaluate_model_targets(
+        dataset_path=dataset_path,
+        targets=[
+            EvaluationTarget(provider="zhipu", model="glm-4v-plus"),
+            EvaluationTarget(provider="openai", model="gpt-5-mini"),
+        ],
+        repeats=1,
+        max_workers=2,
+        pricing_table={
+            "openai:gpt-5-mini": {"input_per_million": 1, "output_per_million": 2},
+            "zhipu:glm-4v-plus": {"input_per_million": 1, "output_per_million": 2},
+        },
+    )
+
+    decisions = build_migration_decisions(
+        report,
+        {
+            "decisions": [
+                {
+                    "baseline_target": "zhipu:glm-4v-plus",
+                    "challenger_target": "openai:gpt-5-mini",
+                    "min_accuracy_gain": 10.0,
+                    "min_structured_success_rate": 99.0,
+                    "max_latency_ratio": 2.0,
+                    "max_cost_ratio": 2.0,
+                }
+            ]
+        },
+    )
+
+    assert len(decisions) == 1
+    assert decisions[0].recommendation == "switch_primary_to_challenger"
+    assert decisions[0].metrics["accuracy_gain"] == 50.0
 
 
 def create_dataset_fixture(tmp_path: Path) -> Path:

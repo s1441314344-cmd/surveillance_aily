@@ -1,0 +1,38 @@
+{
+  "title": "智能巡检系统 V2 摄像头白名单验证报告（示例）",
+  "targets": [
+    {
+      "target_id": "mock-camera-ok",
+      "name": "Mock 白名单摄像头",
+      "rtsp_url": "rtsp://mock/diag-ok",
+      "resolution": "720p",
+      "jpeg_quality": 80,
+      "storage_path": "./data/storage/cameras/whitelist",
+      "expectation": {
+        "should_succeed": true,
+        "min_width": 1,
+        "min_height": 1,
+        "max_latency_ms": 3000,
+        "allowed_capture_modes": [
+          "mock",
+          "rtsp"
+        ]
+      }
+    },
+    {
+      "target_id": "invalid-camera-demo",
+      "name": "非法地址示例",
+      "rtsp_url": "bad-rtsp-url",
+      "resolution": "720p",
+      "jpeg_quality": 80,
+      "storage_path": "./data/storage/cameras/whitelist",
+      "expectation": {
+        "should_succeed": false,
+        "max_latency_ms": 3000,
+        "allowed_capture_modes": [
+          "rtsp"
+        ]
+      }
+    }
+  ]
+}

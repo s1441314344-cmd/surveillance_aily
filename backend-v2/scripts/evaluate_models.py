@@ -15,8 +15,10 @@ if str(BACKEND_DIR) not in sys.path:
 from app.core.database import init_database
 from app.services.bootstrap import seed_defaults
 from app.services.model_evaluation_service import (
+    build_migration_decisions,
     build_targets,
     evaluate_model_targets,
+    load_decision_policy,
     load_pricing_table,
     save_evaluation_markdown_report,
     save_evaluation_report,
@@ -53,6 +55,11 @@ def parse_args() -> argparse.Namespace:
         "--pricing",
         default=None,
         help="Optional pricing JSON file for estimated cost calculation.",
+    )
+    parser.add_argument(
+        "--decision-policy",
+        default=None,
+        help="Optional decision policy JSON for migration recommendation.",
     )
     parser.add_argument(
         "--output",
@@ -96,8 +103,13 @@ def main() -> int:
         pricing_table=pricing_table,
     )
     report.pricing_path = str(Path(args.pricing).expanduser().resolve()) if args.pricing else None
+    if args.decision_policy:
+        decision_policy = load_decision_policy(args.decision_policy)
+        report.decisions = build_migration_decisions(report, decision_policy)
 
     payload = {"summary": report.to_dict()["summaries"]}
+    if report.decisions:
+        payload["decisions"] = report.to_dict()["decisions"]
     if args.output:
         output_path = save_evaluation_report(report, args.output)
         payload["report_path"] = str(output_path)
