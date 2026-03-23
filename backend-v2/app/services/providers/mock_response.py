@@ -14,11 +14,18 @@ def build_mock_provider_response(provider: str, request: ProviderRequest) -> Pro
         image_name=image_name,
     )
     raw_response = json.dumps(normalized_json, ensure_ascii=False, indent=2)
+    prompt_tokens = _estimate_tokens(request.prompt)
+    completion_tokens = _estimate_tokens(raw_response)
     return ProviderResponse(
         success=True,
         raw_response=raw_response,
         normalized_json=normalized_json if isinstance(normalized_json, dict) else {"result": normalized_json},
         error_message=None,
+        usage={
+            "input_tokens": prompt_tokens,
+            "output_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
     )
 
 
@@ -94,3 +101,7 @@ def _generate_value(
     if "target" in lowered:
         return image_name
     return f"mock_{field_name}"
+
+
+def _estimate_tokens(text: str) -> int:
+    return max(1, (len(text or "") + 3) // 4)

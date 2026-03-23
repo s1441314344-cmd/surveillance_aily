@@ -74,6 +74,7 @@ class ZhipuAdapter(ModelProviderAdapter):
             raw_response=output_text or json.dumps(normalized_json, ensure_ascii=False),
             normalized_json=normalized_json,
             error_message=None,
+            usage=_extract_usage(body),
         )
 
     def _build_payload(self, request: ProviderRequest, model_name: str) -> dict:
@@ -121,3 +122,17 @@ def _extract_zhipu_message_content(body: dict) -> str:
                 text_parts.append(str(item["text"]))
         return "\n".join(text_parts).strip()
     return str(content).strip() if content is not None else ""
+
+
+def _extract_usage(body: dict) -> dict | None:
+    usage = body.get("usage") or {}
+    prompt_tokens = usage.get("prompt_tokens") or usage.get("input_tokens")
+    completion_tokens = usage.get("completion_tokens") or usage.get("output_tokens")
+    total_tokens = usage.get("total_tokens")
+    if prompt_tokens is None and completion_tokens is None and total_tokens is None:
+        return None
+    return {
+        "input_tokens": int(prompt_tokens or 0),
+        "output_tokens": int(completion_tokens or 0),
+        "total_tokens": int(total_tokens or (int(prompt_tokens or 0) + int(completion_tokens or 0))),
+    }

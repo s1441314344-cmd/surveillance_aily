@@ -16,6 +16,7 @@ class ProviderResponse:
     raw_response: str
     normalized_json: dict | None
     error_message: str | None = None
+    usage: dict | None = None
 
 
 class ModelProviderAdapter(Protocol):

@@ -80,6 +80,13 @@ make v2-backfill
 ./scripts/v2/backfill.sh --apply
 ```
 
+如需执行模型样本评估：
+
+```bash
+make v2-eval
+./scripts/v2/evaluate.sh --target zhipu:glm-4v-plus --target openai:gpt-5-mini --repeats 3
+```
+
 ## 本地启动顺序
 
 1. 启动依赖
@@ -116,4 +123,5 @@ npm run dev
 
 - 已完成：V2 backlog 拆分、前后端基础骨架、核心路由占位、本地依赖编排、统一异步任务链路、独立 scheduler 进程、本地联调脚本、历史数据回填 dry-run / apply 工具
 - 已补充：OpenAI / 智谱 provider adapter 真实调用实现，开发环境可通过 `PROVIDER_MOCK_FALLBACK_ENABLED=true` 保持无密钥可联调
-- 下一步建议：进入“联调与验证”小周期，优先完成 RTSP 真流验证、回填对账、真实模型样本评估和系统级回归
+- 已补充：模型样本评估脚本、示例样本清单、价格表和指标汇总输出
+- 下一步建议：进入“联调与验证”小周期，优先完成 RTSP 真流验证、真实样本评估报告沉淀和系统级回归

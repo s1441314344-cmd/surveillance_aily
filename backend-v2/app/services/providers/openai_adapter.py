@@ -81,6 +81,7 @@ class OpenAIAdapter(ModelProviderAdapter):
             raw_response=output_text or json.dumps(normalized_json, ensure_ascii=False),
             normalized_json=normalized_json,
             error_message=None,
+            usage=_extract_usage(body),
         )
 
     def _build_payload(self, request: ProviderRequest, model_name: str) -> dict:
@@ -131,3 +132,17 @@ def _extract_refusal_message(body: dict) -> str | None:
             if content.get("type") == "refusal":
                 return str(content.get("refusal") or content.get("text") or "").strip() or "Request refused"
     return None
+
+
+def _extract_usage(body: dict) -> dict | None:
+    usage = body.get("usage") or {}
+    input_tokens = usage.get("input_tokens") or usage.get("prompt_tokens")
+    output_tokens = usage.get("output_tokens") or usage.get("completion_tokens")
+    total_tokens = usage.get("total_tokens")
+    if input_tokens is None and output_tokens is None and total_tokens is None:
+        return None
+    return {
+        "input_tokens": int(input_tokens or 0),
+        "output_tokens": int(output_tokens or 0),
+        "total_tokens": int(total_tokens or (int(input_tokens or 0) + int(output_tokens or 0))),
+    }

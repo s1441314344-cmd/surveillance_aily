@@ -54,6 +54,7 @@ make v2-scheduler
 make v2-frontend
 make v2-smoke
 make v2-backfill
+make v2-eval
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
@@ -65,6 +66,8 @@ make v2-backfill
 `make v2-backfill` 会对旧版 `SQLite` 数据执行一次 dry-run 回填评估，输出将要迁移的 cameras / strategies / schedules / jobs / task_records / file_assets 数量，以及缺失文件和未纳入核心迁移的 legacy 提示。
 
 `PROVIDER_MOCK_FALLBACK_ENABLED=true` 时，如果模型提供方未配置可用密钥，adapter 会回退到本地 mock 输出，方便开发和测试；生产环境建议关闭该开关，并在“模型提供方管理”中配置真实 API Key。
+
+`make v2-eval` 会读取样本集清单，按 provider/model 执行多轮评估，输出准确率、结构化成功率、稳定性、平均时延和成本估算。
 
 ## 异步执行说明
 
@@ -103,6 +106,37 @@ python3 ./scripts/backfill_legacy.py --source ../data/surveillance.db --source-r
 - 旧版 `detection_records` 和 `submit_tasks` 会生成历史 `jobs + task_records`
 - `work_orders` 暂不进入 V2 核心表，仅在报告中提示保留在 legacy DB
 - 脚本默认是 dry-run，适合先做对账和缺失文件扫描
+
+## 模型评估
+
+默认示例：
+
+```bash
+make v2-eval
+```
+
+指定目标模型并运行 3 轮重复评估：
+
+```bash
+./scripts/v2/evaluate.sh --target zhipu:glm-4v-plus --target openai:gpt-5-mini --repeats 3
+```
+
+输出报告到文件并带上价格表：
+
+```bash
+./scripts/v2/evaluate.sh \
+  --dataset ./data/model_eval_dataset.example.json \
+  --pricing ./data/model_pricing.example.json \
+  --target zhipu:glm-4v-plus \
+  --target openai:gpt-5-mini \
+  --output ./data/eval-report.json
+```
+
+数据文件说明：
+
+- 样本清单示例：[model_eval_dataset.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/data/model_eval_dataset.example.json)
+- 价格表示例：[model_pricing.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/data/model_pricing.example.json)
+- 指标默认包括：请求成功率、结构化成功率、准确率、稳定性、平均时延、Token 用量、成本估算
 
 ## 当前包含
 
