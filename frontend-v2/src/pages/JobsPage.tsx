@@ -30,6 +30,7 @@ import {
   JobSchedule,
   listJobs,
   listJobSchedules,
+  retryJob,
   updateJobScheduleStatus,
   uploadJob,
 } from '@/shared/api/tasks';
@@ -77,6 +78,7 @@ const triggerModeLabelMap: Record<string, string> = {
   manual: '手动触发',
   schedule: '定时触发',
 };
+const retryableJobStatus = new Set(['failed', 'cancelled']);
 
 function formatDateTime(value: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
@@ -210,6 +212,18 @@ export function JobsPage() {
     },
     onError: (error) => {
       message.error(getApiErrorMessage(error, '取消任务失败'));
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: retryJob,
+    onSuccess: async (job) => {
+      await invalidateJobs();
+      setSelectedJobId(job.id);
+      message.success('已创建重试任务并进入队列');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '重试任务创建失败'));
     },
   });
 
@@ -517,6 +531,25 @@ export function JobsPage() {
                   dataIndex: 'created_at',
                   render: formatDateTime,
                 },
+                {
+                  title: '操作',
+                  width: 120,
+                  render: (_, record) =>
+                    retryableJobStatus.has(record.status) ? (
+                      <Button
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          retryMutation.mutate(record.id);
+                        }}
+                        loading={retryMutation.isPending}
+                      >
+                        重试
+                      </Button>
+                    ) : (
+                      <Text type="secondary">-</Text>
+                    ),
+                },
               ]}
             />
 
@@ -569,6 +602,13 @@ export function JobsPage() {
                     loading={cancelMutation.isPending}
                   >
                     取消任务
+                  </Button>
+                  <Button
+                    disabled={!retryableJobStatus.has(selectedJob.status)}
+                    onClick={() => retryMutation.mutate(selectedJob.id)}
+                    loading={retryMutation.isPending}
+                  >
+                    重试任务
                   </Button>
                 </Space>
               </Card>

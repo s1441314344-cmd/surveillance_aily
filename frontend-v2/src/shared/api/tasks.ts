@@ -161,6 +161,11 @@ export async function cancelJob(jobId: string) {
   return response.data;
 }
 
+export async function retryJob(jobId: string) {
+  const response = await apiClient.post<Job>(`/api/jobs/${jobId}/retry`);
+  return response.data;
+}
+
 export async function listTaskRecords(params?: {
   status?: string;
   strategyId?: string;
