@@ -89,6 +89,8 @@ export function JobsPage() {
   const queryClient = useQueryClient();
   const [form] = Form.useForm<UploadFormValues>();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [triggerModeFilter, setTriggerModeFilter] = useState<string>('all');
+  const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -104,10 +106,12 @@ export function JobsPage() {
   });
 
   const jobsQuery = useQuery({
-    queryKey: ['jobs', statusFilter],
+    queryKey: ['jobs', statusFilter, triggerModeFilter, cameraFilter],
     queryFn: () =>
       listJobs({
         status: statusFilter === 'all' ? undefined : statusFilter,
+        triggerMode: triggerModeFilter === 'all' ? undefined : triggerModeFilter,
+        cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
       }),
     refetchInterval: 5000,
   });
@@ -473,20 +477,46 @@ export function JobsPage() {
           <Card
             title="任务队列"
             extra={
-              <Select
-                size="small"
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={[
-                  { label: '全部状态', value: 'all' },
-                  { label: '等待中', value: 'queued' },
-                  { label: '处理中', value: 'running' },
-                  { label: '已完成', value: 'completed' },
-                  { label: '失败', value: 'failed' },
-                  { label: '已取消', value: 'cancelled' },
-                ]}
-                style={{ width: 120 }}
-              />
+              <Space wrap>
+                <Select
+                  size="small"
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={[
+                    { label: '全部状态', value: 'all' },
+                    { label: '等待中', value: 'queued' },
+                    { label: '处理中', value: 'running' },
+                    { label: '已完成', value: 'completed' },
+                    { label: '失败', value: 'failed' },
+                    { label: '已取消', value: 'cancelled' },
+                  ]}
+                  style={{ width: 120 }}
+                />
+                <Select
+                  size="small"
+                  value={triggerModeFilter}
+                  onChange={setTriggerModeFilter}
+                  options={[
+                    { label: '全部触发', value: 'all' },
+                    { label: '手动触发', value: 'manual' },
+                    { label: '定时触发', value: 'schedule' },
+                  ]}
+                  style={{ width: 120 }}
+                />
+                <Select
+                  size="small"
+                  value={cameraFilter}
+                  onChange={setCameraFilter}
+                  options={[
+                    { label: '全部摄像头', value: 'all' },
+                    ...cameras.map((item) => ({
+                      label: item.name,
+                      value: item.id,
+                    })),
+                  ]}
+                  style={{ width: 170 }}
+                />
+              </Space>
             }
           >
             <Table<Job>
@@ -516,6 +546,17 @@ export function JobsPage() {
                   title: '触发方式',
                   dataIndex: 'trigger_mode',
                   render: (value: string) => triggerModeLabelMap[value] ?? value,
+                },
+                {
+                  title: '摄像头',
+                  dataIndex: 'camera_id',
+                  render: (value: string | null) =>
+                    value ? (cameras.find((item) => item.id === value)?.name ?? value) : '-',
+                },
+                {
+                  title: '计划',
+                  dataIndex: 'schedule_id',
+                  render: (value: string | null) => (value ? <Text code>{value.slice(0, 8)}</Text> : '-'),
                 },
                 {
                   title: '状态',
