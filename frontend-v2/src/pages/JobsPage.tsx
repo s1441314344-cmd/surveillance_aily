@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -132,26 +132,6 @@ export function JobsPage() {
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
   const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
-
-  useEffect(() => {
-    if (taskMode !== 'upload') {
-      setFileList([]);
-    }
-
-    if (taskMode === 'upload') {
-      form.setFieldValue('cameraId', undefined);
-      form.setFieldValue('scheduleType', DEFAULT_FORM_VALUES.scheduleType);
-      form.setFieldValue('intervalMinutes', DEFAULT_FORM_VALUES.intervalMinutes);
-      form.setFieldValue('dailyTime', DEFAULT_FORM_VALUES.dailyTime);
-      return;
-    }
-
-    if (taskMode === 'camera_once') {
-      form.setFieldValue('scheduleType', DEFAULT_FORM_VALUES.scheduleType);
-      form.setFieldValue('intervalMinutes', DEFAULT_FORM_VALUES.intervalMinutes);
-      form.setFieldValue('dailyTime', DEFAULT_FORM_VALUES.dailyTime);
-    }
-  }, [form, taskMode]);
 
   const invalidateJobs = () =>
     Promise.all([
@@ -299,6 +279,34 @@ export function JobsPage() {
     form.setFieldValue('dailyTime', DEFAULT_FORM_VALUES.dailyTime);
   };
 
+  const handleFormValuesChange = (changedValues: Partial<UploadFormValues>) => {
+    if (!changedValues.taskMode) {
+      return;
+    }
+
+    if (changedValues.taskMode !== 'upload') {
+      setFileList([]);
+    }
+
+    if (changedValues.taskMode === 'upload') {
+      form.setFieldsValue({
+        cameraId: undefined,
+        scheduleType: DEFAULT_FORM_VALUES.scheduleType,
+        intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
+        dailyTime: DEFAULT_FORM_VALUES.dailyTime,
+      });
+      return;
+    }
+
+    if (changedValues.taskMode === 'camera_once') {
+      form.setFieldsValue({
+        scheduleType: DEFAULT_FORM_VALUES.scheduleType,
+        intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
+        dailyTime: DEFAULT_FORM_VALUES.dailyTime,
+      });
+    }
+  };
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <div>
@@ -317,6 +325,7 @@ export function JobsPage() {
               layout="vertical"
               form={form}
               onFinish={handleUploadSubmit}
+              onValuesChange={handleFormValuesChange}
               initialValues={DEFAULT_FORM_VALUES}
             >
               <Form.Item label="任务类型" name="taskMode">

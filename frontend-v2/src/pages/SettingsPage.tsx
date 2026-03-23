@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Card, Col, Empty, Form, Input, List, Row, Select, Space, Spin, Tag, Typography } from 'antd';
-import { listModelProviders, ModelProvider, updateModelProvider } from '@/shared/api/configCenter';
+import { listModelProviders, updateModelProvider } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 
 const { Paragraph, Text, Title } = Typography;
@@ -26,23 +26,19 @@ export function SettingsPage() {
     queryFn: listModelProviders,
   });
 
-  const providers = providerQuery.data ?? [];
-  const activeProvider = useMemo(
-    () => providers.find((item) => item.provider === selectedProvider) ?? null,
-    [providers, selectedProvider],
-  );
-
-  useEffect(() => {
+  const providers = useMemo(() => providerQuery.data ?? [], [providerQuery.data]);
+  const effectiveSelectedProvider = useMemo(() => {
     if (!providers.length) {
-      return;
+      return null;
     }
 
     const exists = providers.some((item) => item.provider === selectedProvider);
-    const nextProvider = exists ? selectedProvider : providers[0]?.provider;
-    if (nextProvider && nextProvider !== selectedProvider) {
-      setSelectedProvider(nextProvider);
-    }
+    return exists ? selectedProvider : providers[0]?.provider ?? null;
   }, [providers, selectedProvider]);
+  const activeProvider = useMemo(
+    () => providers.find((item) => item.provider === effectiveSelectedProvider) ?? null,
+    [effectiveSelectedProvider, providers],
+  );
 
   useEffect(() => {
     if (!activeProvider) {
@@ -79,12 +75,12 @@ export function SettingsPage() {
   });
 
   const handleSubmit = async (values: ProviderFormValues) => {
-    if (!selectedProvider) {
+    if (!effectiveSelectedProvider) {
       message.warning('请先选择一个模型提供方');
       return;
     }
 
-    await saveMutation.mutateAsync({ provider: selectedProvider, payload: values });
+    await saveMutation.mutateAsync({ provider: effectiveSelectedProvider, payload: values });
   };
 
   return (
@@ -112,7 +108,7 @@ export function SettingsPage() {
                       cursor: 'pointer',
                       paddingInline: 12,
                       borderRadius: 12,
-                      background: item.provider === selectedProvider ? '#f0f7ff' : 'transparent',
+                      background: item.provider === effectiveSelectedProvider ? '#f0f7ff' : 'transparent',
                     }}
                     onClick={() => setSelectedProvider(item.provider)}
                   >

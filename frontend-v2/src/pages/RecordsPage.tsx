@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   App,
@@ -37,7 +37,6 @@ export function RecordsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const strategyQuery = useQuery({
     queryKey: ['strategies', 'all-for-records'],
@@ -65,16 +64,19 @@ export function RecordsPage() {
     enabled: Boolean(selectedRecordId),
   });
 
-  useEffect(() => {
-    if (!imageQuery.data) {
-      setImagePreviewUrl(null);
-      return;
-    }
+  const imagePreviewUrl = useMemo(
+    () => (imageQuery.data ? URL.createObjectURL(imageQuery.data) : null),
+    [imageQuery.data],
+  );
 
-    const objectUrl = URL.createObjectURL(imageQuery.data);
-    setImagePreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [imageQuery.data]);
+  useEffect(
+    () => () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    },
+    [imagePreviewUrl],
+  );
 
   const handleExport = async () => {
     try {

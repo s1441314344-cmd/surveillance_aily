@@ -30,6 +30,7 @@ import {
 import { getApiErrorMessage } from '@/shared/api/errors';
 
 const { Paragraph, Text, Title } = Typography;
+const CREATE_CAMERA_ID = '__create__';
 
 type CameraFormValues = {
   name: string;
@@ -79,29 +80,25 @@ export function CamerasPage() {
     queryFn: listCameras,
   });
 
-  const cameras = cameraQuery.data ?? [];
+  const cameras = useMemo(() => cameraQuery.data ?? [], [cameraQuery.data]);
+  const effectiveSelectedCameraId = useMemo(() => {
+    if (selectedCameraId === CREATE_CAMERA_ID) {
+      return null;
+    }
+
+    const exists = selectedCameraId && cameras.some((item) => item.id === selectedCameraId);
+    return exists ? selectedCameraId : cameras[0]?.id ?? null;
+  }, [cameras, selectedCameraId]);
   const activeCamera = useMemo(
-    () => cameras.find((item) => item.id === selectedCameraId) ?? null,
-    [cameras, selectedCameraId],
+    () => cameras.find((item) => item.id === effectiveSelectedCameraId) ?? null,
+    [cameras, effectiveSelectedCameraId],
   );
 
   const statusQuery = useQuery({
-    queryKey: ['camera-status', selectedCameraId],
-    queryFn: () => getCameraStatus(selectedCameraId as string),
-    enabled: Boolean(selectedCameraId),
+    queryKey: ['camera-status', effectiveSelectedCameraId],
+    queryFn: () => getCameraStatus(effectiveSelectedCameraId as string),
+    enabled: Boolean(effectiveSelectedCameraId),
   });
-
-  useEffect(() => {
-    if (!cameras.length) {
-      setSelectedCameraId(null);
-      return;
-    }
-
-    const exists = cameras.some((item) => item.id === selectedCameraId);
-    if (!exists) {
-      setSelectedCameraId(cameras[0].id);
-    }
-  }, [cameras, selectedCameraId]);
 
   useEffect(() => {
     if (!activeCamera) {
@@ -180,7 +177,7 @@ export function CamerasPage() {
   });
 
   const resetForCreate = () => {
-    setSelectedCameraId(null);
+    setSelectedCameraId(CREATE_CAMERA_ID);
     form.setFieldsValue(DEFAULT_CAMERA_VALUES);
   };
 
@@ -197,8 +194,8 @@ export function CamerasPage() {
       jpeg_quality: Number(values.jpeg_quality),
     };
 
-    if (selectedCameraId) {
-      await updateMutation.mutateAsync({ cameraId: selectedCameraId, payload });
+    if (effectiveSelectedCameraId) {
+      await updateMutation.mutateAsync({ cameraId: effectiveSelectedCameraId, payload });
       return;
     }
 
@@ -237,7 +234,7 @@ export function CamerasPage() {
                     size="small"
                     hoverable
                     style={{
-                      borderColor: camera.id === selectedCameraId ? '#1677ff' : undefined,
+                      borderColor: camera.id === effectiveSelectedCameraId ? '#1677ff' : undefined,
                     }}
                     onClick={() => setSelectedCameraId(camera.id)}
                   >
@@ -261,7 +258,7 @@ export function CamerasPage() {
         <Col xs={24} lg={16}>
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
             <Card
-              title={selectedCameraId ? '编辑摄像头' : '新建摄像头'}
+              title={effectiveSelectedCameraId ? '编辑摄像头' : '新建摄像头'}
               extra={
                 activeCamera ? (
                   <Space>
@@ -379,7 +376,7 @@ export function CamerasPage() {
                     htmlType="submit"
                     loading={createMutation.isPending || updateMutation.isPending}
                   >
-                    {selectedCameraId ? '保存修改' : '创建摄像头'}
+                    {effectiveSelectedCameraId ? '保存修改' : '创建摄像头'}
                   </Button>
                   <Button onClick={resetForCreate}>清空重建</Button>
                 </Space>
@@ -387,7 +384,7 @@ export function CamerasPage() {
             </Card>
 
             <Card title="状态概览">
-              {selectedCameraId ? (
+              {effectiveSelectedCameraId ? (
                 statusQuery.isLoading ? (
                   <Spin />
                 ) : (
