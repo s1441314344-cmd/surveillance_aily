@@ -1,4 +1,4 @@
-.PHONY: help v2-help v2-setup v2-deps-up v2-deps-down v2-api v2-worker v2-scheduler v2-frontend v2-dev v2-smoke v2-backfill v2-eval v2-camera-check v2-camera-validate
+.PHONY: help v2-help v2-setup v2-deps-up v2-deps-down v2-api v2-worker v2-scheduler v2-frontend v2-dev v2-smoke v2-e2e v2-backfill v2-eval v2-camera-check v2-camera-validate
 
 help: v2-help
 
@@ -31,6 +31,9 @@ v2-dev:
 
 v2-smoke:
 	@./scripts/v2/smoke.sh
+
+v2-e2e:
+	@./scripts/v2/e2e.sh
 
 v2-backfill:
 	@./scripts/v2/backfill.sh

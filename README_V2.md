@@ -61,6 +61,19 @@ make v2-smoke
 
 该命令会基于正在运行的 API / worker / scheduler 执行上传任务、失败任务重试和定时任务的 smoke 验证。
 
+如需执行前端 E2E 基线回归（登录 + 核心页面可达）：
+
+```bash
+make v2-e2e
+```
+
+首次使用 Playwright 时如需安装浏览器：
+
+```bash
+cd frontend-v2
+npx playwright install chromium
+```
+
 如需单独控制依赖：
 
 ```bash
