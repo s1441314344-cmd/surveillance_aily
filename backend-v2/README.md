@@ -226,6 +226,7 @@ make v2-camera-validate
 ## 当前 API 骨架范围
 
 - `/api/auth`
+- `/api/audit-logs`
 - `/api/users`
 - `/api/model-providers`
 - `/api/strategies`
