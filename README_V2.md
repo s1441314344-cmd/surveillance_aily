@@ -88,6 +88,13 @@ make v2-soak
 ./scripts/v2/soak.sh --rounds 5 --jobs-per-round 20 --concurrency 8 --poll-timeout-seconds 180
 ```
 
+如需一键执行上线前核心检查（自动拉起本地进程并执行 smoke + perf + soak）：
+
+```bash
+make v2-preflight
+./scripts/v2/preflight.sh --with-e2e
+```
+
 如需单独控制依赖：
 
 ```bash
