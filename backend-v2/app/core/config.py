@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     celery_enabled: bool = True
     scheduler_poll_interval_seconds: int = 30
     storage_root: str = "./data/storage"
+    provider_mock_fallback_enabled: bool = True
     cors_origins: Annotated[list[str], NoDecode] = DEFAULT_CORS_ORIGINS
     bootstrap_admin_username: str = "admin"
     bootstrap_admin_password: str = "admin123456"

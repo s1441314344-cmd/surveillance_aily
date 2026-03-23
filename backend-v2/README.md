@@ -64,6 +64,8 @@ make v2-backfill
 
 `make v2-backfill` 会对旧版 `SQLite` 数据执行一次 dry-run 回填评估，输出将要迁移的 cameras / strategies / schedules / jobs / task_records / file_assets 数量，以及缺失文件和未纳入核心迁移的 legacy 提示。
 
+`PROVIDER_MOCK_FALLBACK_ENABLED=true` 时，如果模型提供方未配置可用密钥，adapter 会回退到本地 mock 输出，方便开发和测试；生产环境建议关闭该开关，并在“模型提供方管理”中配置真实 API Key。
+
 ## 异步执行说明
 
 - `POST /api/jobs/uploads` 只负责校验、保存上传文件并创建 `queued` 状态的 Job。
@@ -110,7 +112,7 @@ python3 ./scripts/backfill_legacy.py --source ../data/surveillance.db --source-r
 - Alembic 骨架
 - Celery/Redis 骨架
 - APScheduler 独立调度进程
-- Provider Adapter 骨架
+- OpenAI / 智谱真实 provider adapter（缺少可用密钥时可按配置回退 mock）
 - 健康检查和主要业务路由占位
 
 ## 当前 API 骨架范围

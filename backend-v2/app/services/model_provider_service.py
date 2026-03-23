@@ -1,9 +1,23 @@
+from dataclasses import dataclass
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import decrypt_secret, encrypt_secret, mask_secret
+from app.core.database import SessionLocal
 from app.models.model_provider import ModelProvider
 from app.schemas.model_provider import ModelProviderRead, ModelProviderUpdate
+
+
+@dataclass
+class ModelProviderRuntimeConfig:
+    provider: str
+    display_name: str
+    base_url: str
+    api_key: str | None
+    default_model: str
+    timeout_seconds: int
+    status: str
 
 
 def serialize_model_provider(provider: ModelProvider) -> ModelProviderRead:
@@ -51,3 +65,27 @@ def upsert_model_provider(db: Session, provider_name: str, payload: ModelProvide
     db.commit()
     db.refresh(provider)
     return serialize_model_provider(provider)
+
+
+def build_model_provider_runtime(provider: ModelProvider) -> ModelProviderRuntimeConfig:
+    return ModelProviderRuntimeConfig(
+        provider=provider.provider,
+        display_name=provider.display_name,
+        base_url=provider.base_url,
+        api_key=decrypt_secret(provider.api_key_encrypted),
+        default_model=provider.default_model,
+        timeout_seconds=provider.timeout_seconds,
+        status=provider.status,
+    )
+
+
+def get_model_provider_runtime(db: Session, provider_name: str) -> ModelProviderRuntimeConfig | None:
+    provider = db.get(ModelProvider, provider_name.lower())
+    if provider is None:
+        return None
+    return build_model_provider_runtime(provider)
+
+
+def load_model_provider_runtime(provider_name: str) -> ModelProviderRuntimeConfig | None:
+    with SessionLocal() as db:
+        return get_model_provider_runtime(db, provider_name)

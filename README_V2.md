@@ -115,4 +115,5 @@ npm run dev
 ## 当前阶段
 
 - 已完成：V2 backlog 拆分、前后端基础骨架、核心路由占位、本地依赖编排、统一异步任务链路、独立 scheduler 进程、本地联调脚本、历史数据回填 dry-run / apply 工具
-- 下一步建议：进入“联调与验证”小周期，优先完成 RTSP 真流验证、回填对账、真实模型接入和系统级回归
+- 已补充：OpenAI / 智谱 provider adapter 真实调用实现，开发环境可通过 `PROVIDER_MOCK_FALLBACK_ENABLED=true` 保持无密钥可联调
+- 下一步建议：进入“联调与验证”小周期，优先完成 RTSP 真流验证、回填对账、真实模型样本评估和系统级回归
