@@ -1,9 +1,11 @@
 import csv
 from datetime import datetime, timedelta
 from io import StringIO
+from pathlib import Path
 
 from app.core.database import SessionLocal
 from app.models.job import Job
+from app.models.task_record import TaskRecord
 from app.services.providers.factory import get_provider_adapter
 from app.workers.tasks import process_job
 
@@ -442,3 +444,32 @@ def test_task_records_filter_by_camera_and_time_range(client):
     assert export_out_of_range_response.status_code == 200
     export_rows_out_of_range = list(csv.DictReader(StringIO(export_out_of_range_response.text)))
     assert export_rows_out_of_range == []
+
+
+def test_task_record_image_forbids_paths_outside_storage_root(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-safe.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert process_job(job["id"])["status"] == "completed"
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    record_id = records_response.json()[0]["id"]
+
+    with SessionLocal() as db:
+        record = db.get(TaskRecord, record_id)
+        assert record is not None
+        record.input_image_path = str(Path(__file__).resolve())
+        db.commit()
+
+    image_response = client.get(f"/api/task-records/{record_id}/image", headers=headers)
+    assert image_response.status_code == 403
+    assert image_response.json()["detail"] == "Image file access denied"

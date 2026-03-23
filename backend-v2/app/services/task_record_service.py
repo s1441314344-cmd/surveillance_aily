@@ -7,9 +7,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.database import database_url
 from app.models.task_record import TaskRecord
 from app.schemas.task_record import TaskRecordRead
+
+settings = get_settings()
 
 
 def serialize_task_record(record: TaskRecord) -> TaskRecordRead:
@@ -128,7 +131,14 @@ def get_record_image_path(record: TaskRecord) -> str:
     image_path = Path(record.input_image_path)
     if not record.input_image_path or not image_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image file not found")
-    return str(image_path)
+
+    storage_root = Path(settings.storage_root).resolve()
+    resolved_path = image_path.resolve()
+    try:
+        resolved_path.relative_to(storage_root)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Image file access denied") from exc
+    return str(resolved_path)
 
 
 def _ensure_aware(value: datetime) -> datetime:
