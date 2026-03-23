@@ -53,6 +53,7 @@ make v2-worker
 make v2-scheduler
 make v2-frontend
 make v2-smoke
+make v2-backfill
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
@@ -61,6 +62,8 @@ make v2-smoke
 
 `make v2-smoke` 会对运行中的栈执行一次“上传异步链路 + 定时调度链路”的冒烟验收。
 
+`make v2-backfill` 会对旧版 `SQLite` 数据执行一次 dry-run 回填评估，输出将要迁移的 cameras / strategies / schedules / jobs / task_records / file_assets 数量，以及缺失文件和未纳入核心迁移的 legacy 提示。
+
 ## 异步执行说明
 
 - `POST /api/jobs/uploads` 只负责校验、保存上传文件并创建 `queued` 状态的 Job。
@@ -68,6 +71,36 @@ make v2-smoke
 - Celery worker 通过 `jobs.process(job_id)` 执行抓帧、模型调用、Schema 校验和记录写入。
 - scheduler 进程负责扫描到期的 `job_schedules`，创建 `camera_schedule` Job，并派发到 worker。
 - `task_records`、`feedback`、`dashboard` 继续复用统一的任务闭环。
+
+## 历史数据回填
+
+默认脚本入口：
+
+```bash
+make v2-backfill
+```
+
+手工指定并真正落库：
+
+```bash
+cd ../
+./scripts/v2/backfill.sh --apply
+```
+
+也可以直接运行 Python 脚本：
+
+```bash
+cd backend-v2
+python3 ./scripts/backfill_legacy.py --source ../data/surveillance.db --source-root .. --apply
+```
+
+回填策略说明：
+
+- 旧版 `rules + prompt_templates` 会收敛为 V2 `analysis_strategies`
+- 旧版 `inspection_tasks` 会收敛为 V2 `job_schedules`
+- 旧版 `detection_records` 和 `submit_tasks` 会生成历史 `jobs + task_records`
+- `work_orders` 暂不进入 V2 核心表，仅在报告中提示保留在 legacy DB
+- 脚本默认是 dry-run，适合先做对账和缺失文件扫描
 
 ## 当前包含
 

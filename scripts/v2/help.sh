@@ -12,6 +12,7 @@ Smart Inspection V2 local commands:
   make v2-frontend     # run frontend dev server
   make v2-dev          # deps-up + startup hint
   make v2-smoke        # verify upload + scheduled async flows against running stack
+  make v2-backfill     # dry-run legacy SQLite -> V2 backfill report
   make v2-deps-down    # stop postgres + redis
 
 Recommended flow:
@@ -22,4 +23,8 @@ Recommended flow:
      make v2-worker
      make v2-scheduler
      make v2-frontend
+
+Backfill examples:
+  make v2-backfill
+  ./scripts/v2/backfill.sh --apply
 EOF
