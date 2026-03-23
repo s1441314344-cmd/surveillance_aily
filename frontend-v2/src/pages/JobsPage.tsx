@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -21,7 +21,7 @@ import {
 } from 'antd';
 import type { RcFile, UploadFile } from 'antd/es/upload/interface';
 import { InboxOutlined } from '@ant-design/icons';
-import { listCameras, listStrategies } from '@/shared/api/configCenter';
+import { listCameras, listStrategies, type Camera, type Strategy } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import {
   cancelJob,
@@ -89,6 +89,10 @@ const triggerModeLabelMap: Record<string, string> = {
   schedule: '定时触发',
 };
 const retryableJobStatus = new Set(['failed', 'cancelled']);
+const EMPTY_STRATEGIES: Strategy[] = [];
+const EMPTY_CAMERAS: Camera[] = [];
+const EMPTY_JOBS: Job[] = [];
+const EMPTY_JOB_SCHEDULES: JobSchedule[] = [];
 
 function formatDateTime(value: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
@@ -102,6 +106,7 @@ export function JobsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [triggerModeFilter, setTriggerModeFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
+  const [scheduleFilter, setScheduleFilter] = useState<string>('all');
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
   const [scheduleCameraFilter, setScheduleCameraFilter] = useState<string>('all');
   const [scheduleStrategyFilter, setScheduleStrategyFilter] = useState<string>('all');
@@ -121,12 +126,13 @@ export function JobsPage() {
   });
 
   const jobsQuery = useQuery({
-    queryKey: ['jobs', statusFilter, triggerModeFilter, cameraFilter],
+    queryKey: ['jobs', statusFilter, triggerModeFilter, cameraFilter, scheduleFilter],
     queryFn: () =>
       listJobs({
         status: statusFilter === 'all' ? undefined : statusFilter,
         triggerMode: triggerModeFilter === 'all' ? undefined : triggerModeFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
+        scheduleId: scheduleFilter === 'all' ? undefined : scheduleFilter,
       }),
     refetchInterval: 5000,
   });
@@ -148,13 +154,30 @@ export function JobsPage() {
     enabled: Boolean(selectedJobId),
   });
 
-  const strategies = strategyQuery.data ?? [];
-  const cameras = camerasQuery.data ?? [];
-  const jobs = jobsQuery.data ?? [];
-  const schedules = schedulesQuery.data ?? [];
+  const strategies = strategyQuery.data ?? EMPTY_STRATEGIES;
+  const cameras = camerasQuery.data ?? EMPTY_CAMERAS;
+  const jobs = jobsQuery.data ?? EMPTY_JOBS;
+  const schedules = schedulesQuery.data ?? EMPTY_JOB_SCHEDULES;
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
   const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
+  const scheduleFilterOptions = useMemo(
+    () => [
+      { label: '全部计划', value: 'all' },
+      ...schedules.map((item) => ({
+        label: `${formatDateTime(item.next_run_at)} · ${item.id.slice(0, 8)}`,
+        value: item.id,
+      })),
+    ],
+    [schedules],
+  );
+
+  useEffect(() => {
+    const selectedStrategyId = form.getFieldValue('strategyId');
+    if (!selectedStrategyId && strategies.length > 0) {
+      form.setFieldValue('strategyId', strategies[0].id);
+    }
+  }, [form, strategies]);
 
   const invalidateJobs = () =>
     Promise.all([
@@ -598,6 +621,18 @@ export function JobsPage() {
                   ]}
                   style={{ width: 170 }}
                 />
+                <Select
+                  size="small"
+                  value={scheduleFilter}
+                  onChange={(value) => {
+                    setScheduleFilter(value);
+                    if (value !== 'all') {
+                      setTriggerModeFilter('schedule');
+                    }
+                  }}
+                  options={scheduleFilterOptions}
+                  style={{ width: 190 }}
+                />
               </Space>
             }
           >
@@ -847,6 +882,16 @@ export function JobsPage() {
               title: '操作',
               render: (_, record) => (
                 <Space size={8}>
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      setTriggerModeFilter('schedule');
+                      setScheduleFilter(record.id);
+                      setSelectedJobId(null);
+                    }}
+                  >
+                    查看任务
+                  </Button>
                   <Button
                     size="small"
                     onClick={() => handleOpenScheduleEditor(record)}
