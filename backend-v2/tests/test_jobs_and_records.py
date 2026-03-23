@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from app.core.database import SessionLocal
 from app.models.job import Job
 from app.services.providers.factory import get_provider_adapter
@@ -282,3 +284,91 @@ def test_retry_non_retryable_job_returns_conflict(client):
     retry_response = client.post(f"/api/jobs/{queued_job['id']}/retry", headers=headers)
     assert retry_response.status_code == 409
     assert "not retryable" in retry_response.json()["detail"]
+
+
+def test_task_records_filter_by_camera_and_time_range(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Record Filter Camera",
+            "location": "记录过滤位",
+            "ip_address": "192.168.1.99",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/record-filter",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/record-filter",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_camera_job_response = client.post(
+        "/api/jobs/cameras/once",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+        },
+    )
+    assert create_camera_job_response.status_code == 200
+    camera_job = create_camera_job_response.json()
+    assert process_job(camera_job["id"])["status"] == "completed"
+
+    create_upload_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("record-filter-upload.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_upload_job_response.status_code == 200
+    upload_job = create_upload_job_response.json()
+    assert process_job(upload_job["id"])["status"] == "completed"
+
+    camera_records_response = client.get(
+        "/api/task-records",
+        headers=headers,
+        params={"camera_id": camera["id"]},
+    )
+    assert camera_records_response.status_code == 200
+    camera_records = camera_records_response.json()
+    assert len(camera_records) == 1
+    assert camera_records[0]["job_id"] == camera_job["id"]
+    assert camera_records[0]["camera_id"] == camera["id"]
+
+    created_at = datetime.fromisoformat(camera_records[0]["created_at"])
+    created_from = (created_at - timedelta(seconds=5)).isoformat()
+    created_to = (created_at + timedelta(seconds=5)).isoformat()
+
+    in_range_response = client.get(
+        "/api/task-records",
+        headers=headers,
+        params={
+            "camera_id": camera["id"],
+            "created_from": created_from,
+            "created_to": created_to,
+        },
+    )
+    assert in_range_response.status_code == 200
+    in_range_records = in_range_response.json()
+    assert len(in_range_records) == 1
+    assert in_range_records[0]["id"] == camera_records[0]["id"]
+
+    out_of_range_response = client.get(
+        "/api/task-records",
+        headers=headers,
+        params={
+            "camera_id": camera["id"],
+            "created_from": (created_at + timedelta(minutes=5)).isoformat(),
+        },
+    )
+    assert out_of_range_response.status_code == 200
+    assert out_of_range_response.json() == []

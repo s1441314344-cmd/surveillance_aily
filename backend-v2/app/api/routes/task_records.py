@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy.orm import Session
@@ -22,8 +24,11 @@ def list_task_records(
     status: str | None = None,
     strategy_id: str | None = None,
     job_id: str | None = None,
+    camera_id: str | None = None,
     model_provider: str | None = None,
     feedback_status: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
     _: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -32,8 +37,11 @@ def list_task_records(
         result_status=status,
         strategy_id=strategy_id,
         job_id=job_id,
+        camera_id=camera_id,
         model_provider=model_provider,
         feedback_status=feedback_status,
+        created_from=created_from,
+        created_to=created_to,
     )
 
 
@@ -42,8 +50,11 @@ def export_task_records(
     status: str | None = None,
     strategy_id: str | None = None,
     job_id: str | None = None,
+    camera_id: str | None = None,
     model_provider: str | None = None,
     feedback_status: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
     _: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -52,8 +63,11 @@ def export_task_records(
         result_status=status,
         strategy_id=strategy_id,
         job_id=job_id,
+        camera_id=camera_id,
         model_provider=model_provider,
         feedback_status=feedback_status,
+        created_from=created_from,
+        created_to=created_to,
     )
     csv_content = export_task_records_csv(records)
     return PlainTextResponse(

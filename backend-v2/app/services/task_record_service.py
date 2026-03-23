@@ -1,5 +1,5 @@
 import csv
-from datetime import timezone
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -7,11 +7,20 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.database import database_url
 from app.models.task_record import TaskRecord
 from app.schemas.task_record import TaskRecordRead
 
 
 def serialize_task_record(record: TaskRecord) -> TaskRecordRead:
+    created_at = None
+    if record.created_at:
+        created_at = (
+            record.created_at.astimezone(timezone.utc)
+            if record.created_at.tzinfo is not None
+            else record.created_at.replace(tzinfo=timezone.utc)
+        ).isoformat()
+
     return TaskRecordRead(
         id=record.id,
         job_id=record.job_id,
@@ -31,7 +40,7 @@ def serialize_task_record(record: TaskRecord) -> TaskRecordRead:
         result_status=record.result_status,
         duration_ms=record.duration_ms,
         feedback_status=record.feedback_status,
-        created_at=record.created_at.astimezone(timezone.utc).isoformat() if record.created_at else None,
+        created_at=created_at,
     )
 
 
@@ -41,8 +50,11 @@ def list_task_records(
     result_status: str | None = None,
     strategy_id: str | None = None,
     job_id: str | None = None,
+    camera_id: str | None = None,
     model_provider: str | None = None,
     feedback_status: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
 ) -> list[TaskRecordRead]:
     stmt = select(TaskRecord).order_by(TaskRecord.created_at.desc(), TaskRecord.id.desc())
     if result_status:
@@ -51,10 +63,16 @@ def list_task_records(
         stmt = stmt.where(TaskRecord.strategy_id == strategy_id)
     if job_id:
         stmt = stmt.where(TaskRecord.job_id == job_id)
+    if camera_id:
+        stmt = stmt.where(TaskRecord.camera_id == camera_id)
     if model_provider:
         stmt = stmt.where(TaskRecord.model_provider == model_provider)
     if feedback_status:
         stmt = stmt.where(TaskRecord.feedback_status == feedback_status)
+    if created_from:
+        stmt = stmt.where(TaskRecord.created_at >= _ensure_aware(created_from))
+    if created_to:
+        stmt = stmt.where(TaskRecord.created_at <= _ensure_aware(created_to))
     return [serialize_task_record(record) for record in db.scalars(stmt)]
 
 
@@ -111,3 +129,10 @@ def get_record_image_path(record: TaskRecord) -> str:
     if not record.input_image_path or not image_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image file not found")
     return str(image_path)
+
+
+def _ensure_aware(value: datetime) -> datetime:
+    normalized = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    if database_url.get_backend_name().startswith("sqlite"):
+        return normalized.replace(tzinfo=None)
+    return normalized
