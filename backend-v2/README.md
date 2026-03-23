@@ -55,6 +55,7 @@ make v2-frontend
 make v2-smoke
 make v2-e2e
 make v2-perf
+make v2-soak
 make v2-backfill
 make v2-eval
 make v2-camera-check
@@ -70,6 +71,8 @@ make v2-camera-validate
 `make v2-e2e` 会执行 Playwright 基线回归（登录 + 核心页面导航）。
 
 `make v2-perf` 会执行上传任务并发探测并输出创建时延、任务完成率和吞吐摘要。
+
+`make v2-soak` 会执行多轮任务提交稳定性回归，重点检测未收敛任务、失败任务和提交异常。
 
 `make v2-backfill` 会对旧版 `SQLite` 数据执行一次 dry-run 回填评估，输出将要迁移的 cameras / strategies / schedules / jobs / task_records / file_assets 数量，以及缺失文件和未纳入核心迁移的 legacy 提示。
 

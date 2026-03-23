@@ -81,6 +81,13 @@ make v2-perf
 ./scripts/v2/perf.sh --jobs 50 --concurrency 10 --files-per-job 2 --api-base http://127.0.0.1:8000
 ```
 
+如需做多轮稳定性回归（检查任务是否出现长期未收敛）：
+
+```bash
+make v2-soak
+./scripts/v2/soak.sh --rounds 5 --jobs-per-round 20 --concurrency 8 --poll-timeout-seconds 180
+```
+
 如需单独控制依赖：
 
 ```bash
