@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +25,7 @@ JOB_STATUS_COMPLETED = "completed"
 JOB_STATUS_FAILED = "failed"
 JOB_STATUS_CANCELLED = "cancelled"
 JOB_STATUS_TERMINAL = {JOB_STATUS_COMPLETED, JOB_STATUS_FAILED, JOB_STATUS_CANCELLED}
+JOB_STATUS_RETRYABLE = {JOB_STATUS_FAILED, JOB_STATUS_CANCELLED}
 
 
 def serialize_job(job: Job) -> JobRead:
@@ -215,6 +217,50 @@ def cancel_job(db: Session, job: Job) -> JobRead:
         db.refresh(job)
         _revoke_job_processing(job.celery_task_id)
     return serialize_job(job)
+
+
+def retry_job(
+    db: Session,
+    *,
+    source_job: Job,
+    current_user: CurrentUser,
+) -> JobRead:
+    if source_job.status not in JOB_STATUS_RETRYABLE:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Job status {source_job.status} is not retryable",
+        )
+
+    payload = copy.deepcopy(source_job.payload or {})
+    payload["requested_by"] = current_user.username
+    payload["retry_of_job_id"] = source_job.id
+
+    new_job = Job(
+        id=generate_id(),
+        job_type=source_job.job_type,
+        trigger_mode="manual",
+        strategy_id=source_job.strategy_id,
+        strategy_name=source_job.strategy_name,
+        camera_id=source_job.camera_id,
+        schedule_id=source_job.schedule_id,
+        model_provider=source_job.model_provider,
+        model_name=source_job.model_name,
+        status="queued",
+        celery_task_id=None,
+        total_items=source_job.total_items,
+        completed_items=0,
+        failed_items=0,
+        error_message=None,
+        started_at=None,
+        finished_at=None,
+        payload=payload,
+    )
+    db.add(new_job)
+    db.commit()
+    db.refresh(new_job)
+    _queue_job_processing(db, new_job)
+    db.refresh(new_job)
+    return serialize_job(new_job)
 
 
 def _save_upload_inputs(db: Session, *, job_id: str, files: list[UploadFile]) -> list[FileAsset]:

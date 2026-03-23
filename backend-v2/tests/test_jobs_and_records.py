@@ -203,3 +203,82 @@ def test_running_job_collaborative_cancel_stops_following_records(client, monkey
     records = records_response.json()
     assert len(records) == 1
     assert records[0]["input_filename"] == "helmet-running-1.jpg"
+
+
+def test_retry_failed_camera_job_creates_new_queued_job(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Retry Failed Camera",
+            "location": "重试测试位",
+            "ip_address": "192.168.1.88",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "bad-rtsp-url",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/retry-failed",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_job_response = client.post(
+        "/api/jobs/cameras/once",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+        },
+    )
+    assert create_job_response.status_code == 200
+    failed_job = create_job_response.json()
+    assert process_job(failed_job["id"])["status"] == "failed"
+
+    retry_response = client.post(f"/api/jobs/{failed_job['id']}/retry", headers=headers)
+    assert retry_response.status_code == 200
+    retried_job = retry_response.json()
+
+    assert retried_job["id"] != failed_job["id"]
+    assert retried_job["status"] == "queued"
+    assert retried_job["job_type"] == failed_job["job_type"]
+    assert retried_job["trigger_mode"] == "manual"
+    assert retried_job["camera_id"] == failed_job["camera_id"]
+    assert retried_job["strategy_id"] == failed_job["strategy_id"]
+    assert retried_job["completed_items"] == 0
+    assert retried_job["failed_items"] == 0
+    assert retried_job["error_message"] is None
+
+    with SessionLocal() as db:
+        persisted_retried_job = db.get(Job, retried_job["id"])
+        assert persisted_retried_job is not None
+        assert (persisted_retried_job.payload or {}).get("retry_of_job_id") == failed_job["id"]
+        assert (persisted_retried_job.payload or {}).get("requested_by") == "admin"
+
+    assert process_job(retried_job["id"])["status"] == "failed"
+
+
+def test_retry_non_retryable_job_returns_conflict(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-retry-conflict.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    queued_job = create_job_response.json()
+    assert queued_job["status"] == "queued"
+
+    retry_response = client.post(f"/api/jobs/{queued_job['id']}/retry", headers=headers)
+    assert retry_response.status_code == 409
+    assert "not retryable" in retry_response.json()["detail"]
