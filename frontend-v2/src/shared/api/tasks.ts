@@ -17,6 +17,16 @@ export type Job = {
   created_at: string | null;
 };
 
+export type JobSchedule = {
+  id: string;
+  camera_id: string;
+  strategy_id: string;
+  schedule_type: string;
+  schedule_value: string;
+  status: string;
+  next_run_at: string | null;
+};
+
 export type TaskRecord = {
   id: string;
   job_id: string;
@@ -72,6 +82,43 @@ export async function createCameraOnceJob(payload: {
     strategy_id: payload.strategyId,
     model_provider: payload.modelProvider,
     model_name: payload.modelName,
+  });
+  return response.data;
+}
+
+export async function listJobSchedules(params?: {
+  status?: string;
+  cameraId?: string;
+  strategyId?: string;
+}) {
+  const response = await apiClient.get<JobSchedule[]>('/api/job-schedules', {
+    params: {
+      status: params?.status || undefined,
+      camera_id: params?.cameraId || undefined,
+      strategy_id: params?.strategyId || undefined,
+    },
+  });
+  return response.data;
+}
+
+export async function createJobSchedule(payload: {
+  cameraId: string;
+  strategyId: string;
+  scheduleType: string;
+  scheduleValue: string;
+}) {
+  const response = await apiClient.post<JobSchedule>('/api/job-schedules', {
+    camera_id: payload.cameraId,
+    strategy_id: payload.strategyId,
+    schedule_type: payload.scheduleType,
+    schedule_value: payload.scheduleValue,
+  });
+  return response.data;
+}
+
+export async function updateJobScheduleStatus(scheduleId: string, status: string) {
+  const response = await apiClient.patch<JobSchedule>(`/api/job-schedules/${scheduleId}/status`, {
+    status,
   });
   return response.data;
 }

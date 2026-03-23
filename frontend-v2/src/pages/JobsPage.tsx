@@ -8,6 +8,7 @@ import {
   Col,
   Descriptions,
   Form,
+  Input,
   Row,
   Select,
   Space,
@@ -20,21 +21,38 @@ import type { RcFile, UploadFile } from 'antd/es/upload/interface';
 import { InboxOutlined } from '@ant-design/icons';
 import { listCameras, listStrategies } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
-import { cancelJob, createCameraOnceJob, getJob, Job, listJobs, uploadJob } from '@/shared/api/tasks';
+import {
+  cancelJob,
+  createCameraOnceJob,
+  createJobSchedule,
+  getJob,
+  Job,
+  JobSchedule,
+  listJobs,
+  listJobSchedules,
+  updateJobScheduleStatus,
+  uploadJob,
+} from '@/shared/api/tasks';
 
 const { Title, Paragraph, Text } = Typography;
 const { Dragger } = Upload;
 
 type UploadFormValues = {
-  taskMode: 'upload' | 'camera_once';
+  taskMode: 'upload' | 'camera_once' | 'camera_schedule';
   strategyId: string;
   cameraId?: string;
+  scheduleType?: 'interval_minutes' | 'daily_time';
+  intervalMinutes?: number;
+  dailyTime?: string;
 };
 
 const DEFAULT_FORM_VALUES: UploadFormValues = {
   taskMode: 'upload',
   strategyId: '',
   cameraId: undefined,
+  scheduleType: 'interval_minutes',
+  intervalMinutes: 15,
+  dailyTime: '08:30',
 };
 
 const statusColorMap: Record<string, string> = {
@@ -45,11 +63,22 @@ const statusColorMap: Record<string, string> = {
   cancelled: 'orange',
 };
 
+const scheduleStatusColorMap: Record<string, string> = {
+  active: 'green',
+  paused: 'orange',
+};
+
+const scheduleTypeLabelMap: Record<string, string> = {
+  interval_minutes: '按分钟间隔',
+  daily_time: '每日固定时间',
+};
+
 export function JobsPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<UploadFormValues>();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
@@ -72,6 +101,15 @@ export function JobsPage() {
     refetchInterval: 5000,
   });
 
+  const schedulesQuery = useQuery({
+    queryKey: ['job-schedules', scheduleStatusFilter],
+    queryFn: () =>
+      listJobSchedules({
+        status: scheduleStatusFilter === 'all' ? undefined : scheduleStatusFilter,
+      }),
+    refetchInterval: 10000,
+  });
+
   const selectedJobQuery = useQuery({
     queryKey: ['job-detail', selectedJobId],
     queryFn: () => getJob(selectedJobId as string),
@@ -81,16 +119,29 @@ export function JobsPage() {
   const strategies = strategyQuery.data ?? [];
   const cameras = camerasQuery.data ?? [];
   const jobs = jobsQuery.data ?? [];
+  const schedules = schedulesQuery.data ?? [];
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
+  const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
 
   useEffect(() => {
-    if (taskMode === 'camera_once') {
+    if (taskMode !== 'upload') {
       setFileList([]);
+    }
+
+    if (taskMode === 'upload') {
+      form.setFieldValue('cameraId', undefined);
+      form.setFieldValue('scheduleType', DEFAULT_FORM_VALUES.scheduleType);
+      form.setFieldValue('intervalMinutes', DEFAULT_FORM_VALUES.intervalMinutes);
+      form.setFieldValue('dailyTime', DEFAULT_FORM_VALUES.dailyTime);
       return;
     }
 
-    form.setFieldValue('cameraId', undefined);
+    if (taskMode === 'camera_once') {
+      form.setFieldValue('scheduleType', DEFAULT_FORM_VALUES.scheduleType);
+      form.setFieldValue('intervalMinutes', DEFAULT_FORM_VALUES.intervalMinutes);
+      form.setFieldValue('dailyTime', DEFAULT_FORM_VALUES.dailyTime);
+    }
   }, [form, taskMode]);
 
   const invalidateJobs = () =>
@@ -99,6 +150,9 @@ export function JobsPage() {
       queryClient.invalidateQueries({ queryKey: ['job-detail'] }),
       queryClient.invalidateQueries({ queryKey: ['task-records'] }),
     ]);
+
+  const invalidateSchedules = () =>
+    queryClient.invalidateQueries({ queryKey: ['job-schedules'] });
 
   const uploadMutation = useMutation({
     mutationFn: uploadJob,
@@ -127,6 +181,37 @@ export function JobsPage() {
     },
   });
 
+  const scheduleMutation = useMutation({
+    mutationFn: createJobSchedule,
+    onSuccess: async () => {
+      await invalidateSchedules();
+      form.setFieldsValue({
+        taskMode: 'camera_schedule',
+        strategyId: form.getFieldValue('strategyId'),
+        cameraId: form.getFieldValue('cameraId'),
+        scheduleType: DEFAULT_FORM_VALUES.scheduleType,
+        intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
+        dailyTime: DEFAULT_FORM_VALUES.dailyTime,
+      });
+      message.success('定时任务计划已创建');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '定时任务计划创建失败'));
+    },
+  });
+
+  const scheduleStatusMutation = useMutation({
+    mutationFn: ({ scheduleId, status }: { scheduleId: string; status: string }) =>
+      updateJobScheduleStatus(scheduleId, status),
+    onSuccess: async () => {
+      await invalidateSchedules();
+      message.success('计划状态已更新');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '计划状态更新失败'));
+    },
+  });
+
   const cancelMutation = useMutation({
     mutationFn: cancelJob,
     onSuccess: async (job) => {
@@ -140,6 +225,31 @@ export function JobsPage() {
   });
 
   const handleUploadSubmit = async (values: UploadFormValues) => {
+    if (values.taskMode === 'camera_schedule') {
+      if (!values.cameraId) {
+        message.warning('请先选择摄像头');
+        return;
+      }
+
+      const scheduleValue =
+        values.scheduleType === 'daily_time'
+          ? values.dailyTime?.trim()
+          : String(values.intervalMinutes ?? '').trim();
+
+      if (!values.scheduleType || !scheduleValue) {
+        message.warning('请补充完整的定时任务配置');
+        return;
+      }
+
+      await scheduleMutation.mutateAsync({
+        cameraId: values.cameraId,
+        strategyId: values.strategyId,
+        scheduleType: values.scheduleType,
+        scheduleValue,
+      });
+      return;
+    }
+
     if (values.taskMode === 'camera_once') {
       if (!values.cameraId) {
         message.warning('请先选择摄像头');
@@ -175,6 +285,9 @@ export function JobsPage() {
     }
 
     form.setFieldValue('cameraId', undefined);
+    form.setFieldValue('scheduleType', DEFAULT_FORM_VALUES.scheduleType);
+    form.setFieldValue('intervalMinutes', DEFAULT_FORM_VALUES.intervalMinutes);
+    form.setFieldValue('dailyTime', DEFAULT_FORM_VALUES.dailyTime);
   };
 
   return (
@@ -184,7 +297,7 @@ export function JobsPage() {
           任务中心
         </Title>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          当前已支持图片上传任务和摄像头单次任务。定时任务与异步 worker 会在下一阶段接入。
+          当前已支持图片上传、摄像头单次任务和定时任务计划配置。异步 worker 调度会在下一阶段继续收口。
         </Paragraph>
       </div>
 
@@ -202,6 +315,7 @@ export function JobsPage() {
                   options={[
                     { label: '图片上传', value: 'upload' },
                     { label: '摄像头单次抽帧', value: 'camera_once' },
+                    { label: '摄像头定时任务', value: 'camera_schedule' },
                   ]}
                 />
               </Form.Item>
@@ -237,7 +351,9 @@ export function JobsPage() {
                     <p className="ant-upload-hint">支持 JPG、PNG、JPEG、BMP、WEBP</p>
                   </Dragger>
                 </Form.Item>
-              ) : (
+              ) : null}
+
+              {taskMode !== 'upload' ? (
                 <Form.Item
                   label="选择摄像头"
                   name="cameraId"
@@ -252,18 +368,55 @@ export function JobsPage() {
                     }))}
                   />
                 </Form.Item>
-              )}
+              ) : null}
+
+              {taskMode === 'camera_schedule' ? (
+                <>
+                  <Form.Item label="计划类型" name="scheduleType" rules={[{ required: true, message: '请选择计划类型' }]}>
+                    <Select
+                      options={[
+                        { label: '按分钟间隔执行', value: 'interval_minutes' },
+                        { label: '每日固定时间', value: 'daily_time' },
+                      ]}
+                    />
+                  </Form.Item>
+
+                  {scheduleType === 'interval_minutes' ? (
+                    <Form.Item
+                      label="执行间隔(分钟)"
+                      name="intervalMinutes"
+                      rules={[{ required: true, message: '请输入执行间隔' }]}
+                    >
+                      <Input type="number" min={1} placeholder="例如 15" />
+                    </Form.Item>
+                  ) : (
+                    <Form.Item
+                      label="每日执行时间"
+                      name="dailyTime"
+                      rules={[{ required: true, message: '请输入每日执行时间' }]}
+                    >
+                      <Input placeholder="例如 08:30" />
+                    </Form.Item>
+                  )}
+                </>
+              ) : null}
 
               <Space wrap>
                 <Button
                   type="primary"
                   htmlType="submit"
-                  loading={uploadMutation.isPending || cameraOnceMutation.isPending}
+                  loading={
+                    uploadMutation.isPending || cameraOnceMutation.isPending || scheduleMutation.isPending
+                  }
                 >
-                  {taskMode === 'upload' ? '提交上传任务' : '执行摄像头单次任务'}
+                  {taskMode === 'upload'
+                    ? '提交上传任务'
+                    : taskMode === 'camera_once'
+                      ? '执行摄像头单次任务'
+                      : '创建定时任务计划'}
                 </Button>
                 <Button onClick={handleResetInput}>
-                  {taskMode === 'upload' ? '清空文件' : '清空摄像头选择'}
+                  {taskMode === 'upload' ? '清空文件' : '清空当前配置'}
                 </Button>
               </Space>
             </Form>
@@ -276,7 +429,9 @@ export function JobsPage() {
               description={
                 taskMode === 'upload'
                   ? '上传任务会立即落库并生成任务记录。'
-                  : '摄像头单次任务会按当前 RTSP 配置抓取一帧并生成记录，定时任务和异步 worker 会在下一阶段接入。'
+                  : taskMode === 'camera_once'
+                    ? '摄像头单次任务会按当前 RTSP 配置抓取一帧并生成记录。'
+                    : '定时任务计划当前支持按分钟间隔和每日固定时间两种模式，可统一在计划列表中启停。'
               }
             />
           </Card>
@@ -377,6 +532,91 @@ export function JobsPage() {
           </Card>
         </Col>
       </Row>
+
+      <Card
+        title="定时任务计划"
+        extra={
+          <Select
+            size="small"
+            value={scheduleStatusFilter}
+            onChange={setScheduleStatusFilter}
+            options={[
+              { label: '全部计划', value: 'all' },
+              { label: '启用中', value: 'active' },
+              { label: '已暂停', value: 'paused' },
+            ]}
+            style={{ width: 120 }}
+          />
+        }
+      >
+        <Table<JobSchedule>
+          rowKey="id"
+          dataSource={schedules}
+          loading={schedulesQuery.isLoading}
+          pagination={{ pageSize: 6 }}
+          locale={{ emptyText: '暂无定时任务计划' }}
+          columns={[
+            {
+              title: '计划 ID',
+              dataIndex: 'id',
+              width: 180,
+              render: (value: string) => <Text code>{value.slice(0, 8)}</Text>,
+            },
+            {
+              title: '摄像头',
+              dataIndex: 'camera_id',
+              render: (value: string) =>
+                cameras.find((item) => item.id === value)?.name ?? value,
+            },
+            {
+              title: '策略',
+              dataIndex: 'strategy_id',
+              render: (value: string) =>
+                strategies.find((item) => item.id === value)?.name ?? value,
+            },
+            {
+              title: '计划类型',
+              dataIndex: 'schedule_type',
+              render: (value: string) => scheduleTypeLabelMap[value] ?? value,
+            },
+            {
+              title: '计划值',
+              dataIndex: 'schedule_value',
+              render: (value: string, record) =>
+                record.schedule_type === 'interval_minutes' ? `${value} 分钟` : value,
+            },
+            {
+              title: '下次执行',
+              dataIndex: 'next_run_at',
+              render: (value: string | null) => (value ? new Date(value).toLocaleString() : '-'),
+            },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              render: (value: string) => (
+                <Tag color={scheduleStatusColorMap[value] ?? 'default'}>{value}</Tag>
+              ),
+            },
+            {
+              title: '操作',
+              render: (_, record) => (
+                <Button
+                  size="small"
+                  onClick={() =>
+                    scheduleStatusMutation.mutate({
+                      scheduleId: record.id,
+                      status: record.status === 'active' ? 'paused' : 'active',
+                    })
+                  }
+                  loading={scheduleStatusMutation.isPending}
+                >
+                  {record.status === 'active' ? '暂停' : '启用'}
+                </Button>
+              ),
+            },
+          ]}
+        />
+      </Card>
     </Space>
   );
 }
