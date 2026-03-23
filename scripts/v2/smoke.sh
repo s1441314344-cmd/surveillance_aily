@@ -328,6 +328,31 @@ created_at = datetime.fromisoformat(record_created_at_raw.replace("Z", "+00:00")
 created_from = (created_at - timedelta(seconds=5)).isoformat()
 created_to = (created_at + timedelta(seconds=5)).isoformat()
 
+dashboard_filtered_query = {
+    "strategy_id": scheduled_record["strategy_id"],
+    "model_provider": scheduled_record["model_provider"],
+    "created_from": created_from,
+    "created_to": created_to,
+}
+
+dashboard_summary = get_json(
+    "GET",
+    "/api/dashboard/summary",
+    token=token,
+    query=dashboard_filtered_query,
+)
+if dashboard_summary.get("total_records", 0) < 1:
+    raise RuntimeError(f"dashboard filtered summary is unexpected: {dashboard_summary}")
+
+dashboard_anomalies = get_json(
+    "GET",
+    "/api/dashboard/anomalies",
+    token=token,
+    query=dashboard_filtered_query,
+)
+if not any(item["record_id"] == scheduled_record["id"] for item in dashboard_anomalies):
+    raise RuntimeError("dashboard filtered anomalies do not include scheduled record")
+
 filtered_records = get_json(
     "GET",
     "/api/task-records",
@@ -382,6 +407,7 @@ if remaining_schedules:
     raise RuntimeError(f"expected no schedules after delete, got: {remaining_schedules}")
 
 print("[v2-smoke] task-record filter/export flow ok")
+print("[v2-smoke] dashboard filtered flow ok")
 print("[v2-smoke] schedule delete flow ok")
 print("[v2-smoke] scheduled async flow ok")
 print("[v2-smoke] success")
