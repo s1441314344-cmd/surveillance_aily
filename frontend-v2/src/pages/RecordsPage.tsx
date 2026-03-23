@@ -16,7 +16,7 @@ import {
   Typography,
 } from 'antd';
 import { getApiErrorMessage } from '@/shared/api/errors';
-import { listCameras, listStrategies } from '@/shared/api/configCenter';
+import { listCameras, listModelProviders, listStrategies } from '@/shared/api/configCenter';
 import {
   exportTaskRecords,
   fetchTaskRecordImage,
@@ -49,6 +49,8 @@ export function RecordsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
+  const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
+  const [feedbackFilter, setFeedbackFilter] = useState<string>('all');
   const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
   const [createdToFilter, setCreatedToFilter] = useState<string>('');
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
@@ -63,13 +65,29 @@ export function RecordsPage() {
     queryFn: () => listCameras(),
   });
 
+  const modelProviderQuery = useQuery({
+    queryKey: ['model-providers', 'all-for-records'],
+    queryFn: () => listModelProviders(),
+  });
+
   const recordsQuery = useQuery({
-    queryKey: ['task-records', statusFilter, strategyFilter, cameraFilter, createdFromFilter, createdToFilter],
+    queryKey: [
+      'task-records',
+      statusFilter,
+      strategyFilter,
+      cameraFilter,
+      modelProviderFilter,
+      feedbackFilter,
+      createdFromFilter,
+      createdToFilter,
+    ],
     queryFn: () =>
       listTaskRecords({
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
+        modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
+        feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
         createdFrom: parseDateFilter(createdFromFilter),
         createdTo: parseDateFilter(createdToFilter),
       }),
@@ -107,6 +125,8 @@ export function RecordsPage() {
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
+        modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
+        feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
         createdFrom: parseDateFilter(createdFromFilter),
         createdTo: parseDateFilter(createdToFilter),
       });
@@ -132,7 +152,7 @@ export function RecordsPage() {
           任务记录
         </Title>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          查看上传任务生成的记录、结构化 JSON 和原图预览，并支持按状态/策略/摄像头/时间导出 CSV。
+          查看上传任务生成的记录、结构化 JSON 和原图预览，并支持按状态/策略/摄像头/模型/反馈/时间导出 CSV。
         </Paragraph>
       </div>
 
@@ -176,6 +196,31 @@ export function RecordsPage() {
                 })),
               ]}
               style={{ width: 170 }}
+            />
+            <Select
+              size="small"
+              value={modelProviderFilter}
+              onChange={setModelProviderFilter}
+              options={[
+                { label: '全部模型提供方', value: 'all' },
+                ...(modelProviderQuery.data ?? []).map((item) => ({
+                  label: item.display_name || item.provider,
+                  value: item.provider,
+                })),
+              ]}
+              style={{ width: 180 }}
+            />
+            <Select
+              size="small"
+              value={feedbackFilter}
+              onChange={setFeedbackFilter}
+              options={[
+                { label: '全部反馈状态', value: 'all' },
+                { label: '未复核', value: 'unreviewed' },
+                { label: '正确', value: 'correct' },
+                { label: '错误', value: 'incorrect' },
+              ]}
+              style={{ width: 140 }}
             />
             <Input
               size="small"

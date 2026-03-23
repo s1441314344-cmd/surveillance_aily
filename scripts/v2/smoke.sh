@@ -292,6 +292,34 @@ schedule_records = get_json(
 if len(schedule_records) != 1:
     raise RuntimeError(f"expected 1 scheduled record, got {len(schedule_records)}")
 
+scheduled_record = schedule_records[0]
+feedback = get_json(
+    "POST",
+    "/api/feedback",
+    token=token,
+    json_body={
+        "record_id": scheduled_record["id"],
+        "judgement": "incorrect",
+        "corrected_label": "smoke-corrected-label",
+        "comment": "smoke feedback",
+    },
+)
+if feedback.get("judgement") != "incorrect":
+    raise RuntimeError(f"unexpected feedback response: {feedback}")
+
+filtered_by_model_feedback = get_json(
+    "GET",
+    "/api/task-records",
+    token=token,
+    query={
+        "job_id": scheduled_job["id"],
+        "model_provider": scheduled_record["model_provider"],
+        "feedback_status": "incorrect",
+    },
+)
+if not any(item["id"] == scheduled_record["id"] for item in filtered_by_model_feedback):
+    raise RuntimeError("model_provider + feedback_status filter did not include scheduled record")
+
 record_created_at_raw = schedule_records[0].get("created_at")
 if not record_created_at_raw:
     raise RuntimeError("scheduled record missing created_at")
