@@ -130,6 +130,11 @@ export async function updateJobScheduleStatus(scheduleId: string, status: string
   return response.data;
 }
 
+export async function deleteJobSchedule(scheduleId: string) {
+  const response = await apiClient.delete<{ deleted: boolean }>(`/api/job-schedules/${scheduleId}`);
+  return response.data;
+}
+
 export async function listJobs(params?: {
   status?: string;
   jobType?: string;

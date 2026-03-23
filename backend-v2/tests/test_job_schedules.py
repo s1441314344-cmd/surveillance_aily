@@ -89,6 +89,14 @@ def test_job_schedule_crud_and_status_flow(client):
     assert filtered_schedule_response.status_code == 200
     assert len(filtered_schedule_response.json()) == 1
 
+    delete_schedule_response = client.delete(f"/api/job-schedules/{schedule['id']}", headers=headers)
+    assert delete_schedule_response.status_code == 200
+    assert delete_schedule_response.json() == {"deleted": True}
+
+    list_after_delete_response = client.get("/api/job-schedules", headers=headers)
+    assert list_after_delete_response.status_code == 200
+    assert list_after_delete_response.json() == []
+
 
 def test_scheduler_creates_camera_schedule_job_and_updates_runtime_fields(client):
     login_data = login_as_admin(client)

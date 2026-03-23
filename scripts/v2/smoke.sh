@@ -326,7 +326,21 @@ export_empty_rows = list(csv.DictReader(io.StringIO(export_empty_payload)))
 if export_empty_rows:
     raise RuntimeError("expected empty export rows for out-of-range query")
 
+delete_schedule_result = get_json("DELETE", f"/api/job-schedules/{schedule_id}", token=token)
+if delete_schedule_result.get("deleted") is not True:
+    raise RuntimeError(f"delete schedule failed: {delete_schedule_result}")
+
+remaining_schedules = get_json(
+    "GET",
+    "/api/job-schedules",
+    token=token,
+    query={"camera_id": camera["id"]},
+)
+if remaining_schedules:
+    raise RuntimeError(f"expected no schedules after delete, got: {remaining_schedules}")
+
 print("[v2-smoke] task-record filter/export flow ok")
+print("[v2-smoke] schedule delete flow ok")
 print("[v2-smoke] scheduled async flow ok")
 print("[v2-smoke] success")
 PY

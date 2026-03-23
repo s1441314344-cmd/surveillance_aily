@@ -126,6 +126,12 @@ def update_job_schedule_status(db: Session, schedule: JobSchedule, next_status: 
     return serialize_job_schedule(schedule)
 
 
+def delete_job_schedule(db: Session, schedule: JobSchedule) -> dict[str, bool]:
+    db.delete(schedule)
+    db.commit()
+    return {"deleted": True}
+
+
 def calculate_next_run_at(schedule_type: str, schedule_value: str, current_time: datetime) -> datetime:
     current_time = _ensure_aware(current_time)
 

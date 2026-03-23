@@ -9,6 +9,7 @@ import {
   Descriptions,
   Form,
   Input,
+  Popconfirm,
   Row,
   Select,
   Space,
@@ -25,6 +26,7 @@ import {
   cancelJob,
   createCameraOnceJob,
   createJobSchedule,
+  deleteJobSchedule,
   getJob,
   Job,
   JobSchedule,
@@ -204,6 +206,17 @@ export function JobsPage() {
     },
     onError: (error) => {
       message.error(getApiErrorMessage(error, '计划状态更新失败'));
+    },
+  });
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: deleteJobSchedule,
+    onSuccess: async () => {
+      await invalidateSchedules();
+      message.success('计划已删除');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '删除计划失败'));
     },
   });
 
@@ -736,18 +749,35 @@ export function JobsPage() {
             {
               title: '操作',
               render: (_, record) => (
-                <Button
-                  size="small"
-                  onClick={() =>
-                    scheduleStatusMutation.mutate({
-                      scheduleId: record.id,
-                      status: record.status === 'active' ? 'paused' : 'active',
-                    })
-                  }
-                  loading={scheduleStatusMutation.isPending}
-                >
-                  {record.status === 'active' ? '暂停' : '启用'}
-                </Button>
+                <Space size={8}>
+                  <Button
+                    size="small"
+                    onClick={() =>
+                      scheduleStatusMutation.mutate({
+                        scheduleId: record.id,
+                        status: record.status === 'active' ? 'paused' : 'active',
+                      })
+                    }
+                    loading={scheduleStatusMutation.isPending}
+                  >
+                    {record.status === 'active' ? '暂停' : '启用'}
+                  </Button>
+                  <Popconfirm
+                    title="确认删除该计划吗？"
+                    description="删除后不会影响已生成的历史任务记录。"
+                    okText="删除"
+                    cancelText="取消"
+                    onConfirm={() => deleteScheduleMutation.mutate(record.id)}
+                  >
+                    <Button
+                      size="small"
+                      danger
+                      loading={deleteScheduleMutation.isPending}
+                    >
+                      删除
+                    </Button>
+                  </Popconfirm>
+                </Space>
               ),
             },
           ]}

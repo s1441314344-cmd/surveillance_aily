@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.schemas.auth import CurrentUser
 from app.schemas.job import JobScheduleCreate, JobScheduleRead, JobScheduleStatusUpdate, JobScheduleUpdate
 from app.services.job_schedule_service import (
+    delete_job_schedule as delete_job_schedule_record,
     get_job_schedule_or_404,
     list_job_schedules as list_job_schedule_records,
     update_job_schedule as update_job_schedule_record,
@@ -68,3 +69,12 @@ def update_job_schedule_status(
         get_job_schedule_or_404(db, schedule_id),
         payload.status,
     )
+
+
+@router.delete("/{schedule_id}")
+def delete_job_schedule(
+    schedule_id: str,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    return delete_job_schedule_record(db, get_job_schedule_or_404(db, schedule_id))
