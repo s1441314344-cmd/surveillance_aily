@@ -103,6 +103,8 @@ export function JobsPage() {
   const [triggerModeFilter, setTriggerModeFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
+  const [scheduleCameraFilter, setScheduleCameraFilter] = useState<string>('all');
+  const [scheduleStrategyFilter, setScheduleStrategyFilter] = useState<string>('all');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<JobSchedule | null>(null);
@@ -129,10 +131,12 @@ export function JobsPage() {
   });
 
   const schedulesQuery = useQuery({
-    queryKey: ['job-schedules', scheduleStatusFilter],
+    queryKey: ['job-schedules', scheduleStatusFilter, scheduleCameraFilter, scheduleStrategyFilter],
     queryFn: () =>
       listJobSchedules({
         status: scheduleStatusFilter === 'all' ? undefined : scheduleStatusFilter,
+        cameraId: scheduleCameraFilter === 'all' ? undefined : scheduleCameraFilter,
+        strategyId: scheduleStrategyFilter === 'all' ? undefined : scheduleStrategyFilter,
       }),
     refetchInterval: 10000,
   });
@@ -737,17 +741,45 @@ export function JobsPage() {
       <Card
         title="定时任务计划"
         extra={
-          <Select
-            size="small"
-            value={scheduleStatusFilter}
-            onChange={setScheduleStatusFilter}
-            options={[
-              { label: '全部计划', value: 'all' },
-              { label: '启用中', value: 'active' },
-              { label: '已暂停', value: 'paused' },
-            ]}
-            style={{ width: 120 }}
-          />
+          <Space wrap>
+            <Select
+              size="small"
+              value={scheduleStatusFilter}
+              onChange={setScheduleStatusFilter}
+              options={[
+                { label: '全部计划', value: 'all' },
+                { label: '启用中', value: 'active' },
+                { label: '已暂停', value: 'paused' },
+              ]}
+              style={{ width: 120 }}
+            />
+            <Select
+              size="small"
+              value={scheduleCameraFilter}
+              onChange={setScheduleCameraFilter}
+              options={[
+                { label: '全部摄像头', value: 'all' },
+                ...cameras.map((item) => ({
+                  label: item.name,
+                  value: item.id,
+                })),
+              ]}
+              style={{ width: 170 }}
+            />
+            <Select
+              size="small"
+              value={scheduleStrategyFilter}
+              onChange={setScheduleStrategyFilter}
+              options={[
+                { label: '全部策略', value: 'all' },
+                ...strategies.map((item) => ({
+                  label: item.name,
+                  value: item.id,
+                })),
+              ]}
+              style={{ width: 150 }}
+            />
+          </Space>
         }
       >
         <Table<JobSchedule>
