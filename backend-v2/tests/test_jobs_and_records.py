@@ -1,4 +1,6 @@
+import csv
 from datetime import datetime, timedelta
+from io import StringIO
 
 from app.core.database import SessionLocal
 from app.models.job import Job
@@ -372,3 +374,29 @@ def test_task_records_filter_by_camera_and_time_range(client):
     )
     assert out_of_range_response.status_code == 200
     assert out_of_range_response.json() == []
+
+    export_in_range_response = client.get(
+        "/api/task-records/export",
+        headers=headers,
+        params={
+            "camera_id": camera["id"],
+            "created_from": created_from,
+            "created_to": created_to,
+        },
+    )
+    assert export_in_range_response.status_code == 200
+    export_rows = list(csv.DictReader(StringIO(export_in_range_response.text)))
+    assert len(export_rows) == 1
+    assert export_rows[0]["record_id"] == camera_records[0]["id"]
+
+    export_out_of_range_response = client.get(
+        "/api/task-records/export",
+        headers=headers,
+        params={
+            "camera_id": camera["id"],
+            "created_from": (created_at + timedelta(minutes=5)).isoformat(),
+        },
+    )
+    assert export_out_of_range_response.status_code == 200
+    export_rows_out_of_range = list(csv.DictReader(StringIO(export_out_of_range_response.text)))
+    assert export_rows_out_of_range == []
