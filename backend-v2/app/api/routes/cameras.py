@@ -13,6 +13,7 @@ from app.services.camera_service import (
     get_camera_or_404,
     get_camera_status as get_camera_status_record,
     list_cameras as list_camera_records,
+    list_camera_statuses as list_camera_status_records,
     serialize_camera,
     update_camera as update_camera_record,
 )
@@ -36,6 +37,21 @@ def create_camera(
     db: Session = Depends(get_db),
 ):
     return create_camera_record(db, payload)
+
+
+@router.get("/statuses", response_model=list[CameraStatusRead])
+def list_camera_statuses(
+    camera_ids: str | None = None,
+    alert_only: bool = False,
+    _: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    parsed_camera_ids = [item.strip() for item in (camera_ids or "").split(",") if item.strip()]
+    return list_camera_status_records(
+        db,
+        camera_ids=parsed_camera_ids or None,
+        alert_only=alert_only,
+    )
 
 
 @router.get("/{camera_id}", response_model=CameraRead)

@@ -362,13 +362,12 @@ make v2-release-gate
 ## 当前包含
 
 - FastAPI 应用骨架
-- JWT/RBAC 占位实现
-- SQLAlchemy 模型骨架
-- Alembic 骨架
+- JWT/RBAC 与角色权限控制
+- SQLAlchemy 数据模型与迁移
 - Celery/Redis 骨架
 - APScheduler 独立调度进程
 - OpenAI / 智谱真实 provider adapter（缺少可用密钥时可按配置回退 mock）
-- 健康检查和主要业务路由占位
+- 健康检查与核心业务路由
 
 ## 当前 API 骨架范围
 
@@ -378,6 +377,7 @@ make v2-release-gate
 - `/api/model-providers`
 - `/api/strategies`
 - `/api/cameras`
+- `/api/cameras/statuses`
 - `/api/cameras/{id}/diagnose`
 - `/api/jobs`
 - `/api/job-schedules`

@@ -145,6 +145,35 @@ def get_camera_status(db: Session, camera: Camera) -> CameraStatusRead:
     return serialize_camera_status(get_latest_camera_status_log(db, camera.id), camera.id)
 
 
+def list_camera_statuses(
+    db: Session,
+    *,
+    camera_ids: list[str] | None = None,
+    alert_only: bool = False,
+) -> list[CameraStatusRead]:
+    camera_stmt = select(Camera).order_by(Camera.created_at.desc(), Camera.name.asc())
+    if camera_ids:
+        camera_stmt = camera_stmt.where(Camera.id.in_(camera_ids))
+    cameras = list(db.scalars(camera_stmt))
+    if not cameras:
+        return []
+
+    camera_id_list = [camera.id for camera in cameras]
+    status_stmt = (
+        select(CameraStatusLog)
+        .where(CameraStatusLog.camera_id.in_(camera_id_list))
+        .order_by(CameraStatusLog.camera_id.asc(), CameraStatusLog.created_at.desc(), CameraStatusLog.id.desc())
+    )
+    status_map: dict[str, CameraStatusLog] = {}
+    for status_log in db.scalars(status_stmt):
+        status_map.setdefault(status_log.camera_id, status_log)
+
+    serialized_statuses = [serialize_camera_status(status_map.get(camera.id), camera.id) for camera in cameras]
+    if not alert_only:
+        return serialized_statuses
+    return [item for item in serialized_statuses if item.alert_status != "normal"]
+
+
 def check_camera_status(db: Session, camera: Camera) -> CameraStatusRead:
     connection_status, alert_status, last_error = _evaluate_camera_status(camera)
     status_log = CameraStatusLog(

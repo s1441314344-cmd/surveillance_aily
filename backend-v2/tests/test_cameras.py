@@ -115,3 +115,73 @@ def test_camera_diagnose_success_and_failure(client):
     assert failed_diagnostic["success"] is False
     assert "rtsp://" in failed_diagnostic["error_message"].lower()
     assert failed_diagnostic["snapshot_path"] is None
+
+
+def test_list_camera_statuses_with_alert_filter_and_camera_ids(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    ok_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "状态正常摄像头",
+            "location": "状态测试位A",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/status-ok",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/status-ok",
+        },
+    )
+    assert ok_camera_response.status_code == 200
+    ok_camera = ok_camera_response.json()
+
+    bad_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "状态异常摄像头",
+            "location": "状态测试位B",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "bad-rtsp-url",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/status-bad",
+        },
+    )
+    assert bad_camera_response.status_code == 200
+    bad_camera = bad_camera_response.json()
+
+    assert client.post(f"/api/cameras/{ok_camera['id']}/check", headers=headers).status_code == 200
+    assert client.post(f"/api/cameras/{bad_camera['id']}/check", headers=headers).status_code == 200
+
+    all_statuses_response = client.get("/api/cameras/statuses", headers=headers)
+    assert all_statuses_response.status_code == 200
+    all_statuses = all_statuses_response.json()
+    assert len(all_statuses) == 2
+    status_map = {item["camera_id"]: item for item in all_statuses}
+    assert status_map[ok_camera["id"]]["alert_status"] == "normal"
+    assert status_map[bad_camera["id"]]["alert_status"] == "error"
+
+    alert_only_response = client.get("/api/cameras/statuses?alert_only=true", headers=headers)
+    assert alert_only_response.status_code == 200
+    alert_only = alert_only_response.json()
+    assert len(alert_only) == 1
+    assert alert_only[0]["camera_id"] == bad_camera["id"]
+
+    filtered_response = client.get(f"/api/cameras/statuses?camera_ids={ok_camera['id']}", headers=headers)
+    assert filtered_response.status_code == 200
+    filtered_statuses = filtered_response.json()
+    assert len(filtered_statuses) == 1
+    assert filtered_statuses[0]["camera_id"] == ok_camera["id"]

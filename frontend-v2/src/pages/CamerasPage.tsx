@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -24,6 +25,7 @@ import {
   createCamera,
   deleteCamera,
   getCameraStatus,
+  listCameraStatuses,
   listCameras,
   updateCamera,
 } from '@/shared/api/configCenter';
@@ -98,7 +100,50 @@ export function CamerasPage() {
     queryKey: ['camera-status', effectiveSelectedCameraId],
     queryFn: () => getCameraStatus(effectiveSelectedCameraId as string),
     enabled: Boolean(effectiveSelectedCameraId),
+    refetchInterval: 10000,
   });
+
+  const statusListQuery = useQuery({
+    queryKey: ['camera-statuses', cameras.map((item) => item.id).join(',')],
+    queryFn: () => listCameraStatuses({ cameraIds: cameras.map((item) => item.id) }),
+    enabled: cameras.length > 0,
+    refetchInterval: 10000,
+  });
+
+  const cameraStatusMap = useMemo(() => {
+    const statuses = statusListQuery.data ?? [];
+    return Object.fromEntries(statuses.map((item) => [item.camera_id, item]));
+  }, [statusListQuery.data]);
+
+  const statusSummary = useMemo(() => {
+    const summary = {
+      online: 0,
+      warning: 0,
+      offline: 0,
+      unknown: 0,
+      abnormal: 0,
+    };
+    for (const camera of cameras) {
+      const status = cameraStatusMap[camera.id];
+      const connectionStatus = status?.connection_status ?? 'unknown';
+      if (connectionStatus in summary) {
+        summary[connectionStatus as keyof typeof summary] += 1;
+      } else {
+        summary.unknown += 1;
+      }
+      if ((status?.alert_status ?? 'normal') !== 'normal') {
+        summary.abnormal += 1;
+      }
+    }
+    return summary;
+  }, [cameraStatusMap, cameras]);
+
+  const selectedCameraStatus = useMemo(() => {
+    if (!effectiveSelectedCameraId) {
+      return null;
+    }
+    return statusQuery.data ?? cameraStatusMap[effectiveSelectedCameraId] ?? null;
+  }, [cameraStatusMap, effectiveSelectedCameraId, statusQuery.data]);
 
   useEffect(() => {
     if (!activeCamera) {
@@ -126,6 +171,7 @@ export function CamerasPage() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['cameras'] }),
       queryClient.invalidateQueries({ queryKey: ['camera-status'] }),
+      queryClient.invalidateQueries({ queryKey: ['camera-statuses'] }),
     ]);
 
   const createMutation = useMutation({
@@ -168,7 +214,10 @@ export function CamerasPage() {
   const checkMutation = useMutation({
     mutationFn: checkCameraStatus,
     onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: ['camera-status', result.camera_id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['camera-status', result.camera_id] }),
+        queryClient.invalidateQueries({ queryKey: ['camera-statuses'] }),
+      ]);
       message.success('摄像头状态检查完成');
     },
     onError: (error) => {
@@ -224,6 +273,22 @@ export function CamerasPage() {
             }
             style={{ height: '100%' }}
           >
+            {cameras.length ? (
+              <Alert
+                type={statusSummary.abnormal > 0 ? 'warning' : 'success'}
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`在线 ${statusSummary.online} / 告警 ${statusSummary.abnormal}`}
+                description={
+                  <Space wrap size={8}>
+                    <Tag color={statusColorMap.online}>online: {statusSummary.online}</Tag>
+                    <Tag color={statusColorMap.warning}>warning: {statusSummary.warning}</Tag>
+                    <Tag color={statusColorMap.offline}>offline: {statusSummary.offline}</Tag>
+                    <Tag color={statusColorMap.unknown}>unknown: {statusSummary.unknown}</Tag>
+                  </Space>
+                }
+              />
+            ) : null}
             {cameraQuery.isLoading ? (
               <Spin />
             ) : cameras.length ? (
@@ -242,6 +307,14 @@ export function CamerasPage() {
                       <Space>
                         <Text strong>{camera.name}</Text>
                         <Tag>{camera.protocol.toUpperCase()}</Tag>
+                        <Tag color={statusColorMap[cameraStatusMap[camera.id]?.connection_status ?? 'unknown'] ?? 'default'}>
+                          {cameraStatusMap[camera.id]?.connection_status ?? 'unknown'}
+                        </Tag>
+                        {(cameraStatusMap[camera.id]?.alert_status ?? 'normal') !== 'normal' ? (
+                          <Tag color={statusColorMap[cameraStatusMap[camera.id]?.alert_status ?? 'warning'] ?? 'gold'}>
+                            {cameraStatusMap[camera.id]?.alert_status}
+                          </Tag>
+                        ) : null}
                       </Space>
                       <Text type="secondary">{camera.location || '未设置位置'}</Text>
                       <Text type="secondary">{camera.rtsp_url || camera.ip_address || '未配置地址'}</Text>
@@ -390,20 +463,20 @@ export function CamerasPage() {
                 ) : (
                   <Descriptions column={1} size="small" bordered>
                     <Descriptions.Item label="连接状态">
-                      <Tag color={statusColorMap[statusQuery.data?.connection_status ?? 'unknown'] ?? 'default'}>
-                        {statusQuery.data?.connection_status ?? 'unknown'}
+                      <Tag color={statusColorMap[selectedCameraStatus?.connection_status ?? 'unknown'] ?? 'default'}>
+                        {selectedCameraStatus?.connection_status ?? 'unknown'}
                       </Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="告警状态">
-                      <Tag color={statusColorMap[statusQuery.data?.alert_status ?? 'unknown'] ?? 'default'}>
-                        {statusQuery.data?.alert_status ?? 'unknown'}
+                      <Tag color={statusColorMap[selectedCameraStatus?.alert_status ?? 'unknown'] ?? 'default'}>
+                        {selectedCameraStatus?.alert_status ?? 'unknown'}
                       </Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="最近检查时间">
-                      {statusQuery.data?.last_checked_at ?? '尚未检查'}
+                      {selectedCameraStatus?.last_checked_at ?? '尚未检查'}
                     </Descriptions.Item>
                     <Descriptions.Item label="最近错误">
-                      {statusQuery.data?.last_error || '无'}
+                      {selectedCameraStatus?.last_error || '无'}
                     </Descriptions.Item>
                   </Descriptions>
                 )

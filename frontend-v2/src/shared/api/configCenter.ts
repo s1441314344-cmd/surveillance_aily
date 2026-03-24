@@ -156,6 +156,16 @@ export async function getCameraStatus(cameraId: string) {
   return response.data;
 }
 
+export async function listCameraStatuses(params?: { cameraIds?: string[]; alertOnly?: boolean }) {
+  const response = await apiClient.get<CameraStatus[]>('/api/cameras/statuses', {
+    params: {
+      camera_ids: params?.cameraIds?.length ? params.cameraIds.join(',') : undefined,
+      alert_only: params?.alertOnly || undefined,
+    },
+  });
+  return response.data;
+}
+
 export async function checkCameraStatus(cameraId: string) {
   const response = await apiClient.post<CameraStatus>(`/api/cameras/${cameraId}/check`);
   return response.data;
