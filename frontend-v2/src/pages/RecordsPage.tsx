@@ -59,6 +59,7 @@ export function RecordsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
+  const [scheduleIdFilter, setScheduleIdFilter] = useState<string>('');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
   const [feedbackFilter, setFeedbackFilter] = useState<string>('all');
@@ -87,6 +88,7 @@ export function RecordsPage() {
       statusFilter,
       strategyFilter,
       jobTypeFilter,
+      scheduleIdFilter,
       cameraFilter,
       modelProviderFilter,
       feedbackFilter,
@@ -98,6 +100,7 @@ export function RecordsPage() {
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         jobType: jobTypeFilter === 'all' ? undefined : jobTypeFilter,
+        scheduleId: scheduleIdFilter || undefined,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
         feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
@@ -151,6 +154,7 @@ export function RecordsPage() {
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         jobType: jobTypeFilter === 'all' ? undefined : jobTypeFilter,
+        scheduleId: scheduleIdFilter || undefined,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
         feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
@@ -237,6 +241,13 @@ export function RecordsPage() {
                 })),
               ]}
               style={{ width: 170 }}
+            />
+            <Input
+              size="small"
+              value={scheduleIdFilter}
+              onChange={(event) => setScheduleIdFilter(event.target.value.trim())}
+              placeholder="计划 ID 过滤"
+              style={{ width: 150 }}
             />
             <Select
               size="small"
