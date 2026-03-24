@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.services.providers.base import ProviderResponse
 from app.services.scheduler_service import run_due_job_schedules_once
 from app.workers.tasks import process_job
 
@@ -89,8 +90,10 @@ def test_dashboard_summary_trends_and_anomalies(client):
     assert summary["total_jobs"] == 2
     assert summary["total_records"] == 3
     assert summary["pending_review_count"] == 2
+    assert summary["schema_invalid_count"] == 0
     assert summary["success_rate"] == 100.0
     assert summary["structured_success_rate"] == 100.0
+    assert summary["schema_invalid_rate"] == 0.0
     assert summary["reviewed_rate"] == 33.33
     assert summary["confirmed_accuracy_rate"] == 0.0
     assert summary["anomaly_rate"] == 33.33
@@ -125,7 +128,9 @@ def test_dashboard_summary_trends_and_anomalies(client):
     assert filtered_summary["total_jobs"] == 1
     assert filtered_summary["total_records"] == 1
     assert filtered_summary["pending_review_count"] == 1
+    assert filtered_summary["schema_invalid_count"] == 0
     assert filtered_summary["success_rate"] == 100.0
+    assert filtered_summary["schema_invalid_rate"] == 0.0
     assert filtered_summary["anomaly_rate"] == 0.0
 
     filtered_trends_response = client.get(
@@ -157,3 +162,44 @@ def test_dashboard_summary_trends_and_anomalies(client):
     )
     assert filtered_anomalies_response.status_code == 200
     assert filtered_anomalies_response.json() == []
+
+
+def test_dashboard_summary_reports_schema_invalid_metrics(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("dashboard-schema-invalid.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    class InvalidJsonAdapter:
+        def analyze(self, _request):
+            return ProviderResponse(
+                success=False,
+                raw_response="not-json",
+                normalized_json=None,
+                error_message="OpenAI did not return valid JSON content",
+            )
+
+    monkeypatch.setattr(
+        "app.services.job_execution_service.get_provider_adapter",
+        lambda _provider: InvalidJsonAdapter(),
+    )
+
+    assert process_job(job["id"])["status"] == "failed"
+
+    summary_response = client.get("/api/dashboard/summary", headers=headers)
+    assert summary_response.status_code == 200
+    summary = summary_response.json()
+    assert summary["total_jobs"] == 1
+    assert summary["total_records"] == 1
+    assert summary["schema_invalid_count"] == 1
+    assert summary["schema_invalid_rate"] == 100.0
+    assert summary["structured_success_rate"] == 0.0
+    assert summary["anomaly_rate"] == 100.0

@@ -174,6 +174,11 @@ export function DashboardPage() {
           </Col>
           <Col xs={24} md={8} xl={4}>
             <Card loading={summaryQuery.isLoading}>
+              <Statistic title="结构化异常数" value={summary?.schema_invalid_count ?? 0} />
+            </Card>
+          </Col>
+          <Col xs={24} md={8} xl={4}>
+            <Card loading={summaryQuery.isLoading}>
               <Statistic title="已复核率" value={summary?.reviewed_rate ?? 0} suffix="%" />
             </Card>
           </Col>
@@ -199,6 +204,10 @@ export function DashboardPage() {
               <div>
                 <Text strong>异常案例占比</Text>
                 <Progress percent={summary?.anomaly_rate ?? 0} strokeColor="#fa541c" />
+              </div>
+              <div>
+                <Text strong>结构化异常率</Text>
+                <Progress percent={summary?.schema_invalid_rate ?? 0} strokeColor="#fa8c16" />
               </div>
               <div>
                 <Text strong>人工确认准确率</Text>

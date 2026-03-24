@@ -7,6 +7,7 @@ from zipfile import ZipFile
 from app.core.database import SessionLocal
 from app.models.job import Job
 from app.models.task_record import TaskRecord
+from app.services.providers.base import ProviderResponse
 from app.services.providers.factory import get_provider_adapter
 from app.workers.tasks import process_job
 
@@ -306,6 +307,96 @@ def test_cancelled_queued_job_will_not_be_processed(client):
     records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
     assert records_response.status_code == 200
     assert records_response.json() == []
+
+
+def test_upload_job_invalid_json_response_is_marked_as_schema_invalid(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-invalid-json.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    class InvalidJsonAdapter:
+        def analyze(self, _request):
+            return ProviderResponse(
+                success=False,
+                raw_response="not-json",
+                normalized_json=None,
+                error_message="Zhipu did not return valid JSON content",
+            )
+
+    monkeypatch.setattr(
+        "app.services.job_execution_service.get_provider_adapter",
+        lambda _provider: InvalidJsonAdapter(),
+    )
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "failed"
+
+    job_response = client.get(f"/api/jobs/{job['id']}", headers=headers)
+    assert job_response.status_code == 200
+    processed_job = job_response.json()
+    assert processed_job["status"] == "failed"
+    assert "valid JSON content" in (processed_job["error_message"] or "")
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["result_status"] == "schema_invalid"
+    assert records[0]["raw_model_response"] == "not-json"
+
+
+def test_upload_job_schema_mismatch_is_marked_as_schema_invalid(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-schema-mismatch.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    class SchemaMismatchAdapter:
+        def analyze(self, _request):
+            return ProviderResponse(
+                success=True,
+                raw_response='{"summary":"only-summary"}',
+                normalized_json={"summary": "only-summary"},
+                error_message=None,
+            )
+
+    monkeypatch.setattr(
+        "app.services.job_execution_service.get_provider_adapter",
+        lambda _provider: SchemaMismatchAdapter(),
+    )
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "failed"
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["result_status"] == "schema_invalid"
+    assert records[0]["normalized_json"] == {"summary": "only-summary"}
+
+    job_response = client.get(f"/api/jobs/{job['id']}", headers=headers)
+    assert job_response.status_code == 200
+    processed_job = job_response.json()
+    assert processed_job["status"] == "failed"
+    assert "schema validation" in (processed_job["error_message"] or "")
 
 
 def test_running_job_collaborative_cancel_stops_following_records(client, monkeypatch):

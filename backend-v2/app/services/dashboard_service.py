@@ -42,6 +42,7 @@ def get_dashboard_summary(
         for record in records
         if record.result_status == "completed" and record.normalized_json is not None
     )
+    schema_invalid_count = sum(1 for record in records if record.result_status == "schema_invalid")
     reviewed_count = sum(1 for record in records if record.feedback_status != "unreviewed")
     pending_review_count = sum(1 for record in records if record.feedback_status == "unreviewed")
     confirmed_correct_count = sum(1 for record in records if record.feedback_status == "correct")
@@ -55,9 +56,11 @@ def get_dashboard_summary(
         total_jobs=total_jobs,
         total_records=total_records,
         pending_review_count=pending_review_count,
+        schema_invalid_count=schema_invalid_count,
         success_rate=_safe_rate(completed_jobs, total_jobs),
         anomaly_rate=_safe_rate(anomaly_count, total_records),
         structured_success_rate=_safe_rate(structured_success_count, total_records),
+        schema_invalid_rate=_safe_rate(schema_invalid_count, total_records),
         reviewed_rate=_safe_rate(reviewed_count, total_records),
         confirmed_accuracy_rate=_safe_rate(confirmed_correct_count, reviewed_count),
     )

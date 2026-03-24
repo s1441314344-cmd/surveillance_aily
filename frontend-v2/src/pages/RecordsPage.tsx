@@ -191,8 +191,9 @@ export function RecordsPage() {
                 { label: '全部状态', value: 'all' },
                 { label: '已完成', value: 'completed' },
                 { label: '失败', value: 'failed' },
+                { label: '结构化异常', value: 'schema_invalid' },
               ]}
-              style={{ width: 120 }}
+              style={{ width: 132 }}
             />
             <Select
               size="small"

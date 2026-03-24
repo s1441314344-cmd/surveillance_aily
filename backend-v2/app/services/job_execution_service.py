@@ -18,11 +18,26 @@ from app.services.providers.base import ProviderRequest
 from app.services.providers.factory import get_provider_adapter
 from app.services.storage import FileStorageService
 
+try:
+    from jsonschema import Draft202012Validator
+except Exception:  # pragma: no cover - optional dependency guard
+    Draft202012Validator = None
+
 JOB_STATUS_COMPLETED = "completed"
 JOB_STATUS_FAILED = "failed"
 JOB_STATUS_CANCELLED = "cancelled"
 JOB_STATUS_RUNNING = "running"
 JOB_STATUS_TERMINAL = {JOB_STATUS_COMPLETED, JOB_STATUS_FAILED, JOB_STATUS_CANCELLED}
+RECORD_STATUS_SCHEMA_INVALID = "schema_invalid"
+SCHEMA_INVALID_ERROR_MARKERS = (
+    "invalid json payload",
+    "valid json content",
+    "json decode",
+    "json parse",
+    "json schema",
+    "schema validation",
+    "structured output",
+)
 
 
 def process_job(job_id: str) -> dict[str, str]:
@@ -110,6 +125,13 @@ def _process_upload_job(db: Session, job: Job) -> None:
             )
         )
         duration_ms = int((time.perf_counter() - started_at) * 1000)
+        result_status, record_error_message = _resolve_task_record_status(
+            provider_success=provider_response.success,
+            normalized_json=provider_response.normalized_json,
+            raw_response=provider_response.raw_response,
+            error_message=provider_response.error_message,
+            response_schema=strategy_snapshot.get("response_schema"),
+        )
 
         task_record = TaskRecord(
             id=generate_id(),
@@ -127,18 +149,18 @@ def _process_upload_job(db: Session, job: Job) -> None:
             model_name=job.model_name,
             raw_model_response=provider_response.raw_response or "",
             normalized_json=provider_response.normalized_json,
-            result_status=JOB_STATUS_COMPLETED if provider_response.success else JOB_STATUS_FAILED,
+            result_status=result_status,
             duration_ms=duration_ms,
             feedback_status="unreviewed",
         )
         db.add(task_record)
 
-        if provider_response.success:
+        if result_status == JOB_STATUS_COMPLETED:
             job.completed_items += 1
         else:
             job.failed_items += 1
             if not job.error_message:
-                job.error_message = provider_response.error_message
+                job.error_message = record_error_message
         db.commit()
 
     if _job_cancelled(db, job.id):
@@ -211,6 +233,13 @@ def _process_camera_job(db: Session, job: Job) -> None:
         )
     )
     duration_ms = int((time.perf_counter() - started_at) * 1000)
+    result_status, record_error_message = _resolve_task_record_status(
+        provider_success=provider_response.success,
+        normalized_json=provider_response.normalized_json,
+        raw_response=provider_response.raw_response,
+        error_message=provider_response.error_message,
+        response_schema=strategy_snapshot.get("response_schema"),
+    )
 
     task_record = TaskRecord(
         id=generate_id(),
@@ -228,13 +257,13 @@ def _process_camera_job(db: Session, job: Job) -> None:
         model_name=job.model_name,
         raw_model_response=provider_response.raw_response or "",
         normalized_json=provider_response.normalized_json,
-        result_status=JOB_STATUS_COMPLETED if provider_response.success else JOB_STATUS_FAILED,
+        result_status=result_status,
         duration_ms=duration_ms,
         feedback_status="unreviewed",
     )
     db.add(task_record)
 
-    if provider_response.success:
+    if result_status == JOB_STATUS_COMPLETED:
         job.completed_items += 1
         db.commit()
         _finish_job(db, job, status=JOB_STATUS_COMPLETED, error_message=None)
@@ -243,7 +272,7 @@ def _process_camera_job(db: Session, job: Job) -> None:
 
     job.failed_items += 1
     if not job.error_message:
-        job.error_message = provider_response.error_message
+        job.error_message = record_error_message
     db.commit()
     _finish_job(db, job, status=JOB_STATUS_FAILED, error_message=job.error_message)
     _sync_schedule_error_state(db, job, job.error_message)
@@ -349,6 +378,55 @@ def _sync_schedule_error_state(db: Session, job: Job, error_message: str | None)
 
     schedule.last_error = error_message
     db.commit()
+
+
+def _resolve_task_record_status(
+    *,
+    provider_success: bool,
+    normalized_json: dict | None,
+    raw_response: str,
+    error_message: str | None,
+    response_schema: dict | None,
+) -> tuple[str, str | None]:
+    if provider_success:
+        if not isinstance(normalized_json, dict):
+            return RECORD_STATUS_SCHEMA_INVALID, "Model did not produce a structured JSON object"
+        schema_error = _validate_schema_output(normalized_json, response_schema)
+        if schema_error:
+            return RECORD_STATUS_SCHEMA_INVALID, f"Model response failed schema validation: {schema_error}"
+        return JOB_STATUS_COMPLETED, None
+
+    resolved_error = error_message or raw_response or "Model analysis failed"
+    if _is_schema_invalid_failure(error_message, raw_response):
+        return RECORD_STATUS_SCHEMA_INVALID, resolved_error
+    return JOB_STATUS_FAILED, resolved_error
+
+
+def _validate_schema_output(result: dict, response_schema: dict | None) -> str | None:
+    if not response_schema or Draft202012Validator is None:
+        return None
+
+    try:
+        validator = Draft202012Validator(response_schema)
+    except Exception:
+        return None
+
+    errors = sorted(
+        validator.iter_errors(result),
+        key=lambda item: [str(path_item) for path_item in item.absolute_path],
+    )
+    if not errors:
+        return None
+
+    first_error = errors[0]
+    field_path = ".".join(str(path_item) for path_item in first_error.absolute_path)
+    location = field_path or "$"
+    return f"{location}: {first_error.message}"
+
+
+def _is_schema_invalid_failure(error_message: str | None, raw_response: str) -> bool:
+    combined = f"{error_message or ''} {raw_response or ''}".lower()
+    return any(marker in combined for marker in SCHEMA_INVALID_ERROR_MARKERS)
 
 
 def _utcnow() -> datetime:

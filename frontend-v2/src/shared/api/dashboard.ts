@@ -4,9 +4,11 @@ export type DashboardSummary = {
   total_jobs: number;
   total_records: number;
   pending_review_count: number;
+  schema_invalid_count: number;
   success_rate: number;
   anomaly_rate: number;
   structured_success_rate: number;
+  schema_invalid_rate: number;
   reviewed_rate: number;
   confirmed_accuracy_rate: number;
 };
