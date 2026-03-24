@@ -166,4 +166,35 @@ test('schema invalid record is visible in records and dashboard metrics', async 
     })
     .first();
   await expect(schemaInvalidCard.locator('.ant-statistic-content-value')).toContainText('1');
+
+  const anomalyCard = page
+    .locator('.ant-card')
+    .filter({
+      has: page.locator('.ant-card-head-title').filter({ hasText: /^异常案例$/ }),
+    })
+    .first();
+  const anomalyRow = anomalyCard
+    .locator('.ant-table-tbody tr')
+    .filter({ hasText: targetRecordId.slice(0, 8) })
+    .first();
+  await expect(anomalyRow).toBeVisible();
+  await expect(anomalyRow).toContainText('结构化异常');
+  await expect(anomalyRow).toContainText('schema_invalid');
+
+  const anomalyTypeFilter = filterCard.locator('.ant-select').nth(2);
+  await anomalyTypeFilter.click();
+  await page
+    .locator('.ant-select-dropdown .ant-select-item-option')
+    .filter({ hasText: '人工判错' })
+    .first()
+    .click();
+  await expect(anomalyCard.locator('.ant-empty-description')).toContainText('暂无异常案例');
+
+  await anomalyTypeFilter.click();
+  await page
+    .locator('.ant-select-dropdown .ant-select-item-option')
+    .filter({ hasText: '结构化异常' })
+    .first()
+    .click();
+  await expect(anomalyRow).toBeVisible();
 });
