@@ -244,15 +244,16 @@ def _validate_target(*, target: CameraValidationTarget, save_snapshot: bool) -> 
                 )
             diagnostic = diagnose_camera_capture(camera, save_snapshot=save_snapshot)
     else:
-        diagnostic = diagnose_camera_capture(
-            CameraCaptureConfig(
-                id=target.target_id,
-                name=target.name,
-                rtsp_url=target.rtsp_url,
-                resolution=target.resolution,
-                jpeg_quality=target.jpeg_quality,
-                storage_path=target.storage_path,
-            ),
+            diagnostic = diagnose_camera_capture(
+                CameraCaptureConfig(
+                    id=target.target_id,
+                    name=target.name,
+                    protocol="rtsp",
+                    rtsp_url=target.rtsp_url,
+                    resolution=target.resolution,
+                    jpeg_quality=target.jpeg_quality,
+                    storage_path=target.storage_path,
+                ),
             save_snapshot=save_snapshot,
         )
 

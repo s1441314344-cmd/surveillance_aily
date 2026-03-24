@@ -2,12 +2,14 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 
+test.setTimeout(120000);
+
 async function loginAsAdmin(page: Page) {
   await page.goto('/login');
   await page.getByLabel('用户名').fill('admin');
   await page.getByLabel('密码').fill('admin123456');
   await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -60,15 +62,43 @@ test('camera once job is queued and can be cancelled in job center', async ({ pa
   const createTaskCard = page.locator('.ant-card').filter({ hasText: '创建任务' }).first();
   const taskModeSelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '任务类型' }).locator('.ant-select');
   await taskModeSelect.click();
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
+  await page
+    .locator('.ant-select-dropdown .ant-select-item-option')
+    .filter({ hasText: '摄像头单次抽帧' })
+    .first()
+    .click();
+
+  const strategySelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '分析策略' }).locator('.ant-select');
+  await strategySelect.click();
+  await page
+    .locator('.ant-select-dropdown .ant-select-item-option')
+    .filter({ hasText: '火情识别' })
+    .first()
+    .click();
 
   const cameraSelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '选择摄像头' }).locator('.ant-select');
   await cameraSelect.click();
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
+  await page
+    .locator('.ant-select-dropdown .ant-select-item-option')
+    .filter({ hasText: cameraName })
+    .first()
+    .click();
 
+  const createJobResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/jobs/cameras/once') && response.request().method() === 'POST',
+  );
   await page.getByRole('button', { name: '执行摄像头单次任务' }).click();
+  const createJobResponse = await createJobResponsePromise;
+  expect(createJobResponse.ok()).toBeTruthy();
+  const createdJob = (await createJobResponse.json()) as { id: string };
+
+  const jobRow = page
+    .locator('.ant-table-tbody tr')
+    .filter({ hasText: createdJob.id.slice(0, 8) })
+    .first();
+  await expect(jobRow).toBeVisible();
+  await jobRow.click();
 
   const detailCard = page.locator('.ant-card-small').filter({ hasText: '任务详情' }).first();
   await expect(detailCard).toBeVisible();

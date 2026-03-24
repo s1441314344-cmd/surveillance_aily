@@ -1,7 +1,11 @@
 def login_as_admin(client):
+    return login_as_user(client, username="admin", password="admin123456")
+
+
+def login_as_user(client, *, username: str, password: str):
     response = client.post(
         "/api/auth/login",
-        json={"username": "admin", "password": "admin123456"},
+        json={"username": username, "password": password},
     )
     assert response.status_code == 200
     return response.json()
@@ -59,3 +63,96 @@ def test_user_create_list_and_disable(client):
     )
     assert disable_response.status_code == 200
     assert disable_response.json()["is_active"] is False
+
+
+def test_analysis_viewer_has_read_only_access_scope(client):
+    admin_login = login_as_admin(client)
+    admin_headers = auth_headers(admin_login["access_token"])
+
+    create_viewer_response = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "username": "viewer_only",
+            "password": "Viewer123!",
+            "display_name": "只读分析查看者",
+            "roles": ["analysis_viewer"],
+        },
+    )
+    assert create_viewer_response.status_code == 200
+
+    viewer_login = login_as_user(client, username="viewer_only", password="Viewer123!")
+    viewer_headers = auth_headers(viewer_login["access_token"])
+
+    assert client.get("/api/dashboard/summary", headers=viewer_headers).status_code == 200
+    assert client.get("/api/task-records", headers=viewer_headers).status_code == 200
+
+    assert client.get("/api/users", headers=viewer_headers).status_code == 403
+    assert client.get("/api/audit-logs", headers=viewer_headers).status_code == 403
+
+    create_upload_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=viewer_headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("viewer-upload.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_upload_job_response.status_code == 403
+
+
+def test_strategy_configurator_can_manage_strategies_but_not_provider_keys(client):
+    admin_login = login_as_admin(client)
+    admin_headers = auth_headers(admin_login["access_token"])
+
+    create_configurator_response = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "username": "strategy_editor",
+            "password": "Editor123!",
+            "display_name": "策略配置员",
+            "roles": ["strategy_configurator"],
+        },
+    )
+    assert create_configurator_response.status_code == 200
+
+    configurator_login = login_as_user(client, username="strategy_editor", password="Editor123!")
+    configurator_headers = auth_headers(configurator_login["access_token"])
+
+    list_provider_response = client.get("/api/model-providers", headers=configurator_headers)
+    assert list_provider_response.status_code == 200
+
+    update_provider_response = client.put(
+        "/api/model-providers/openai",
+        headers=configurator_headers,
+        json={
+            "enabled": True,
+            "api_base_url": "https://api.openai.com/v1/responses",
+            "default_model": "gpt-5-mini",
+            "api_key": "sk-test-key",
+            "timeout_seconds": 30,
+            "max_requests_per_minute": 30,
+        },
+    )
+    assert update_provider_response.status_code == 403
+
+    create_strategy_response = client.post(
+        "/api/strategies",
+        headers=configurator_headers,
+        json={
+            "name": "策略配置员新增策略",
+            "scene_description": "用于验证角色权限",
+            "prompt_template": "请输出JSON。",
+            "model_provider": "zhipu",
+            "model_name": "glm-4v-plus",
+            "response_schema": {
+                "type": "object",
+                "properties": {
+                    "result": {"type": "string"},
+                },
+                "required": ["result"],
+                "additionalProperties": False,
+            },
+            "status": "active",
+        },
+    )
+    assert create_strategy_response.status_code == 200

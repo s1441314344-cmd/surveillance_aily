@@ -15,7 +15,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import { listCameras, listModelProviders, listStrategies } from '@/shared/api/configCenter';
 import {
@@ -34,6 +34,13 @@ const statusColorMap: Record<string, string> = {
   schema_invalid: 'orange',
 };
 
+const jobTypeColorMap: Record<string, string> = {
+  upload_single: 'blue',
+  upload_batch: 'cyan',
+  camera_once: 'purple',
+  camera_schedule: 'geekblue',
+};
+
 const parseDateFilter = (value: string) => {
   if (!value) {
     return undefined;
@@ -47,9 +54,12 @@ const parseDateFilter = (value: string) => {
 
 export function RecordsPage() {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
+  const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
+  const [scheduleIdFilter, setScheduleIdFilter] = useState<string>('');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
   const [feedbackFilter, setFeedbackFilter] = useState<string>('all');
@@ -77,6 +87,8 @@ export function RecordsPage() {
       'task-records',
       statusFilter,
       strategyFilter,
+      jobTypeFilter,
+      scheduleIdFilter,
       cameraFilter,
       modelProviderFilter,
       feedbackFilter,
@@ -87,6 +99,8 @@ export function RecordsPage() {
       listTaskRecords({
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
+        jobType: jobTypeFilter === 'all' ? undefined : jobTypeFilter,
+        scheduleId: scheduleIdFilter || undefined,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
         feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
@@ -133,11 +147,14 @@ export function RecordsPage() {
     setSearchParams(nextParams, { replace: true });
   };
 
-  const handleExport = async () => {
+  const handleExport = async (format: 'csv' | 'xlsx') => {
     try {
       const blob = await exportTaskRecords({
+        format,
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
+        jobType: jobTypeFilter === 'all' ? undefined : jobTypeFilter,
+        scheduleId: scheduleIdFilter || undefined,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
         feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
@@ -147,12 +164,12 @@ export function RecordsPage() {
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = 'task-records.csv';
+      link.download = format === 'xlsx' ? 'task-records.xlsx' : 'task-records.csv';
       link.click();
       URL.revokeObjectURL(objectUrl);
-      message.success('CSV 导出成功');
+      message.success(format === 'xlsx' ? 'Excel 导出成功' : 'CSV 导出成功');
     } catch (error) {
-      message.error(getApiErrorMessage(error, 'CSV 导出失败'));
+      message.error(getApiErrorMessage(error, format === 'xlsx' ? 'Excel 导出失败' : 'CSV 导出失败'));
     }
   };
 
@@ -166,7 +183,7 @@ export function RecordsPage() {
           任务记录
         </Title>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          查看上传任务生成的记录、结构化 JSON 和原图预览，并支持按状态/策略/摄像头/模型/反馈/时间导出 CSV。
+          查看上传任务生成的记录、结构化 JSON 和原图预览，并支持按状态/策略/摄像头/模型/反馈/时间导出 CSV/Excel。
         </Paragraph>
       </div>
 
@@ -182,8 +199,9 @@ export function RecordsPage() {
                 { label: '全部状态', value: 'all' },
                 { label: '已完成', value: 'completed' },
                 { label: '失败', value: 'failed' },
+                { label: '结构化异常', value: 'schema_invalid' },
               ]}
-              style={{ width: 120 }}
+              style={{ width: 132 }}
             />
             <Select
               size="small"
@@ -200,6 +218,19 @@ export function RecordsPage() {
             />
             <Select
               size="small"
+              value={jobTypeFilter}
+              onChange={setJobTypeFilter}
+              options={[
+                { label: '全部任务类型', value: 'all' },
+                { label: '上传单张', value: 'upload_single' },
+                { label: '上传批量', value: 'upload_batch' },
+                { label: '摄像头单次', value: 'camera_once' },
+                { label: '摄像头定时', value: 'camera_schedule' },
+              ]}
+              style={{ width: 140 }}
+            />
+            <Select
+              size="small"
               value={cameraFilter}
               onChange={setCameraFilter}
               options={[
@@ -210,6 +241,13 @@ export function RecordsPage() {
                 })),
               ]}
               style={{ width: 170 }}
+            />
+            <Input
+              size="small"
+              value={scheduleIdFilter}
+              onChange={(event) => setScheduleIdFilter(event.target.value.trim())}
+              placeholder="计划 ID 过滤"
+              style={{ width: 150 }}
             />
             <Select
               size="small"
@@ -250,8 +288,11 @@ export function RecordsPage() {
               onChange={(event) => setCreatedToFilter(event.target.value)}
               style={{ width: 190 }}
             />
-            <Button size="small" onClick={handleExport}>
+            <Button size="small" onClick={() => handleExport('csv')}>
               导出 CSV
+            </Button>
+            <Button size="small" onClick={() => handleExport('xlsx')}>
+              导出 Excel
             </Button>
           </Space>
         }
@@ -281,6 +322,17 @@ export function RecordsPage() {
                 dataIndex: 'input_filename',
               },
               {
+                title: '执行来源',
+                render: (_, record) => (
+                  <Space size={6}>
+                    <Tag color={jobTypeColorMap[record.job_type || ''] ?? 'default'}>
+                      {record.job_type || 'unknown'}
+                    </Tag>
+                    {record.schedule_id ? <Text type="secondary">计划 {record.schedule_id.slice(0, 8)}</Text> : null}
+                  </Space>
+                ),
+              },
+              {
                 title: '模型',
                 render: (_, record) => `${record.model_provider} / ${record.model_name}`,
               },
@@ -304,6 +356,13 @@ export function RecordsPage() {
         open={Boolean(selectedRecordId)}
         size="large"
         title="记录详情"
+        extra={
+          detail ? (
+            <Button size="small" onClick={() => navigate(`/feedback?recordId=${detail.id}`)}>
+              去人工复核
+            </Button>
+          ) : null
+        }
         onClose={handleCloseDetail}
       >
         {detail ? (
@@ -327,6 +386,8 @@ export function RecordsPage() {
                   <Space orientation="vertical" size={8} style={{ width: '100%' }}>
                     <Text>记录 ID：{detail.id}</Text>
                     <Text>任务 ID：{detail.job_id}</Text>
+                    <Text>任务类型：{detail.job_type || 'unknown'}</Text>
+                    <Text>计划 ID：{detail.schedule_id || '无'}</Text>
                     <Text>策略：{detail.strategy_name}</Text>
                     <Text>文件：{detail.input_filename}</Text>
                     <Text>模型：{detail.model_provider} / {detail.model_name}</Text>

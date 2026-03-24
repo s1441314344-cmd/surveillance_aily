@@ -88,6 +88,38 @@ export type CameraStatus = {
   last_checked_at: string | null;
 };
 
+export type CameraStatusSweepSummary = {
+  checked_count: number;
+  failed_count: number;
+  total_count: number;
+};
+
+export type CameraStatusLog = {
+  id: string;
+  camera_id: string;
+  connection_status: string;
+  alert_status: string;
+  last_error: string | null;
+  created_at: string;
+};
+
+export type CameraDiagnostic = {
+  camera_id: string;
+  camera_name: string;
+  protocol: string;
+  stream_url_masked: string | null;
+  success: boolean;
+  capture_mode: string;
+  latency_ms: number;
+  frame_size_bytes: number | null;
+  mime_type: string | null;
+  width: number | null;
+  height: number | null;
+  snapshot_path: string | null;
+  error_message: string | null;
+  checked_at: string;
+};
+
 export async function listModelProviders() {
   const response = await apiClient.get<ModelProvider[]>('/api/model-providers');
   return response.data;
@@ -156,7 +188,44 @@ export async function getCameraStatus(cameraId: string) {
   return response.data;
 }
 
+export async function listCameraStatuses(params?: { cameraIds?: string[]; alertOnly?: boolean }) {
+  const response = await apiClient.get<CameraStatus[]>('/api/cameras/statuses', {
+    params: {
+      camera_ids: params?.cameraIds?.length ? params.cameraIds.join(',') : undefined,
+      alert_only: params?.alertOnly || undefined,
+    },
+  });
+  return response.data;
+}
+
 export async function checkCameraStatus(cameraId: string) {
   const response = await apiClient.post<CameraStatus>(`/api/cameras/${cameraId}/check`);
+  return response.data;
+}
+
+export async function checkAllCamerasStatus(params?: { cameraIds?: string[] }) {
+  const response = await apiClient.post<CameraStatusSweepSummary>('/api/cameras/check-all', undefined, {
+    params: {
+      camera_ids: params?.cameraIds?.length ? params.cameraIds.join(',') : undefined,
+    },
+  });
+  return response.data;
+}
+
+export async function listCameraStatusLogs(cameraId: string, params?: { limit?: number }) {
+  const response = await apiClient.get<CameraStatusLog[]>(`/api/cameras/${cameraId}/status-logs`, {
+    params: {
+      limit: params?.limit ?? 20,
+    },
+  });
+  return response.data;
+}
+
+export async function diagnoseCamera(cameraId: string, params?: { saveSnapshot?: boolean }) {
+  const response = await apiClient.post<CameraDiagnostic>(`/api/cameras/${cameraId}/diagnose`, undefined, {
+    params: {
+      save_snapshot: params?.saveSnapshot ?? true,
+    },
+  });
   return response.data;
 }

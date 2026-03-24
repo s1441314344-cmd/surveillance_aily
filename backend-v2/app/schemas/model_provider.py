@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ModelProviderRead(BaseModel):
@@ -15,7 +15,7 @@ class ModelProviderRead(BaseModel):
 class ModelProviderUpdate(BaseModel):
     display_name: str | None = None
     base_url: str
-    api_key: str | None = Field(default=None, repr=False)
+    api_key: str | None = None
     default_model: str
     timeout_seconds: int = 120
     status: str = "inactive"

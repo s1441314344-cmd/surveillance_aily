@@ -53,6 +53,21 @@ class CameraStatusRead(BaseModel):
     last_checked_at: str | None = None
 
 
+class CameraStatusLogRead(BaseModel):
+    id: str
+    camera_id: str
+    connection_status: str
+    alert_status: str
+    last_error: str | None = None
+    created_at: str
+
+
+class CameraStatusSweepRead(BaseModel):
+    checked_count: int
+    failed_count: int
+    total_count: int
+
+
 class CameraDiagnosticRead(BaseModel):
     camera_id: str
     camera_name: str

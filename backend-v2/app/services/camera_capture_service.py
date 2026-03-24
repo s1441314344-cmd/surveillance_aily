@@ -38,6 +38,7 @@ class CameraFrame:
 class CameraCaptureConfig:
     id: str
     name: str
+    protocol: str
     rtsp_url: str | None
     resolution: str
     jpeg_quality: int
@@ -66,6 +67,7 @@ def camera_to_capture_config(camera: Camera) -> CameraCaptureConfig:
     return CameraCaptureConfig(
         id=camera.id,
         name=camera.name,
+        protocol=camera.protocol,
         rtsp_url=camera.rtsp_url,
         resolution=camera.resolution,
         jpeg_quality=camera.jpeg_quality,
@@ -77,6 +79,7 @@ def snapshot_to_capture_config(snapshot: dict) -> CameraCaptureConfig:
     return CameraCaptureConfig(
         id=str(snapshot.get("id") or ""),
         name=str(snapshot.get("name") or "camera"),
+        protocol=str(snapshot.get("protocol") or "rtsp").lower(),
         rtsp_url=snapshot.get("rtsp_url"),
         resolution=str(snapshot.get("resolution") or "1080p"),
         jpeg_quality=int(snapshot.get("jpeg_quality") or 80),
@@ -86,6 +89,12 @@ def snapshot_to_capture_config(snapshot: dict) -> CameraCaptureConfig:
 
 def capture_camera_frame(camera: Camera | CameraCaptureConfig) -> CameraFrame:
     capture_config = camera if isinstance(camera, CameraCaptureConfig) else camera_to_capture_config(camera)
+    protocol = (capture_config.protocol or "").strip().lower()
+    if protocol != "rtsp":
+        raise CameraCaptureError(
+            f"Camera protocol {protocol or 'unknown'} is not supported in V1 capture chain; only RTSP is supported",
+        )
+
     rtsp_url = (capture_config.rtsp_url or "").strip()
     if not rtsp_url:
         raise CameraCaptureError("RTSP URL is missing")
@@ -176,7 +185,7 @@ def diagnose_camera_capture(
         return CameraCaptureDiagnostic(
             camera_id=capture_config.id,
             camera_name=capture_config.name,
-            protocol="rtsp",
+            protocol=(capture_config.protocol or "rtsp").lower(),
             stream_url_masked=masked_url,
             success=True,
             capture_mode="mock" if (capture_config.rtsp_url or "").startswith("rtsp://mock/") else "rtsp",
@@ -194,10 +203,10 @@ def diagnose_camera_capture(
         return CameraCaptureDiagnostic(
             camera_id=capture_config.id,
             camera_name=capture_config.name,
-            protocol="rtsp",
+            protocol=(capture_config.protocol or "rtsp").lower(),
             stream_url_masked=masked_url,
             success=False,
-            capture_mode="rtsp",
+            capture_mode=(capture_config.protocol or "rtsp").lower(),
             latency_ms=latency_ms,
             frame_size_bytes=None,
             mime_type=None,

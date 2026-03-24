@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -10,10 +10,11 @@ from app.schemas.auth import CurrentUser
 from app.schemas.task_record import TaskRecordRead
 from app.services.task_record_service import (
     export_task_records_csv,
+    export_task_records_xlsx,
     get_record_image_path,
+    get_task_record_read,
     get_task_record_or_404,
     list_task_records as list_task_record_rows,
-    serialize_task_record,
 )
 
 router = APIRouter()
@@ -24,6 +25,8 @@ def list_task_records(
     status: str | None = None,
     strategy_id: str | None = None,
     job_id: str | None = None,
+    job_type: str | None = None,
+    schedule_id: str | None = None,
     camera_id: str | None = None,
     model_provider: str | None = None,
     feedback_status: str | None = None,
@@ -37,6 +40,8 @@ def list_task_records(
         result_status=status,
         strategy_id=strategy_id,
         job_id=job_id,
+        job_type=job_type,
+        schedule_id=schedule_id,
         camera_id=camera_id,
         model_provider=model_provider,
         feedback_status=feedback_status,
@@ -47,9 +52,12 @@ def list_task_records(
 
 @router.get("/export")
 def export_task_records(
+    format: str = "csv",
     status: str | None = None,
     strategy_id: str | None = None,
     job_id: str | None = None,
+    job_type: str | None = None,
+    schedule_id: str | None = None,
     camera_id: str | None = None,
     model_provider: str | None = None,
     feedback_status: str | None = None,
@@ -63,17 +71,34 @@ def export_task_records(
         result_status=status,
         strategy_id=strategy_id,
         job_id=job_id,
+        job_type=job_type,
+        schedule_id=schedule_id,
         camera_id=camera_id,
         model_provider=model_provider,
         feedback_status=feedback_status,
         created_from=created_from,
         created_to=created_to,
     )
-    csv_content = export_task_records_csv(records)
-    return PlainTextResponse(
-        csv_content,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="task-records.csv"'},
+    export_format = format.lower().strip()
+    if export_format == "csv":
+        csv_content = export_task_records_csv(records)
+        return PlainTextResponse(
+            csv_content,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="task-records.csv"'},
+        )
+
+    if export_format == "xlsx":
+        xlsx_content = export_task_records_xlsx(records)
+        return Response(
+            xlsx_content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="task-records.xlsx"'},
+        )
+
+    raise HTTPException(
+        status_code=http_status.HTTP_400_BAD_REQUEST,
+        detail="Unsupported export format, expected csv or xlsx",
     )
 
 
@@ -94,4 +119,4 @@ def get_task_record(
     _: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return serialize_task_record(get_task_record_or_404(db, record_id))
+    return get_task_record_read(db, get_task_record_or_404(db, record_id))

@@ -1,4 +1,5 @@
 from typing import Annotated
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
@@ -52,6 +53,8 @@ def list_jobs(
     trigger_mode: str | None = None,
     camera_id: str | None = None,
     schedule_id: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
     _: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -63,6 +66,8 @@ def list_jobs(
         trigger_mode=trigger_mode,
         camera_id=camera_id,
         schedule_id=schedule_id,
+        created_from=created_from,
+        created_to=created_to,
     )
 
 

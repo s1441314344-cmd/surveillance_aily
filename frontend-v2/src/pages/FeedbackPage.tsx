@@ -27,6 +27,7 @@ import {
   TaskRecord,
   updateFeedback,
 } from '@/shared/api/tasks';
+import { useSearchParams } from 'react-router-dom';
 
 const { Paragraph, Text, Title } = Typography;
 const { TextArea } = Input;
@@ -52,10 +53,14 @@ const feedbackStatusColorMap: Record<string, string> = {
 export function FeedbackPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedRecordId = searchParams.get('recordId');
   const [form] = Form.useForm<FeedbackFormValues>();
-  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>('unreviewed');
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>(
+    selectedRecordId ? 'all' : 'unreviewed',
+  );
+  const [resultStatusFilter, setResultStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
   const strategyQuery = useQuery({
     queryKey: ['strategies', 'all-for-feedback'],
@@ -63,9 +68,10 @@ export function FeedbackPage() {
   });
 
   const recordsQuery = useQuery({
-    queryKey: ['task-records', 'feedback', feedbackStatusFilter, strategyFilter],
+    queryKey: ['task-records', 'feedback', feedbackStatusFilter, resultStatusFilter, strategyFilter],
     queryFn: () =>
       listTaskRecords({
+        status: resultStatusFilter === 'all' ? undefined : resultStatusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         feedbackStatus: feedbackStatusFilter === 'all' ? undefined : feedbackStatusFilter,
       }),
@@ -74,11 +80,10 @@ export function FeedbackPage() {
   const records = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data]);
   const effectiveSelectedRecordId = useMemo(() => {
     if (!records.length) {
-      return null;
+      return selectedRecordId;
     }
 
-    const hasSelectedRecord = selectedRecordId && records.some((item) => item.id === selectedRecordId);
-    return hasSelectedRecord ? selectedRecordId : records[0].id;
+    return selectedRecordId || records[0].id;
   }, [records, selectedRecordId]);
 
   const recordDetailQuery = useQuery({
@@ -175,6 +180,12 @@ export function FeedbackPage() {
     await reviewMutation.mutateAsync(values);
   };
 
+  const handleSelectRecord = (recordId: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('recordId', recordId);
+    setSearchParams(nextParams, { replace: true });
+  };
+
   return (
     <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <div>
@@ -206,6 +217,18 @@ export function FeedbackPage() {
                 />
                 <Select
                   size="small"
+                  value={resultStatusFilter}
+                  onChange={setResultStatusFilter}
+                  options={[
+                    { label: '全部结果', value: 'all' },
+                    { label: '已完成', value: 'completed' },
+                    { label: '失败', value: 'failed' },
+                    { label: '结构化异常', value: 'schema_invalid' },
+                  ]}
+                  style={{ width: 130 }}
+                />
+                <Select
+                  size="small"
                   value={strategyFilter}
                   onChange={setStrategyFilter}
                   options={[
@@ -228,7 +251,7 @@ export function FeedbackPage() {
                 pagination={{ pageSize: 8 }}
                 size="small"
                 onRow={(record) => ({
-                  onClick: () => setSelectedRecordId(record.id),
+                  onClick: () => handleSelectRecord(record.id),
                 })}
                 columns={[
                   {

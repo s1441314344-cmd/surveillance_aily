@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from app.services.scheduler_service import run_due_job_schedules_once
 from app.workers.tasks import process_job
 
-from .test_auth_and_users import auth_headers, login_as_admin
+from .test_auth_and_users import auth_headers, login_as_admin, login_as_user
 
 
 def test_job_schedule_crud_and_status_flow(client):
@@ -359,3 +359,132 @@ def test_list_jobs_filters_by_trigger_mode_camera_and_schedule_id(client):
     by_schedule = by_schedule_response.json()
     assert len(by_schedule) == 1
     assert by_schedule[0]["id"] == scheduled_job_id
+
+
+def test_run_schedule_now_creates_camera_schedule_job_and_allows_task_operator(client):
+    admin_login = login_as_admin(client)
+    admin_headers = auth_headers(admin_login["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=admin_headers,
+        json={
+            "name": "RunNow Camera",
+            "location": "快速触发点位",
+            "ip_address": "192.168.1.78",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/run-now",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/run-now",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=admin_headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "15",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+    original_next_run_at = schedule["next_run_at"]
+
+    create_operator_response = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "username": "schedule_operator",
+            "password": "Schedule123!",
+            "display_name": "计划操作员",
+            "roles": ["task_operator"],
+        },
+    )
+    assert create_operator_response.status_code == 200
+
+    operator_login = login_as_user(client, username="schedule_operator", password="Schedule123!")
+    operator_headers = auth_headers(operator_login["access_token"])
+
+    run_now_response = client.post(
+        f"/api/job-schedules/{schedule['id']}/run-now",
+        headers=operator_headers,
+    )
+    assert run_now_response.status_code == 200
+    run_now_job = run_now_response.json()
+    assert run_now_job["job_type"] == "camera_schedule"
+    assert run_now_job["trigger_mode"] == "schedule"
+    assert run_now_job["schedule_id"] == schedule["id"]
+    assert run_now_job["status"] == "queued"
+
+    assert process_job(run_now_job["id"])["status"] == "completed"
+
+    updated_schedule_response = client.get(f"/api/job-schedules?status=active", headers=admin_headers)
+    assert updated_schedule_response.status_code == 200
+    updated_schedule = next(item for item in updated_schedule_response.json() if item["id"] == schedule["id"])
+    assert updated_schedule["last_run_at"] is not None
+    assert updated_schedule["next_run_at"] is not None
+    assert updated_schedule["next_run_at"] != original_next_run_at
+
+
+def test_run_schedule_now_rejects_paused_schedule(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "RunNow Paused Camera",
+            "location": "暂停计划测试点",
+            "ip_address": "192.168.1.79",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/run-now-paused",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/run-now-paused",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "10",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+
+    pause_response = client.patch(
+        f"/api/job-schedules/{schedule['id']}/status",
+        headers=headers,
+        json={"status": "paused"},
+    )
+    assert pause_response.status_code == 200
+    assert pause_response.json()["status"] == "paused"
+
+    run_now_response = client.post(
+        f"/api/job-schedules/{schedule['id']}/run-now",
+        headers=headers,
+    )
+    assert run_now_response.status_code == 400
+    assert "Schedule is not active" in run_now_response.json()["detail"]

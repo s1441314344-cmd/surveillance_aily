@@ -37,6 +37,8 @@ export type JobSchedule = {
 export type TaskRecord = {
   id: string;
   job_id: string;
+  job_type: string | null;
+  schedule_id: string | null;
   strategy_id: string;
   strategy_name: string;
   strategy_snapshot: Record<string, unknown>;
@@ -155,6 +157,11 @@ export async function deleteJobSchedule(scheduleId: string) {
   return response.data;
 }
 
+export async function runJobScheduleNow(scheduleId: string) {
+  const response = await apiClient.post<Job>(`/api/job-schedules/${scheduleId}/run-now`);
+  return response.data;
+}
+
 export async function listJobs(params?: {
   status?: string;
   jobType?: string;
@@ -162,6 +169,8 @@ export async function listJobs(params?: {
   triggerMode?: string;
   cameraId?: string;
   scheduleId?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   const response = await apiClient.get<Job[]>('/api/jobs', {
     params: {
@@ -171,6 +180,8 @@ export async function listJobs(params?: {
       trigger_mode: params?.triggerMode || undefined,
       camera_id: params?.cameraId || undefined,
       schedule_id: params?.scheduleId || undefined,
+      created_from: params?.createdFrom || undefined,
+      created_to: params?.createdTo || undefined,
     },
   });
   return response.data;
@@ -195,6 +206,8 @@ export async function listTaskRecords(params?: {
   status?: string;
   strategyId?: string;
   jobId?: string;
+  jobType?: string;
+  scheduleId?: string;
   cameraId?: string;
   modelProvider?: string;
   feedbackStatus?: string;
@@ -206,6 +219,8 @@ export async function listTaskRecords(params?: {
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
+      job_type: params?.jobType || undefined,
+      schedule_id: params?.scheduleId || undefined,
       camera_id: params?.cameraId || undefined,
       model_provider: params?.modelProvider || undefined,
       feedback_status: params?.feedbackStatus || undefined,
@@ -232,17 +247,23 @@ export async function exportTaskRecords(params?: {
   status?: string;
   strategyId?: string;
   jobId?: string;
+  jobType?: string;
+  scheduleId?: string;
   cameraId?: string;
   modelProvider?: string;
   feedbackStatus?: string;
   createdFrom?: string;
   createdTo?: string;
+  format?: 'csv' | 'xlsx';
 }) {
   const response = await apiClient.get<Blob>('/api/task-records/export', {
     params: {
+      format: params?.format || 'csv',
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
+      job_type: params?.jobType || undefined,
+      schedule_id: params?.scheduleId || undefined,
       camera_id: params?.cameraId || undefined,
       model_provider: params?.modelProvider || undefined,
       feedback_status: params?.feedbackStatus || undefined,

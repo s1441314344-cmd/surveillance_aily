@@ -3,6 +3,7 @@ import { Alert, App, Button, Card, Form, Input, Space, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { login } from '@/shared/api/auth';
 import { getApiErrorMessage } from '@/shared/api/errors';
+import { toStoreSessionPayload } from '@/shared/auth/session';
 import { useAuthStore } from '@/shared/state/authStore';
 
 const { Paragraph, Title } = Typography;
@@ -16,16 +17,7 @@ export function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: (response) => {
-      setSession({
-        token: response.access_token,
-        refreshToken: response.refresh_token,
-        user: {
-          id: response.user.id,
-          username: response.user.username,
-          displayName: response.user.display_name,
-          roles: response.user.roles,
-        },
-      });
+      setSession(toStoreSessionPayload(response));
       message.success('登录成功');
       navigate('/dashboard');
     },

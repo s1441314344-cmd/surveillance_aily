@@ -34,6 +34,7 @@ import {
   listJobs,
   listJobSchedules,
   retryJob,
+  runJobScheduleNow,
   updateJobSchedule,
   updateJobScheduleStatus,
   uploadJob,
@@ -98,15 +99,29 @@ function formatDateTime(value: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
 }
 
+function parseDateFilter(value: string) {
+  if (!value) {
+    return undefined;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  return date.toISOString();
+}
+
 export function JobsPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<UploadFormValues>();
   const [scheduleEditForm] = Form.useForm<EditScheduleFormValues>();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [triggerModeFilter, setTriggerModeFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [scheduleFilter, setScheduleFilter] = useState<string>('all');
+  const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
+  const [createdToFilter, setCreatedToFilter] = useState<string>('');
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
   const [scheduleCameraFilter, setScheduleCameraFilter] = useState<string>('all');
   const [scheduleStrategyFilter, setScheduleStrategyFilter] = useState<string>('all');
@@ -126,13 +141,25 @@ export function JobsPage() {
   });
 
   const jobsQuery = useQuery({
-    queryKey: ['jobs', statusFilter, triggerModeFilter, cameraFilter, scheduleFilter],
+    queryKey: [
+      'jobs',
+      statusFilter,
+      strategyFilter,
+      triggerModeFilter,
+      cameraFilter,
+      scheduleFilter,
+      createdFromFilter,
+      createdToFilter,
+    ],
     queryFn: () =>
       listJobs({
         status: statusFilter === 'all' ? undefined : statusFilter,
+        strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         triggerMode: triggerModeFilter === 'all' ? undefined : triggerModeFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         scheduleId: scheduleFilter === 'all' ? undefined : scheduleFilter,
+        createdFrom: parseDateFilter(createdFromFilter),
+        createdTo: parseDateFilter(createdToFilter),
       }),
     refetchInterval: 5000,
   });
@@ -161,6 +188,15 @@ export function JobsPage() {
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
   const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
+  const selectedCameraIdInForm = Form.useWatch('cameraId', form) ?? undefined;
+  const selectedCameraInForm = useMemo(
+    () => cameras.find((item) => item.id === selectedCameraIdInForm) ?? null,
+    [cameras, selectedCameraIdInForm],
+  );
+  const hasUnsupportedCameraProtocol =
+    taskMode !== 'upload' &&
+    Boolean(selectedCameraInForm) &&
+    (selectedCameraInForm?.protocol || '').toLowerCase() !== 'rtsp';
   const scheduleFilterOptions = useMemo(
     () => [
       { label: '全部计划', value: 'all' },
@@ -272,6 +308,20 @@ export function JobsPage() {
     },
   });
 
+  const runScheduleNowMutation = useMutation({
+    mutationFn: runJobScheduleNow,
+    onSuccess: async (job) => {
+      await Promise.all([invalidateJobs(), invalidateSchedules()]);
+      setSelectedJobId(job.id);
+      setTriggerModeFilter('schedule');
+      setScheduleFilter(job.schedule_id ?? 'all');
+      message.success('已按计划立即触发一次任务');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '计划立即执行失败'));
+    },
+  });
+
   const cancelMutation = useMutation({
     mutationFn: cancelJob,
     onSuccess: async (job) => {
@@ -302,6 +352,10 @@ export function JobsPage() {
         message.warning('请先选择摄像头');
         return;
       }
+      if ((selectedCameraInForm?.protocol || '').toLowerCase() !== 'rtsp') {
+        message.warning('当前 V1 任务链路仅支持 RTSP 摄像头，ONVIF 为后续扩展能力');
+        return;
+      }
 
       const scheduleValue =
         values.scheduleType === 'daily_time'
@@ -325,6 +379,10 @@ export function JobsPage() {
     if (values.taskMode === 'camera_once') {
       if (!values.cameraId) {
         message.warning('请先选择摄像头');
+        return;
+      }
+      if ((selectedCameraInForm?.protocol || '').toLowerCase() !== 'rtsp') {
+        message.warning('当前 V1 任务链路仅支持 RTSP 摄像头，ONVIF 为后续扩展能力');
         return;
       }
 
@@ -504,11 +562,21 @@ export function JobsPage() {
                     placeholder="请选择一个可用摄像头"
                     loading={camerasQuery.isLoading}
                     options={cameras.map((item) => ({
-                      label: `${item.name} (${item.location || item.rtsp_url || '未配置位置'})`,
+                      label: `${item.name} [${item.protocol.toUpperCase()}] (${item.location || item.rtsp_url || '未配置位置'})`,
                       value: item.id,
                     }))}
                   />
                 </Form.Item>
+              ) : null}
+
+              {taskMode !== 'upload' && hasUnsupportedCameraProtocol ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  title="当前摄像头协议暂不支持"
+                  description="V1 正式任务链路仅支持 RTSP 摄像头，ONVIF 计划在后续版本扩展。"
+                />
               ) : null}
 
               {taskMode === 'camera_schedule' ? (
@@ -546,6 +614,7 @@ export function JobsPage() {
                 <Button
                   type="primary"
                   htmlType="submit"
+                  disabled={hasUnsupportedCameraProtocol}
                   loading={
                     uploadMutation.isPending || cameraOnceMutation.isPending || scheduleMutation.isPending
                   }
@@ -584,6 +653,7 @@ export function JobsPage() {
             extra={
               <Space wrap>
                 <Select
+                  data-testid="jobs-filter-status"
                   size="small"
                   value={statusFilter}
                   onChange={setStatusFilter}
@@ -598,6 +668,21 @@ export function JobsPage() {
                   style={{ width: 120 }}
                 />
                 <Select
+                  data-testid="jobs-filter-strategy"
+                  size="small"
+                  value={strategyFilter}
+                  onChange={setStrategyFilter}
+                  options={[
+                    { label: '全部策略', value: 'all' },
+                    ...strategies.map((item) => ({
+                      label: item.name,
+                      value: item.id,
+                    })),
+                  ]}
+                  style={{ width: 160 }}
+                />
+                <Select
+                  data-testid="jobs-filter-trigger"
                   size="small"
                   value={triggerModeFilter}
                   onChange={setTriggerModeFilter}
@@ -609,6 +694,7 @@ export function JobsPage() {
                   style={{ width: 120 }}
                 />
                 <Select
+                  data-testid="jobs-filter-camera"
                   size="small"
                   value={cameraFilter}
                   onChange={setCameraFilter}
@@ -622,6 +708,7 @@ export function JobsPage() {
                   style={{ width: 170 }}
                 />
                 <Select
+                  data-testid="jobs-filter-schedule"
                   size="small"
                   value={scheduleFilter}
                   onChange={(value) => {
@@ -631,6 +718,20 @@ export function JobsPage() {
                     }
                   }}
                   options={scheduleFilterOptions}
+                  style={{ width: 190 }}
+                />
+                <Input
+                  size="small"
+                  type="datetime-local"
+                  value={createdFromFilter}
+                  onChange={(event) => setCreatedFromFilter(event.target.value)}
+                  style={{ width: 190 }}
+                />
+                <Input
+                  size="small"
+                  type="datetime-local"
+                  value={createdToFilter}
+                  onChange={(event) => setCreatedToFilter(event.target.value)}
                   style={{ width: 190 }}
                 />
               </Space>
@@ -891,6 +992,13 @@ export function JobsPage() {
                     }}
                   >
                     查看任务
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => runScheduleNowMutation.mutate(record.id)}
+                    loading={runScheduleNowMutation.isPending}
+                  >
+                    立即执行
                   </Button>
                   <Button
                     size="small"

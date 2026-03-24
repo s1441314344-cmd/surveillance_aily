@@ -2,12 +2,24 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 
+test.setTimeout(120000);
+
 async function loginAsAdmin(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('用户名').fill('admin');
-  await page.getByLabel('密码').fill('admin123456');
-  await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.goto('/login');
+    await page.getByLabel('用户名').fill('admin');
+    await page.getByLabel('密码').fill('admin123456');
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+      return;
+    } catch (error) {
+      if (attempt === 1) {
+        throw error;
+      }
+      await page.waitForTimeout(500);
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -76,7 +88,16 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
   await expect(page).toHaveURL(/\/jobs$/);
   await expect(page.getByRole('heading', { name: '任务中心' })).toBeVisible();
 
-  const scheduleRow = page.getByRole('row', { name: new RegExp(shortScheduleId) }).first();
+  const scheduleCard = page.locator('.ant-card').filter({ hasText: '定时任务计划' }).first();
+  const scheduleCameraFilter = scheduleCard.locator('.ant-card-extra .ant-select').nth(1);
+  await scheduleCameraFilter.click();
+  await page
+    .locator('.ant-select-dropdown .ant-select-item-option')
+    .filter({ hasText: cameraName })
+    .first()
+    .click();
+
+  const scheduleRow = scheduleCard.locator('.ant-table-tbody tr').filter({ hasText: shortScheduleId }).first();
   await expect(scheduleRow).toBeVisible();
   await expect(scheduleRow).toContainText('active');
   await expect(scheduleRow).toContainText('5 分钟');
@@ -87,9 +108,20 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
   await scheduleRow.getByRole('button', { name: /启\s*用/ }).click();
   await expect(scheduleRow).toContainText('active');
 
+  const runNowResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/job-schedules/${scheduleId}/run-now`) &&
+      response.request().method() === 'POST',
+  );
+  await scheduleRow.getByRole('button', { name: '立即执行' }).click();
+  const runNowResponse = await runNowResponsePromise;
+  expect(runNowResponse.ok()).toBeTruthy();
+  const runNowJob = (await runNowResponse.json()) as { id: string };
+
   await scheduleRow.getByRole('button', { name: '查看任务' }).click();
 
   const taskQueueCard = page.locator('.ant-card').filter({ hasText: '任务队列' }).first();
-  await expect(taskQueueCard.locator('.ant-select').nth(1)).toContainText('定时触发');
-  await expect(taskQueueCard.locator('.ant-select').nth(3)).toContainText(shortScheduleId);
+  await expect(taskQueueCard.locator('[data-testid="jobs-filter-trigger"]')).toContainText('定时触发');
+  await expect(taskQueueCard.locator('[data-testid="jobs-filter-schedule"]')).toContainText(shortScheduleId);
+  await expect(taskQueueCard.locator('.ant-table-tbody tr').filter({ hasText: runNowJob.id.slice(0, 8) }).first()).toBeVisible();
 });

@@ -40,6 +40,12 @@ python3 -m celery -A app.core.celery_app.celery_app worker --loglevel=info
 python -m app.schedulers.runner
 ```
 
+可选环境变量（默认值见 `.env.example`）：
+
+- `SCHEDULER_POLL_INTERVAL_SECONDS`：定时任务扫描周期（秒）
+- `SCHEDULER_CAMERA_STATUS_SWEEP_ENABLED`：是否启用摄像头状态后台巡检
+- `SCHEDULER_CAMERA_STATUS_SWEEP_INTERVAL_SECONDS`：摄像头状态巡检周期（秒）
+
 ## 推荐联调方式
 
 仓库根目录已经提供轻量命令入口，适合日常开发：
@@ -52,6 +58,9 @@ make v2-api
 make v2-worker
 make v2-scheduler
 make v2-frontend
+make v2-backend-test
+make v2-frontend-test
+make v2-verify
 make v2-smoke
 make v2-e2e
 make v2-perf
@@ -61,6 +70,10 @@ make v2-backfill
 make v2-eval
 make v2-camera-check
 make v2-camera-validate
+make v2-release-drill
+make v2-uat
+make v2-release-checklist
+make v2-release-gate
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
@@ -68,6 +81,10 @@ make v2-camera-validate
 默认 `CORS_ORIGINS` 已覆盖 `localhost/127.0.0.1` 的 `5174-5178` 端口，兼容 Vite 开发端口回退。
 
 `make v2-smoke` 会对运行中的栈执行一次“上传异步链路 + 失败任务重试链路 + 定时调度链路”的冒烟验收。
+
+`make v2-backend-test` 会执行后端 `pytest` 全量用例；`make v2-frontend-test` 会执行前端 `vitest` 单元测试。
+
+`make v2-verify` 会按“模块单测 -> 联调 preflight -> 最终 UAT”顺序串行执行完整验证流水线，并输出统一摘要。
 
 `make v2-e2e` 会执行 Playwright 基线回归（登录 + 核心页面导航）。
 
@@ -87,12 +104,23 @@ make v2-camera-validate
 
 `make v2-camera-validate` 会按白名单清单批量执行摄像头诊断，输出 JSON / Markdown 报告，并根据期望门槛给出通过/失败结果。
 
+`make v2-release-drill` 会串行执行 `preflight + backfill + 演练报告生成`，输出一份可用于上线评审的 JSON / Markdown 报告，并包含标准回滚步骤提示。
+
+`make v2-uat` 会串行执行 `backend pytest + frontend lint + frontend vitest + frontend build + e2e`，并输出一份 JSON 验收摘要；可选追加 release drill。
+
+`make v2-release-checklist` 会读取最近一次 UAT 与 release drill 产物，生成最终发布清单（JSON/Markdown）。
+
+`make v2-release-gate` 会一键串行执行 UAT（可选）+ 发布清单生成，并输出最终放行结论（`ready_to_release`）和阻塞项摘要。
+
 ## 异步执行说明
 
 - `POST /api/jobs/uploads` 只负责校验、保存上传文件并创建 `queued` 状态的 Job。
 - `POST /api/jobs/cameras/once` 只负责校验输入并创建 `queued` 状态的 Job。
 - Celery worker 通过 `jobs.process(job_id)` 执行抓帧、模型调用、Schema 校验和记录写入。
 - scheduler 进程负责扫描到期的 `job_schedules`，创建 `camera_schedule` Job，并派发到 worker。
+- scheduler 进程会按配置周期执行摄像头状态巡检，批量写入 `camera_status_logs`，供监控页面读取。
+- 管理端可通过 `POST /api/cameras/check-all` 手动触发全量或指定摄像头的状态巡检。
+- 管理端可通过 `POST /api/job-schedules/{id}/run-now` 对某个计划进行一次立即触发（仍按 `camera_schedule` 入队）。
 - `task_records`、`feedback`、`dashboard` 继续复用统一的任务闭环。
 
 ## 历史数据回填
@@ -224,16 +252,131 @@ make v2-camera-validate
 - 如果清单使用 `camera_id` 引用已配置摄像头，则需要先启动数据库并完成初始化
 - 示例清单见：[camera_whitelist_manifest.example.json](/Users/shaopeng/Downloads/surveillance_aily/backend-v2/examples/camera_whitelist_manifest.example.json)
 
+## 上线演练与回滚报告
+
+默认执行（含 preflight + backfill dry-run）：
+
+```bash
+make v2-release-drill
+```
+
+包含 e2e 的演练：
+
+```bash
+./scripts/v2/release-drill.sh --with-e2e
+```
+
+执行真实回填并生成演练报告：
+
+```bash
+./scripts/v2/release-drill.sh --apply-backfill
+```
+
+输出目录默认在 `data/release-drill-logs/<timestamp>/`，包含：
+
+- `preflight.log`
+- `backfill.json`
+- `release-drill-report.json`
+- `release-drill-report.md`
+
+## UAT 验收脚本
+
+默认执行基线验收（后端测试 + 前端 lint + vitest + build + e2e）：
+
+```bash
+make v2-uat
+```
+
+验收后追加 release drill：
+
+```bash
+./scripts/v2/uat.sh --with-release-drill
+```
+
+release drill 同时带 e2e：
+
+```bash
+./scripts/v2/uat.sh --with-release-drill --release-drill-with-e2e
+```
+
+输出目录默认在 `data/uat-logs/<timestamp>/`，包含每一步日志、`summary.json` 和可直接评审的 `summary.md`。
+
+## 全流程验证流水线
+
+默认执行三段校验：`precheck(backend/frontend unit)` -> `integration preflight` -> `final UAT`：
+
+```bash
+make v2-verify
+```
+
+跳过集成 preflight（仅跑单测 + UAT）：
+
+```bash
+./scripts/v2/verify.sh --skip-preflight
+```
+
+输出目录默认在 `data/verify-logs/<timestamp>/`，包含：
+
+- `backend-test.log`
+- `frontend-test.log`
+- `preflight.log`
+- `uat.log`
+- `summary.json`
+- `summary.md`
+
+## 发布清单生成
+
+基于最近一次 UAT + release drill 自动生成发布清单：
+
+```bash
+make v2-release-checklist
+```
+
+只基于 UAT 生成（临时放行，无 release drill）：
+
+```bash
+./scripts/v2/release-checklist.sh --allow-without-release-drill
+```
+
+输出目录默认在 `data/release-checklists/<timestamp>/`，包含：
+
+- `release-checklist.json`
+- `release-checklist.md`
+
+## 一键发布闸门
+
+默认执行（自动跑 UAT，再生成发布清单并给出最终闸门结论）：
+
+```bash
+make v2-release-gate
+```
+
+复用已有 UAT / release drill 产物进行快速判定：
+
+```bash
+./scripts/v2/release-gate.sh \
+  --skip-uat \
+  --uat-summary ./data/uat-logs/<timestamp>/summary.json \
+  --release-drill-report ./data/release-drill-logs/<timestamp>/release-drill-report.json
+```
+
+输出目录默认在 `data/release-gates/<timestamp>/`，包含：
+
+- `uat.log`（如果执行了 UAT）
+- `release-checklist.log`
+- `checklist/release-checklist.json`
+- `checklist/release-checklist.md`
+- `gate-summary.json`
+
 ## 当前包含
 
 - FastAPI 应用骨架
-- JWT/RBAC 占位实现
-- SQLAlchemy 模型骨架
-- Alembic 骨架
+- JWT/RBAC 与角色权限控制
+- SQLAlchemy 数据模型与迁移
 - Celery/Redis 骨架
 - APScheduler 独立调度进程
 - OpenAI / 智谱真实 provider adapter（缺少可用密钥时可按配置回退 mock）
-- 健康检查和主要业务路由占位
+- 健康检查与核心业务路由
 
 ## 当前 API 骨架范围
 
@@ -243,6 +386,7 @@ make v2-camera-validate
 - `/api/model-providers`
 - `/api/strategies`
 - `/api/cameras`
+- `/api/cameras/statuses`
 - `/api/cameras/{id}/diagnose`
 - `/api/jobs`
 - `/api/job-schedules`

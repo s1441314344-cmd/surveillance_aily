@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -9,9 +10,11 @@ import {
   Empty,
   Form,
   Input,
+  Modal,
   Popconfirm,
   Row,
   Select,
+  Switch,
   Space,
   Spin,
   Tag,
@@ -19,11 +22,17 @@ import {
 } from 'antd';
 import {
   Camera,
+  CameraDiagnostic,
   CameraPayload,
+  CameraStatusLog,
+  checkAllCamerasStatus,
   checkCameraStatus,
   createCamera,
   deleteCamera,
+  diagnoseCamera,
   getCameraStatus,
+  listCameraStatusLogs,
+  listCameraStatuses,
   listCameras,
   updateCamera,
 } from '@/shared/api/configCenter';
@@ -74,6 +83,9 @@ export function CamerasPage() {
   const queryClient = useQueryClient();
   const [form] = Form.useForm<CameraFormValues>();
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [alertOnly, setAlertOnly] = useState(false);
+  const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
+  const [lastDiagnostic, setLastDiagnostic] = useState<CameraDiagnostic | null>(null);
 
   const cameraQuery = useQuery({
     queryKey: ['cameras'],
@@ -98,7 +110,68 @@ export function CamerasPage() {
     queryKey: ['camera-status', effectiveSelectedCameraId],
     queryFn: () => getCameraStatus(effectiveSelectedCameraId as string),
     enabled: Boolean(effectiveSelectedCameraId),
+    refetchInterval: 10000,
   });
+
+  const statusListQuery = useQuery({
+    queryKey: ['camera-statuses', cameras.map((item) => item.id).join(',')],
+    queryFn: () => listCameraStatuses({ cameraIds: cameras.map((item) => item.id) }),
+    enabled: cameras.length > 0,
+    refetchInterval: 10000,
+  });
+
+  const statusLogsQuery = useQuery({
+    queryKey: ['camera-status-logs', effectiveSelectedCameraId],
+    queryFn: () => listCameraStatusLogs(effectiveSelectedCameraId as string, { limit: 20 }),
+    enabled: Boolean(effectiveSelectedCameraId),
+    refetchInterval: 10000,
+  });
+
+  const cameraStatusMap = useMemo(() => {
+    const statuses = statusListQuery.data ?? [];
+    return Object.fromEntries(statuses.map((item) => [item.camera_id, item]));
+  }, [statusListQuery.data]);
+
+  const visibleCameras = useMemo(() => {
+    if (!alertOnly) {
+      return cameras;
+    }
+    return cameras.filter((camera) => (cameraStatusMap[camera.id]?.alert_status ?? 'normal') !== 'normal');
+  }, [alertOnly, cameraStatusMap, cameras]);
+
+  const statusSummary = useMemo(() => {
+    const summary = {
+      online: 0,
+      warning: 0,
+      offline: 0,
+      unknown: 0,
+      abnormal: 0,
+    };
+    for (const camera of cameras) {
+      const status = cameraStatusMap[camera.id];
+      const connectionStatus = status?.connection_status ?? 'unknown';
+      if (connectionStatus in summary) {
+        summary[connectionStatus as keyof typeof summary] += 1;
+      } else {
+        summary.unknown += 1;
+      }
+      if ((status?.alert_status ?? 'normal') !== 'normal') {
+        summary.abnormal += 1;
+      }
+    }
+    return summary;
+  }, [cameraStatusMap, cameras]);
+
+  const selectedCameraStatus = useMemo(() => {
+    if (!effectiveSelectedCameraId) {
+      return null;
+    }
+    return statusQuery.data ?? cameraStatusMap[effectiveSelectedCameraId] ?? null;
+  }, [cameraStatusMap, effectiveSelectedCameraId, statusQuery.data]);
+  const selectedCameraStatusLogs = useMemo(
+    () => statusLogsQuery.data ?? [],
+    [statusLogsQuery.data],
+  );
 
   useEffect(() => {
     if (!activeCamera) {
@@ -126,6 +199,8 @@ export function CamerasPage() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['cameras'] }),
       queryClient.invalidateQueries({ queryKey: ['camera-status'] }),
+      queryClient.invalidateQueries({ queryKey: ['camera-statuses'] }),
+      queryClient.invalidateQueries({ queryKey: ['camera-status-logs'] }),
     ]);
 
   const createMutation = useMutation({
@@ -168,11 +243,44 @@ export function CamerasPage() {
   const checkMutation = useMutation({
     mutationFn: checkCameraStatus,
     onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: ['camera-status', result.camera_id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['camera-status', result.camera_id] }),
+        queryClient.invalidateQueries({ queryKey: ['camera-statuses'] }),
+      ]);
       message.success('摄像头状态检查完成');
     },
     onError: (error) => {
       message.error(getApiErrorMessage(error, '摄像头状态检查失败'));
+    },
+  });
+
+  const sweepMutation = useMutation({
+    mutationFn: (cameraIds?: string[]) => checkAllCamerasStatus({ cameraIds }),
+    onSuccess: async (summary) => {
+      await invalidateCameraQueries();
+      message.success(
+        `全量巡检完成：检查 ${summary.checked_count}/${summary.total_count}，失败 ${summary.failed_count}`,
+      );
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '全量巡检失败'));
+    },
+  });
+
+  const diagnoseMutation = useMutation({
+    mutationFn: (cameraId: string) => diagnoseCamera(cameraId),
+    onSuccess: async (diagnostic) => {
+      setLastDiagnostic(diagnostic);
+      setDiagnosticModalOpen(true);
+      await invalidateCameraQueries();
+      if (diagnostic.success) {
+        message.success('摄像头深度诊断完成');
+      } else {
+        message.warning('摄像头深度诊断完成，发现异常');
+      }
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '摄像头深度诊断失败'));
     },
   });
 
@@ -218,21 +326,58 @@ export function CamerasPage() {
           <Card
             title="摄像头列表"
             extra={
-              <Button size="small" type="primary" onClick={resetForCreate}>
-                新建
-              </Button>
+              <Space>
+                <Space size={6}>
+                  <Text type="secondary">仅看告警</Text>
+                  <Switch
+                    size="small"
+                    checked={alertOnly}
+                    onChange={setAlertOnly}
+                    data-testid="cameras-alert-only-switch"
+                  />
+                </Space>
+                <Button
+                  size="small"
+                  loading={sweepMutation.isPending}
+                  disabled={!cameras.length}
+                  data-testid="cameras-bulk-check-btn"
+                  onClick={() => sweepMutation.mutate(cameras.map((item) => item.id))}
+                >
+                  全量巡检
+                </Button>
+                <Button size="small" type="primary" onClick={resetForCreate}>
+                  新建
+                </Button>
+              </Space>
             }
             style={{ height: '100%' }}
           >
+            {cameras.length ? (
+              <Alert
+                type={statusSummary.abnormal > 0 ? 'warning' : 'success'}
+                showIcon
+                style={{ marginBottom: 12 }}
+                title={`在线 ${statusSummary.online} / 告警 ${statusSummary.abnormal}`}
+                description={
+                  <Space wrap size={8}>
+                    <Tag color={statusColorMap.online}>online: {statusSummary.online}</Tag>
+                    <Tag color={statusColorMap.warning}>warning: {statusSummary.warning}</Tag>
+                    <Tag color={statusColorMap.offline}>offline: {statusSummary.offline}</Tag>
+                    <Tag color={statusColorMap.unknown}>unknown: {statusSummary.unknown}</Tag>
+                  </Space>
+                }
+              />
+            ) : null}
             {cameraQuery.isLoading ? (
               <Spin />
-            ) : cameras.length ? (
+            ) : visibleCameras.length ? (
               <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-                {cameras.map((camera: Camera) => (
+                {visibleCameras.map((camera: Camera) => (
                   <Card
                     key={camera.id}
                     size="small"
                     hoverable
+                    data-testid={`camera-card-${camera.id}`}
                     style={{
                       borderColor: camera.id === effectiveSelectedCameraId ? '#1677ff' : undefined,
                     }}
@@ -242,6 +387,14 @@ export function CamerasPage() {
                       <Space>
                         <Text strong>{camera.name}</Text>
                         <Tag>{camera.protocol.toUpperCase()}</Tag>
+                        <Tag color={statusColorMap[cameraStatusMap[camera.id]?.connection_status ?? 'unknown'] ?? 'default'}>
+                          {cameraStatusMap[camera.id]?.connection_status ?? 'unknown'}
+                        </Tag>
+                        {(cameraStatusMap[camera.id]?.alert_status ?? 'normal') !== 'normal' ? (
+                          <Tag color={statusColorMap[cameraStatusMap[camera.id]?.alert_status ?? 'warning'] ?? 'gold'}>
+                            {cameraStatusMap[camera.id]?.alert_status}
+                          </Tag>
+                        ) : null}
                       </Space>
                       <Text type="secondary">{camera.location || '未设置位置'}</Text>
                       <Text type="secondary">{camera.rtsp_url || camera.ip_address || '未配置地址'}</Text>
@@ -249,6 +402,8 @@ export function CamerasPage() {
                   </Card>
                 ))}
               </Space>
+            ) : alertOnly ? (
+              <Empty description="当前没有告警摄像头" />
             ) : (
               <Empty description="暂无摄像头配置" />
             )}
@@ -268,6 +423,14 @@ export function CamerasPage() {
                       loading={checkMutation.isPending}
                     >
                       立即检查
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => diagnoseMutation.mutate(activeCamera.id)}
+                      loading={diagnoseMutation.isPending}
+                      data-testid="cameras-diagnose-btn"
+                    >
+                      深度诊断
                     </Button>
                     <Popconfirm
                       title="确定删除该摄像头吗？"
@@ -390,20 +553,20 @@ export function CamerasPage() {
                 ) : (
                   <Descriptions column={1} size="small" bordered>
                     <Descriptions.Item label="连接状态">
-                      <Tag color={statusColorMap[statusQuery.data?.connection_status ?? 'unknown'] ?? 'default'}>
-                        {statusQuery.data?.connection_status ?? 'unknown'}
+                      <Tag color={statusColorMap[selectedCameraStatus?.connection_status ?? 'unknown'] ?? 'default'}>
+                        {selectedCameraStatus?.connection_status ?? 'unknown'}
                       </Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="告警状态">
-                      <Tag color={statusColorMap[statusQuery.data?.alert_status ?? 'unknown'] ?? 'default'}>
-                        {statusQuery.data?.alert_status ?? 'unknown'}
+                      <Tag color={statusColorMap[selectedCameraStatus?.alert_status ?? 'unknown'] ?? 'default'}>
+                        {selectedCameraStatus?.alert_status ?? 'unknown'}
                       </Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="最近检查时间">
-                      {statusQuery.data?.last_checked_at ?? '尚未检查'}
+                      {selectedCameraStatus?.last_checked_at ?? '尚未检查'}
                     </Descriptions.Item>
                     <Descriptions.Item label="最近错误">
-                      {statusQuery.data?.last_error || '无'}
+                      {selectedCameraStatus?.last_error || '无'}
                     </Descriptions.Item>
                   </Descriptions>
                 )
@@ -411,9 +574,98 @@ export function CamerasPage() {
                 <Empty description="请选择一个摄像头查看状态" />
               )}
             </Card>
+
+            <Card title="状态日志">
+              {effectiveSelectedCameraId ? (
+                statusLogsQuery.isLoading ? (
+                  <Spin />
+                ) : selectedCameraStatusLogs.length ? (
+                  <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                    {selectedCameraStatusLogs.map((item: CameraStatusLog) => (
+                      <Card key={item.id} size="small">
+                        <Space orientation="vertical" size={2} style={{ width: '100%' }}>
+                          <Space wrap>
+                            <Tag color={statusColorMap[item.connection_status] ?? 'default'}>
+                              {item.connection_status}
+                            </Tag>
+                            <Tag color={statusColorMap[item.alert_status] ?? 'default'}>{item.alert_status}</Tag>
+                            <Text type="secondary">{new Date(item.created_at).toLocaleString()}</Text>
+                          </Space>
+                          <Text type={item.last_error ? 'danger' : 'secondary'}>
+                            {item.last_error || '无错误'}
+                          </Text>
+                        </Space>
+                      </Card>
+                    ))}
+                  </Space>
+                ) : (
+                  <Empty description="暂无状态日志" />
+                )
+              ) : (
+                <Empty description="请选择一个摄像头查看状态日志" />
+              )}
+            </Card>
           </Space>
         </Col>
       </Row>
+
+      <Modal
+        open={diagnosticModalOpen}
+        title="摄像头诊断结果"
+        onCancel={() => setDiagnosticModalOpen(false)}
+        footer={
+          <Button type="primary" onClick={() => setDiagnosticModalOpen(false)}>
+            关闭
+          </Button>
+        }
+      >
+        {lastDiagnostic ? (
+          <Descriptions column={1} size="small" bordered>
+            <Descriptions.Item label="摄像头">
+              {lastDiagnostic.camera_name} ({lastDiagnostic.camera_id})
+            </Descriptions.Item>
+            <Descriptions.Item label="诊断状态">
+              <Tag color={lastDiagnostic.success ? 'green' : 'red'}>
+                {lastDiagnostic.success ? '成功' : '失败'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="协议">
+              {lastDiagnostic.protocol.toUpperCase()}
+            </Descriptions.Item>
+            <Descriptions.Item label="采集模式">
+              {lastDiagnostic.capture_mode}
+            </Descriptions.Item>
+            <Descriptions.Item label="时延">
+              {lastDiagnostic.latency_ms} ms
+            </Descriptions.Item>
+            <Descriptions.Item label="图像尺寸">
+              {lastDiagnostic.width && lastDiagnostic.height
+                ? `${lastDiagnostic.width} x ${lastDiagnostic.height}`
+                : '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="文件大小">
+              {lastDiagnostic.frame_size_bytes ? `${lastDiagnostic.frame_size_bytes} bytes` : '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="媒体类型">
+              {lastDiagnostic.mime_type ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="脱敏地址">
+              {lastDiagnostic.stream_url_masked ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="诊断快照路径">
+              {lastDiagnostic.snapshot_path ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="错误信息">
+              {lastDiagnostic.error_message ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="诊断时间">
+              {lastDiagnostic.checked_at}
+            </Descriptions.Item>
+          </Descriptions>
+        ) : (
+          <Empty description="暂无诊断结果" />
+        )}
+      </Modal>
     </Space>
   );
 }

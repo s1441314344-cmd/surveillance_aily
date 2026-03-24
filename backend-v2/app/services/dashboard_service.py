@@ -42,6 +42,7 @@ def get_dashboard_summary(
         for record in records
         if record.result_status == "completed" and record.normalized_json is not None
     )
+    schema_invalid_count = sum(1 for record in records if record.result_status == "schema_invalid")
     reviewed_count = sum(1 for record in records if record.feedback_status != "unreviewed")
     pending_review_count = sum(1 for record in records if record.feedback_status == "unreviewed")
     confirmed_correct_count = sum(1 for record in records if record.feedback_status == "correct")
@@ -55,9 +56,11 @@ def get_dashboard_summary(
         total_jobs=total_jobs,
         total_records=total_records,
         pending_review_count=pending_review_count,
+        schema_invalid_count=schema_invalid_count,
         success_rate=_safe_rate(completed_jobs, total_jobs),
         anomaly_rate=_safe_rate(anomaly_count, total_records),
         structured_success_rate=_safe_rate(structured_success_count, total_records),
+        schema_invalid_rate=_safe_rate(schema_invalid_count, total_records),
         reviewed_rate=_safe_rate(reviewed_count, total_records),
         confirmed_accuracy_rate=_safe_rate(confirmed_correct_count, reviewed_count),
     )
@@ -135,6 +138,7 @@ def get_dashboard_anomalies(
     *,
     strategy_id: str | None = None,
     model_provider: str | None = None,
+    anomaly_type: str | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
     limit: int = 10,
@@ -150,12 +154,17 @@ def get_dashboard_anomalies(
         )
         if record.result_status != "completed" or record.feedback_status == "incorrect"
     ]
+    if anomaly_type:
+        records = [record for record in records if _resolve_anomaly_type(record) == anomaly_type]
 
     return [
         AnomalyCase(
             record_id=record.id,
             strategy_name=record.strategy_name,
             summary=_build_anomaly_summary(record),
+            anomaly_type=_resolve_anomaly_type(record),
+            result_status=record.result_status,
+            feedback_status=record.feedback_status,
             created_at=_ensure_aware(record.created_at).isoformat() if record.created_at else "",
         )
         for record in records[:limit]
@@ -226,6 +235,16 @@ def _safe_rate(numerator: int, denominator: int) -> float:
     if denominator <= 0:
         return 0.0
     return round((numerator / denominator) * 100, 2)
+
+
+def _resolve_anomaly_type(record: TaskRecord) -> str:
+    if record.result_status == "schema_invalid":
+        return "schema_invalid"
+    if record.result_status != "completed":
+        return "task_failed"
+    if record.feedback_status == "incorrect":
+        return "feedback_incorrect"
+    return "unknown"
 
 
 def _ensure_aware(value: datetime) -> datetime:

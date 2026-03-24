@@ -12,6 +12,7 @@ import {
   Select,
   Space,
   Statistic,
+  Tag,
   Table,
   Typography,
 } from 'antd';
@@ -26,6 +27,28 @@ import {
 } from '@/shared/api/dashboard';
 
 const { Paragraph, Text, Title } = Typography;
+const resultStatusColorMap: Record<string, string> = {
+  completed: 'green',
+  failed: 'red',
+  schema_invalid: 'orange',
+};
+const feedbackStatusColorMap: Record<string, string> = {
+  unreviewed: 'default',
+  correct: 'green',
+  incorrect: 'red',
+};
+const anomalyTypeLabelMap: Record<string, string> = {
+  schema_invalid: '结构化异常',
+  task_failed: '执行失败',
+  feedback_incorrect: '人工判错',
+  unknown: '未知异常',
+};
+const anomalyTypeColorMap: Record<string, string> = {
+  schema_invalid: 'orange',
+  task_failed: 'red',
+  feedback_incorrect: 'volcano',
+  unknown: 'default',
+};
 
 const parseDateFilter = (value: string) => {
   if (!value) {
@@ -42,6 +65,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
+  const [anomalyTypeFilter, setAnomalyTypeFilter] = useState<string>('all');
   const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
   const [createdToFilter, setCreatedToFilter] = useState<string>('');
 
@@ -81,8 +105,12 @@ export function DashboardPage() {
   });
 
   const anomaliesQuery = useQuery({
-    queryKey: ['dashboard', 'anomalies', queryFilters],
-    queryFn: () => getDashboardAnomalies(queryFilters),
+    queryKey: ['dashboard', 'anomalies', queryFilters, anomalyTypeFilter],
+    queryFn: () =>
+      getDashboardAnomalies({
+        ...queryFilters,
+        anomalyType: anomalyTypeFilter === 'all' ? undefined : anomalyTypeFilter,
+      }),
     refetchInterval: 15000,
   });
 
@@ -143,6 +171,18 @@ export function DashboardPage() {
             onChange={(event) => setCreatedToFilter(event.target.value)}
             style={{ width: 200 }}
           />
+          <Select
+            size="small"
+            value={anomalyTypeFilter}
+            onChange={setAnomalyTypeFilter}
+            options={[
+              { label: '全部异常类型', value: 'all' },
+              { label: '结构化异常', value: 'schema_invalid' },
+              { label: '执行失败', value: 'task_failed' },
+              { label: '人工判错', value: 'feedback_incorrect' },
+            ]}
+            style={{ width: 160 }}
+          />
         </Space>
       </Card>
 
@@ -174,6 +214,11 @@ export function DashboardPage() {
           </Col>
           <Col xs={24} md={8} xl={4}>
             <Card loading={summaryQuery.isLoading}>
+              <Statistic title="结构化异常数" value={summary?.schema_invalid_count ?? 0} />
+            </Card>
+          </Col>
+          <Col xs={24} md={8} xl={4}>
+            <Card loading={summaryQuery.isLoading}>
               <Statistic title="已复核率" value={summary?.reviewed_rate ?? 0} suffix="%" />
             </Card>
           </Col>
@@ -199,6 +244,10 @@ export function DashboardPage() {
               <div>
                 <Text strong>异常案例占比</Text>
                 <Progress percent={summary?.anomaly_rate ?? 0} strokeColor="#fa541c" />
+              </div>
+              <div>
+                <Text strong>结构化异常率</Text>
+                <Progress percent={summary?.schema_invalid_rate ?? 0} strokeColor="#fa8c16" />
               </div>
               <div>
                 <Text strong>人工确认准确率</Text>
@@ -284,6 +333,12 @@ export function DashboardPage() {
                   width: 140,
                 },
                 {
+                  title: '记录 ID',
+                  dataIndex: 'record_id',
+                  width: 120,
+                  render: (value: string) => <Text code>{value.slice(0, 8)}</Text>,
+                },
+                {
                   title: '摘要',
                   dataIndex: 'summary',
                   render: (value: string) => (
@@ -291,19 +346,57 @@ export function DashboardPage() {
                   ),
                 },
                 {
+                  title: '异常类型',
+                  dataIndex: 'anomaly_type',
+                  width: 120,
+                  render: (value: string) => (
+                    <Tag color={anomalyTypeColorMap[value] ?? 'default'}>
+                      {anomalyTypeLabelMap[value] ?? value}
+                    </Tag>
+                  ),
+                },
+                {
+                  title: '结果状态',
+                  dataIndex: 'result_status',
+                  width: 120,
+                  render: (value: string) => (
+                    <Tag color={resultStatusColorMap[value] ?? 'default'}>{value}</Tag>
+                  ),
+                },
+                {
+                  title: '反馈状态',
+                  dataIndex: 'feedback_status',
+                  width: 120,
+                  render: (value: string) => (
+                    <Tag color={feedbackStatusColorMap[value] ?? 'default'}>{value}</Tag>
+                  ),
+                },
+                {
                   title: '操作',
-                  width: 100,
+                  width: 180,
                   render: (_, record) => (
-                    <Button
-                      type="link"
-                      size="small"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        navigate(`/records?recordId=${record.record_id}`);
-                      }}
-                    >
-                      查看详情
-                    </Button>
+                    <Space size={4}>
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/records?recordId=${record.record_id}`);
+                        }}
+                      >
+                        查看记录
+                      </Button>
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/feedback?recordId=${record.record_id}`);
+                        }}
+                      >
+                        去复核
+                      </Button>
+                    </Space>
                   ),
                 },
               ]}

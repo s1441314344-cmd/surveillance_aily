@@ -1,11 +1,13 @@
 import csv
-from datetime import datetime, timedelta
-from io import StringIO
+from datetime import datetime, timedelta, timezone
+from io import BytesIO, StringIO
 from pathlib import Path
+from zipfile import ZipFile
 
 from app.core.database import SessionLocal
 from app.models.job import Job
 from app.models.task_record import TaskRecord
+from app.services.providers.base import ProviderResponse
 from app.services.providers.factory import get_provider_adapter
 from app.workers.tasks import process_job
 
@@ -55,6 +57,8 @@ def test_upload_job_and_task_records_flow(client):
     assert all(record["job_id"] == job["id"] for record in records)
     assert all(record["strategy_name"] == "安全帽识别" for record in records)
     assert all(record["normalized_json"] is not None for record in records)
+    assert all(record["job_type"] == "upload_batch" for record in records)
+    assert all(record["schedule_id"] is None for record in records)
 
     first_record = records[0]
     get_record_response = client.get(f"/api/task-records/{first_record['id']}", headers=headers)
@@ -67,7 +71,35 @@ def test_upload_job_and_task_records_flow(client):
 
     export_response = client.get("/api/task-records/export", headers=headers)
     assert export_response.status_code == 200
-    assert "record_id,job_id,created_at" in export_response.text
+    assert (
+        "record_id,job_id,job_type,schedule_id,created_at,strategy_id,strategy_name,input_filename,source_type,"
+        "camera_id,input_image_path,model_provider,model_name,strategy_snapshot,normalized_json,raw_model_response,"
+        "result_status,feedback_status,duration_ms"
+    ) in export_response.text
+    export_rows = list(csv.DictReader(StringIO(export_response.text)))
+    assert len(export_rows) == 2
+    assert all(row["job_type"] == "upload_batch" for row in export_rows)
+    assert all(row["schedule_id"] == "" for row in export_rows)
+    assert all(row["camera_id"] == "" for row in export_rows)
+    assert all(row["strategy_snapshot"] for row in export_rows)
+    assert all(row["normalized_json"] for row in export_rows)
+    assert all(row["raw_model_response"] for row in export_rows)
+
+    export_xlsx_response = client.get("/api/task-records/export?format=xlsx", headers=headers)
+    assert export_xlsx_response.status_code == 200
+    assert (
+        export_xlsx_response.headers["content-type"]
+        == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert 'filename="task-records.xlsx"' in export_xlsx_response.headers["content-disposition"]
+    assert export_xlsx_response.content.startswith(b"PK")
+
+    with ZipFile(BytesIO(export_xlsx_response.content), "r") as workbook:
+        sheet_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        assert "record_id" in sheet_xml
+        assert "job_type" in sheet_xml
+        assert "raw_model_response" in sheet_xml
+        assert "helmet-1.jpg" in sheet_xml or "helmet-2.png" in sheet_xml
 
 
 def test_upload_job_rejects_unsupported_file_extension(client):
@@ -125,6 +157,15 @@ def test_upload_job_rejects_unsupported_content_type(client):
     )
     assert create_job_response.status_code == 400
     assert "Unsupported content type" in create_job_response.json()["detail"]
+
+
+def test_task_records_export_rejects_unsupported_format(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    export_response = client.get("/api/task-records/export?format=pdf", headers=headers)
+    assert export_response.status_code == 400
+    assert "Unsupported export format" in export_response.json()["detail"]
 
 
 def test_upload_job_rejects_empty_file(client):
@@ -193,10 +234,67 @@ def test_camera_once_job_creates_camera_record(client):
     assert record["camera_id"] == camera["id"]
     assert record["strategy_name"] == "火情识别"
     assert record["normalized_json"] is not None
+    assert record["job_type"] == "camera_once"
+    assert record["schedule_id"] is None
 
     image_response = client.get(f"/api/task-records/{record['id']}/image", headers=headers)
     assert image_response.status_code == 200
     assert image_response.content
+
+
+def test_camera_once_job_onvif_protocol_fails_with_clear_message(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "ONVIF Camera",
+            "location": "测试ONVIF点位",
+            "ip_address": "127.0.0.1",
+            "port": 80,
+            "protocol": "onvif",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/onvif-fallback",
+            "frame_frequency_seconds": 15,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/mock-onvif",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+    assert camera["protocol"] == "onvif"
+
+    create_job_response = client.post(
+        "/api/jobs/cameras/once",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+        },
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "failed"
+
+    job_detail_response = client.get(f"/api/jobs/{job['id']}", headers=headers)
+    assert job_detail_response.status_code == 200
+    failed_job = job_detail_response.json()
+    assert failed_job["status"] == "failed"
+    assert "only RTSP is supported" in (failed_job["error_message"] or "")
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["result_status"] == "failed"
+    assert "only RTSP is supported" in records[0]["raw_model_response"]
 
 
 def test_cancelled_queued_job_will_not_be_processed(client):
@@ -223,6 +321,96 @@ def test_cancelled_queued_job_will_not_be_processed(client):
     records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
     assert records_response.status_code == 200
     assert records_response.json() == []
+
+
+def test_upload_job_invalid_json_response_is_marked_as_schema_invalid(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-invalid-json.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    class InvalidJsonAdapter:
+        def analyze(self, _request):
+            return ProviderResponse(
+                success=False,
+                raw_response="not-json",
+                normalized_json=None,
+                error_message="Zhipu did not return valid JSON content",
+            )
+
+    monkeypatch.setattr(
+        "app.services.job_execution_service.get_provider_adapter",
+        lambda _provider: InvalidJsonAdapter(),
+    )
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "failed"
+
+    job_response = client.get(f"/api/jobs/{job['id']}", headers=headers)
+    assert job_response.status_code == 200
+    processed_job = job_response.json()
+    assert processed_job["status"] == "failed"
+    assert "valid JSON content" in (processed_job["error_message"] or "")
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["result_status"] == "schema_invalid"
+    assert records[0]["raw_model_response"] == "not-json"
+
+
+def test_upload_job_schema_mismatch_is_marked_as_schema_invalid(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet-schema-mismatch.jpg", b"fake-jpg-content", "image/jpeg"))],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["status"] == "queued"
+
+    class SchemaMismatchAdapter:
+        def analyze(self, _request):
+            return ProviderResponse(
+                success=True,
+                raw_response='{"summary":"only-summary"}',
+                normalized_json={"summary": "only-summary"},
+                error_message=None,
+            )
+
+    monkeypatch.setattr(
+        "app.services.job_execution_service.get_provider_adapter",
+        lambda _provider: SchemaMismatchAdapter(),
+    )
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "failed"
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["result_status"] == "schema_invalid"
+    assert records[0]["normalized_json"] == {"summary": "only-summary"}
+
+    job_response = client.get(f"/api/jobs/{job['id']}", headers=headers)
+    assert job_response.status_code == 200
+    processed_job = job_response.json()
+    assert processed_job["status"] == "failed"
+    assert "schema validation" in (processed_job["error_message"] or "")
 
 
 def test_running_job_collaborative_cancel_stops_following_records(client, monkeypatch):
@@ -361,6 +549,129 @@ def test_retry_non_retryable_job_returns_conflict(client):
     assert "not retryable" in retry_response.json()["detail"]
 
 
+def test_camera_schedule_task_record_contains_job_runtime_fields(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Schedule Runtime Camera",
+            "location": "计划来源字段测试位",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/schedule-runtime",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/schedule-runtime",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "10",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+
+    run_now_response = client.post(
+        f"/api/job-schedules/{schedule['id']}/run-now",
+        headers=headers,
+    )
+    assert run_now_response.status_code == 200
+    job = run_now_response.json()
+    assert job["job_type"] == "camera_schedule"
+    assert job["schedule_id"] == schedule["id"]
+
+    assert process_job(job["id"])["status"] == "completed"
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["job_type"] == "camera_schedule"
+    assert records[0]["schedule_id"] == schedule["id"]
+
+    filtered_records_response = client.get(
+        "/api/task-records",
+        headers=headers,
+        params={
+            "job_type": "camera_schedule",
+            "schedule_id": schedule["id"],
+        },
+    )
+    assert filtered_records_response.status_code == 200
+    filtered_records = filtered_records_response.json()
+    assert len(filtered_records) == 1
+    assert filtered_records[0]["id"] == records[0]["id"]
+
+
+def test_jobs_filter_by_created_time_range(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    first_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("jobs-time-filter-1.jpg", b"fake-jpg-content-1", "image/jpeg"))],
+    )
+    assert first_job_response.status_code == 200
+    first_job = first_job_response.json()
+
+    second_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("jobs-time-filter-2.jpg", b"fake-jpg-content-2", "image/jpeg"))],
+    )
+    assert second_job_response.status_code == 200
+    second_job = second_job_response.json()
+
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        first_job_model = db.get(Job, first_job["id"])
+        second_job_model = db.get(Job, second_job["id"])
+        assert first_job_model is not None
+        assert second_job_model is not None
+        first_job_model.created_at = (now - timedelta(days=2)).replace(tzinfo=None)
+        second_job_model.created_at = now.replace(tzinfo=None)
+        db.commit()
+
+    recent_jobs_response = client.get(
+        "/api/jobs",
+        headers=headers,
+        params={"created_from": (now - timedelta(hours=1)).isoformat()},
+    )
+    assert recent_jobs_response.status_code == 200
+    recent_ids = {item["id"] for item in recent_jobs_response.json()}
+    assert second_job["id"] in recent_ids
+    assert first_job["id"] not in recent_ids
+
+    old_jobs_response = client.get(
+        "/api/jobs",
+        headers=headers,
+        params={"created_to": (now - timedelta(days=1)).isoformat()},
+    )
+    assert old_jobs_response.status_code == 200
+    old_ids = {item["id"] for item in old_jobs_response.json()}
+    assert first_job["id"] in old_ids
+    assert second_job["id"] not in old_ids
+
+
 def test_task_records_filter_by_camera_and_time_range(client):
     login_data = login_as_admin(client)
     headers = auth_headers(login_data["access_token"])
@@ -461,6 +772,23 @@ def test_task_records_filter_by_camera_and_time_range(client):
     export_rows = list(csv.DictReader(StringIO(export_in_range_response.text)))
     assert len(export_rows) == 1
     assert export_rows[0]["record_id"] == camera_records[0]["id"]
+    assert export_rows[0]["camera_id"] == camera["id"]
+    assert export_rows[0]["job_type"] == "camera_once"
+    assert export_rows[0]["source_type"] == "camera"
+    assert export_rows[0]["input_image_path"]
+
+    export_by_job_type_response = client.get(
+        "/api/task-records/export",
+        headers=headers,
+        params={
+            "camera_id": camera["id"],
+            "job_type": "camera_once",
+        },
+    )
+    assert export_by_job_type_response.status_code == 200
+    export_rows_by_job_type = list(csv.DictReader(StringIO(export_by_job_type_response.text)))
+    assert len(export_rows_by_job_type) == 1
+    assert export_rows_by_job_type[0]["record_id"] == camera_records[0]["id"]
 
     export_out_of_range_response = client.get(
         "/api/task-records/export",
