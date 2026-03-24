@@ -64,6 +64,7 @@ make v2-camera-validate
 make v2-release-drill
 make v2-uat
 make v2-release-checklist
+make v2-release-gate
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
@@ -95,6 +96,8 @@ make v2-release-checklist
 `make v2-uat` 会串行执行 `backend pytest + frontend lint/build + e2e`，并输出一份 JSON 验收摘要；可选追加 release drill。
 
 `make v2-release-checklist` 会读取最近一次 UAT 与 release drill 产物，生成最终发布清单（JSON/Markdown）。
+
+`make v2-release-gate` 会一键串行执行 UAT（可选）+ 发布清单生成，并输出最终放行结论（`ready_to_release`）和阻塞项摘要。
 
 ## 异步执行说明
 
@@ -300,6 +303,31 @@ make v2-release-checklist
 
 - `release-checklist.json`
 - `release-checklist.md`
+
+## 一键发布闸门
+
+默认执行（自动跑 UAT，再生成发布清单并给出最终闸门结论）：
+
+```bash
+make v2-release-gate
+```
+
+复用已有 UAT / release drill 产物进行快速判定：
+
+```bash
+./scripts/v2/release-gate.sh \
+  --skip-uat \
+  --uat-summary ./data/uat-logs/<timestamp>/summary.json \
+  --release-drill-report ./data/release-drill-logs/<timestamp>/release-drill-report.json
+```
+
+输出目录默认在 `data/release-gates/<timestamp>/`，包含：
+
+- `uat.log`（如果执行了 UAT）
+- `release-checklist.log`
+- `checklist/release-checklist.json`
+- `checklist/release-checklist.md`
+- `gate-summary.json`
 
 ## 当前包含
 

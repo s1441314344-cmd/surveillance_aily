@@ -23,6 +23,7 @@ Smart Inspection V2 local commands:
   make v2-release-drill # run cutover drill (preflight + backfill + rollback-ready report)
   make v2-uat          # run UAT baseline and export a verification summary
   make v2-release-checklist # build final release checklist from UAT + release drill artifacts
+  make v2-release-gate # run one-command release gate (UAT + checklist + final verdict)
   make v2-deps-down    # stop postgres + redis
 
 Recommended flow:
@@ -64,4 +65,8 @@ UAT examples:
 Release checklist examples:
   make v2-release-checklist
   ./scripts/v2/release-checklist.sh --allow-without-release-drill
+
+Release gate examples:
+  make v2-release-gate
+  ./scripts/v2/release-gate.sh --skip-uat --uat-summary /path/to/summary.json --release-drill-report /path/to/release-drill-report.json
 EOF
