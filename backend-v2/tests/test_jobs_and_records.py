@@ -56,6 +56,8 @@ def test_upload_job_and_task_records_flow(client):
     assert all(record["job_id"] == job["id"] for record in records)
     assert all(record["strategy_name"] == "安全帽识别" for record in records)
     assert all(record["normalized_json"] is not None for record in records)
+    assert all(record["job_type"] == "upload_batch" for record in records)
+    assert all(record["schedule_id"] is None for record in records)
 
     first_record = records[0]
     get_record_response = client.get(f"/api/task-records/{first_record['id']}", headers=headers)
@@ -217,6 +219,8 @@ def test_camera_once_job_creates_camera_record(client):
     assert record["camera_id"] == camera["id"]
     assert record["strategy_name"] == "火情识别"
     assert record["normalized_json"] is not None
+    assert record["job_type"] == "camera_once"
+    assert record["schedule_id"] is None
 
     image_response = client.get(f"/api/task-records/{record['id']}/image", headers=headers)
     assert image_response.status_code == 200
@@ -438,6 +442,63 @@ def test_retry_non_retryable_job_returns_conflict(client):
     retry_response = client.post(f"/api/jobs/{queued_job['id']}/retry", headers=headers)
     assert retry_response.status_code == 409
     assert "not retryable" in retry_response.json()["detail"]
+
+
+def test_camera_schedule_task_record_contains_job_runtime_fields(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Schedule Runtime Camera",
+            "location": "计划来源字段测试位",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/schedule-runtime",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/schedule-runtime",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "10",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+
+    run_now_response = client.post(
+        f"/api/job-schedules/{schedule['id']}/run-now",
+        headers=headers,
+    )
+    assert run_now_response.status_code == 200
+    job = run_now_response.json()
+    assert job["job_type"] == "camera_schedule"
+    assert job["schedule_id"] == schedule["id"]
+
+    assert process_job(job["id"])["status"] == "completed"
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["job_type"] == "camera_schedule"
+    assert records[0]["schedule_id"] == schedule["id"]
 
 
 def test_task_records_filter_by_camera_and_time_range(client):

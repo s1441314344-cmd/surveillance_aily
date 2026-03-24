@@ -11,6 +11,7 @@ from xml.sax.saxutils import escape
 
 from app.core.config import get_settings
 from app.core.database import database_url
+from app.models.job import Job
 from app.models.task_record import TaskRecord
 from app.schemas.task_record import TaskRecordRead
 
@@ -31,7 +32,12 @@ EXPORT_HEADERS = [
 ]
 
 
-def serialize_task_record(record: TaskRecord) -> TaskRecordRead:
+def serialize_task_record(
+    record: TaskRecord,
+    *,
+    job_type: str | None = None,
+    schedule_id: str | None = None,
+) -> TaskRecordRead:
     created_at = None
     if record.created_at:
         created_at = (
@@ -52,6 +58,8 @@ def serialize_task_record(record: TaskRecord) -> TaskRecordRead:
         preview_image_path=record.preview_image_path,
         source_type=record.source_type,
         camera_id=record.camera_id,
+        job_type=job_type,
+        schedule_id=schedule_id,
         model_provider=record.model_provider,
         model_name=record.model_name,
         raw_model_response=record.raw_model_response,
@@ -92,7 +100,19 @@ def list_task_records(
         stmt = stmt.where(TaskRecord.created_at >= _ensure_aware(created_from))
     if created_to:
         stmt = stmt.where(TaskRecord.created_at <= _ensure_aware(created_to))
-    return [serialize_task_record(record) for record in db.scalars(stmt)]
+    records = list(db.scalars(stmt))
+    runtime_map = _build_job_runtime_map(
+        db,
+        {record.job_id for record in records},
+    )
+    return [
+        serialize_task_record(
+            record,
+            job_type=runtime_map.get(record.job_id, {}).get("job_type"),
+            schedule_id=runtime_map.get(record.job_id, {}).get("schedule_id"),
+        )
+        for record in records
+    ]
 
 
 def get_task_record_or_404(db: Session, record_id: str) -> TaskRecord:
@@ -100,6 +120,15 @@ def get_task_record_or_404(db: Session, record_id: str) -> TaskRecord:
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task record not found")
     return record
+
+
+def get_task_record_read(db: Session, record: TaskRecord) -> TaskRecordRead:
+    runtime = _build_job_runtime_map(db, {record.job_id}).get(record.job_id, {})
+    return serialize_task_record(
+        record,
+        job_type=runtime.get("job_type"),
+        schedule_id=runtime.get("schedule_id"),
+    )
 
 
 def export_task_records_csv(records: list[TaskRecordRead]) -> str:
@@ -257,3 +286,16 @@ def _xlsx_cell(value: str | int) -> str:
         return f"<c><v>{value}</v></c>"
     safe_text = escape(str(value)).replace("\r\n", "\n").replace("\r", "\n")
     return f'<c t="inlineStr"><is><t xml:space="preserve">{safe_text}</t></is></c>'
+
+
+def _build_job_runtime_map(db: Session, job_ids: set[str]) -> dict[str, dict[str, str | None]]:
+    if not job_ids:
+        return {}
+    stmt = select(Job.id, Job.job_type, Job.schedule_id).where(Job.id.in_(job_ids))
+    return {
+        job_id: {
+            "job_type": job_type,
+            "schedule_id": schedule_id,
+        }
+        for job_id, job_type, schedule_id in db.execute(stmt)
+    }

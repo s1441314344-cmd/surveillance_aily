@@ -34,6 +34,13 @@ const statusColorMap: Record<string, string> = {
   schema_invalid: 'orange',
 };
 
+const jobTypeColorMap: Record<string, string> = {
+  upload_single: 'blue',
+  upload_batch: 'cyan',
+  camera_once: 'purple',
+  camera_schedule: 'geekblue',
+};
+
 const parseDateFilter = (value: string) => {
   if (!value) {
     return undefined;
@@ -286,6 +293,17 @@ export function RecordsPage() {
                 dataIndex: 'input_filename',
               },
               {
+                title: '执行来源',
+                render: (_, record) => (
+                  <Space size={6}>
+                    <Tag color={jobTypeColorMap[record.job_type || ''] ?? 'default'}>
+                      {record.job_type || 'unknown'}
+                    </Tag>
+                    {record.schedule_id ? <Text type="secondary">计划 {record.schedule_id.slice(0, 8)}</Text> : null}
+                  </Space>
+                ),
+              },
+              {
                 title: '模型',
                 render: (_, record) => `${record.model_provider} / ${record.model_name}`,
               },
@@ -339,6 +357,8 @@ export function RecordsPage() {
                   <Space orientation="vertical" size={8} style={{ width: '100%' }}>
                     <Text>记录 ID：{detail.id}</Text>
                     <Text>任务 ID：{detail.job_id}</Text>
+                    <Text>任务类型：{detail.job_type || 'unknown'}</Text>
+                    <Text>计划 ID：{detail.schedule_id || '无'}</Text>
                     <Text>策略：{detail.strategy_name}</Text>
                     <Text>文件：{detail.input_filename}</Text>
                     <Text>模型：{detail.model_provider} / {detail.model_name}</Text>

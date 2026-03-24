@@ -37,6 +37,8 @@ export type JobSchedule = {
 export type TaskRecord = {
   id: string;
   job_id: string;
+  job_type: string | null;
+  schedule_id: string | null;
   strategy_id: string;
   strategy_name: string;
   strategy_snapshot: Record<string, unknown>;

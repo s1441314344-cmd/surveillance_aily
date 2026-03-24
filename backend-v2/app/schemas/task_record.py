@@ -15,6 +15,8 @@ class TaskRecordRead(BaseModel):
     preview_image_path: str | None = None
     source_type: str
     camera_id: str | None = None
+    job_type: str | None = None
+    schedule_id: str | None = None
     model_provider: str
     model_name: str
     raw_model_response: str

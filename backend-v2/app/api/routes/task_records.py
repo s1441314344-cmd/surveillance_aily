@@ -12,9 +12,9 @@ from app.services.task_record_service import (
     export_task_records_csv,
     export_task_records_xlsx,
     get_record_image_path,
+    get_task_record_read,
     get_task_record_or_404,
     list_task_records as list_task_record_rows,
-    serialize_task_record,
 )
 
 router = APIRouter()
@@ -111,4 +111,4 @@ def get_task_record(
     _: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return serialize_task_record(get_task_record_or_404(db, record_id))
+    return get_task_record_read(db, get_task_record_or_404(db, record_id))
