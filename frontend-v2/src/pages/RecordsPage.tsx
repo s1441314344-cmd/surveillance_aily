@@ -58,6 +58,7 @@ export function RecordsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
+  const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
   const [feedbackFilter, setFeedbackFilter] = useState<string>('all');
@@ -85,6 +86,7 @@ export function RecordsPage() {
       'task-records',
       statusFilter,
       strategyFilter,
+      jobTypeFilter,
       cameraFilter,
       modelProviderFilter,
       feedbackFilter,
@@ -95,6 +97,7 @@ export function RecordsPage() {
       listTaskRecords({
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
+        jobType: jobTypeFilter === 'all' ? undefined : jobTypeFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
         feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
@@ -147,6 +150,7 @@ export function RecordsPage() {
         format,
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
+        jobType: jobTypeFilter === 'all' ? undefined : jobTypeFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         modelProvider: modelProviderFilter === 'all' ? undefined : modelProviderFilter,
         feedbackStatus: feedbackFilter === 'all' ? undefined : feedbackFilter,
@@ -207,6 +211,19 @@ export function RecordsPage() {
                 })),
               ]}
               style={{ width: 150 }}
+            />
+            <Select
+              size="small"
+              value={jobTypeFilter}
+              onChange={setJobTypeFilter}
+              options={[
+                { label: '全部任务类型', value: 'all' },
+                { label: '上传单张', value: 'upload_single' },
+                { label: '上传批量', value: 'upload_batch' },
+                { label: '摄像头单次', value: 'camera_once' },
+                { label: '摄像头定时', value: 'camera_schedule' },
+              ]}
+              style={{ width: 140 }}
             />
             <Select
               size="small"

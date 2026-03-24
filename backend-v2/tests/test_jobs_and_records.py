@@ -597,6 +597,19 @@ def test_camera_schedule_task_record_contains_job_runtime_fields(client):
     assert records[0]["job_type"] == "camera_schedule"
     assert records[0]["schedule_id"] == schedule["id"]
 
+    filtered_records_response = client.get(
+        "/api/task-records",
+        headers=headers,
+        params={
+            "job_type": "camera_schedule",
+            "schedule_id": schedule["id"],
+        },
+    )
+    assert filtered_records_response.status_code == 200
+    filtered_records = filtered_records_response.json()
+    assert len(filtered_records) == 1
+    assert filtered_records[0]["id"] == records[0]["id"]
+
 
 def test_task_records_filter_by_camera_and_time_range(client):
     login_data = login_as_admin(client)
@@ -700,6 +713,19 @@ def test_task_records_filter_by_camera_and_time_range(client):
     assert export_rows[0]["record_id"] == camera_records[0]["id"]
     assert export_rows[0]["camera_id"] == camera["id"]
     assert export_rows[0]["job_type"] == "camera_once"
+
+    export_by_job_type_response = client.get(
+        "/api/task-records/export",
+        headers=headers,
+        params={
+            "camera_id": camera["id"],
+            "job_type": "camera_once",
+        },
+    )
+    assert export_by_job_type_response.status_code == 200
+    export_rows_by_job_type = list(csv.DictReader(StringIO(export_by_job_type_response.text)))
+    assert len(export_rows_by_job_type) == 1
+    assert export_rows_by_job_type[0]["record_id"] == camera_records[0]["id"]
 
     export_out_of_range_response = client.get(
         "/api/task-records/export",

@@ -202,6 +202,8 @@ export async function listTaskRecords(params?: {
   status?: string;
   strategyId?: string;
   jobId?: string;
+  jobType?: string;
+  scheduleId?: string;
   cameraId?: string;
   modelProvider?: string;
   feedbackStatus?: string;
@@ -213,6 +215,8 @@ export async function listTaskRecords(params?: {
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
+      job_type: params?.jobType || undefined,
+      schedule_id: params?.scheduleId || undefined,
       camera_id: params?.cameraId || undefined,
       model_provider: params?.modelProvider || undefined,
       feedback_status: params?.feedbackStatus || undefined,
@@ -239,6 +243,8 @@ export async function exportTaskRecords(params?: {
   status?: string;
   strategyId?: string;
   jobId?: string;
+  jobType?: string;
+  scheduleId?: string;
   cameraId?: string;
   modelProvider?: string;
   feedbackStatus?: string;
@@ -252,6 +258,8 @@ export async function exportTaskRecords(params?: {
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,
+      job_type: params?.jobType || undefined,
+      schedule_id: params?.scheduleId || undefined,
       camera_id: params?.cameraId || undefined,
       model_provider: params?.modelProvider || undefined,
       feedback_status: params?.feedbackStatus || undefined,

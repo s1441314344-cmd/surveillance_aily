@@ -80,19 +80,28 @@ def list_task_records(
     result_status: str | None = None,
     strategy_id: str | None = None,
     job_id: str | None = None,
+    job_type: str | None = None,
+    schedule_id: str | None = None,
     camera_id: str | None = None,
     model_provider: str | None = None,
     feedback_status: str | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
 ) -> list[TaskRecordRead]:
-    stmt = select(TaskRecord).order_by(TaskRecord.created_at.desc(), TaskRecord.id.desc())
+    requires_job_join = bool(job_type or schedule_id)
+    stmt = select(TaskRecord)
+    if requires_job_join:
+        stmt = stmt.join(Job, Job.id == TaskRecord.job_id)
     if result_status:
         stmt = stmt.where(TaskRecord.result_status == result_status)
     if strategy_id:
         stmt = stmt.where(TaskRecord.strategy_id == strategy_id)
     if job_id:
         stmt = stmt.where(TaskRecord.job_id == job_id)
+    if job_type:
+        stmt = stmt.where(Job.job_type == job_type)
+    if schedule_id:
+        stmt = stmt.where(Job.schedule_id == schedule_id)
     if camera_id:
         stmt = stmt.where(TaskRecord.camera_id == camera_id)
     if model_provider:
@@ -103,6 +112,7 @@ def list_task_records(
         stmt = stmt.where(TaskRecord.created_at >= _ensure_aware(created_from))
     if created_to:
         stmt = stmt.where(TaskRecord.created_at <= _ensure_aware(created_to))
+    stmt = stmt.order_by(TaskRecord.created_at.desc(), TaskRecord.id.desc())
     records = list(db.scalars(stmt))
     runtime_map = _build_job_runtime_map(
         db,
