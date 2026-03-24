@@ -286,6 +286,7 @@ export function CamerasPage() {
                   size="small"
                   loading={sweepMutation.isPending}
                   disabled={!cameras.length}
+                  data-testid="cameras-bulk-check-btn"
                   onClick={() => sweepMutation.mutate(cameras.map((item) => item.id))}
                 >
                   全量巡检
