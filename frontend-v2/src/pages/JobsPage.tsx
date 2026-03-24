@@ -164,6 +164,15 @@ export function JobsPage() {
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
   const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
+  const selectedCameraIdInForm = Form.useWatch('cameraId', form) ?? undefined;
+  const selectedCameraInForm = useMemo(
+    () => cameras.find((item) => item.id === selectedCameraIdInForm) ?? null,
+    [cameras, selectedCameraIdInForm],
+  );
+  const hasUnsupportedCameraProtocol =
+    taskMode !== 'upload' &&
+    Boolean(selectedCameraInForm) &&
+    (selectedCameraInForm?.protocol || '').toLowerCase() !== 'rtsp';
   const scheduleFilterOptions = useMemo(
     () => [
       { label: '全部计划', value: 'all' },
@@ -319,6 +328,10 @@ export function JobsPage() {
         message.warning('请先选择摄像头');
         return;
       }
+      if ((selectedCameraInForm?.protocol || '').toLowerCase() !== 'rtsp') {
+        message.warning('当前 V1 任务链路仅支持 RTSP 摄像头，ONVIF 为后续扩展能力');
+        return;
+      }
 
       const scheduleValue =
         values.scheduleType === 'daily_time'
@@ -342,6 +355,10 @@ export function JobsPage() {
     if (values.taskMode === 'camera_once') {
       if (!values.cameraId) {
         message.warning('请先选择摄像头');
+        return;
+      }
+      if ((selectedCameraInForm?.protocol || '').toLowerCase() !== 'rtsp') {
+        message.warning('当前 V1 任务链路仅支持 RTSP 摄像头，ONVIF 为后续扩展能力');
         return;
       }
 
@@ -521,11 +538,21 @@ export function JobsPage() {
                     placeholder="请选择一个可用摄像头"
                     loading={camerasQuery.isLoading}
                     options={cameras.map((item) => ({
-                      label: `${item.name} (${item.location || item.rtsp_url || '未配置位置'})`,
+                      label: `${item.name} [${item.protocol.toUpperCase()}] (${item.location || item.rtsp_url || '未配置位置'})`,
                       value: item.id,
                     }))}
                   />
                 </Form.Item>
+              ) : null}
+
+              {taskMode !== 'upload' && hasUnsupportedCameraProtocol ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message="当前摄像头协议暂不支持"
+                  description="V1 正式任务链路仅支持 RTSP 摄像头，ONVIF 计划在后续版本扩展。"
+                />
               ) : null}
 
               {taskMode === 'camera_schedule' ? (
@@ -563,6 +590,7 @@ export function JobsPage() {
                 <Button
                   type="primary"
                   htmlType="submit"
+                  disabled={hasUnsupportedCameraProtocol}
                   loading={
                     uploadMutation.isPending || cameraOnceMutation.isPending || scheduleMutation.isPending
                   }
