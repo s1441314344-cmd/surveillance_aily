@@ -284,6 +284,12 @@ export function DashboardPage() {
                   width: 140,
                 },
                 {
+                  title: '记录 ID',
+                  dataIndex: 'record_id',
+                  width: 120,
+                  render: (value: string) => <Text code>{value.slice(0, 8)}</Text>,
+                },
+                {
                   title: '摘要',
                   dataIndex: 'summary',
                   render: (value: string) => (
@@ -292,18 +298,30 @@ export function DashboardPage() {
                 },
                 {
                   title: '操作',
-                  width: 100,
+                  width: 180,
                   render: (_, record) => (
-                    <Button
-                      type="link"
-                      size="small"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        navigate(`/records?recordId=${record.record_id}`);
-                      }}
-                    >
-                      查看详情
-                    </Button>
+                    <Space size={4}>
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/records?recordId=${record.record_id}`);
+                        }}
+                      >
+                        查看记录
+                      </Button>
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/feedback?recordId=${record.record_id}`);
+                        }}
+                      >
+                        去复核
+                      </Button>
+                    </Space>
                   ),
                 },
               ]}

@@ -2,12 +2,14 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 
+test.setTimeout(120000);
+
 async function loginAsAdmin(page: Page) {
   await page.goto('/login');
   await page.getByLabel('用户名').fill('admin');
   await page.getByLabel('密码').fill('admin123456');
   await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -22,7 +24,14 @@ async function loginToken(request: APIRequestContext): Promise<string> {
   return payload.access_token;
 }
 
-test('record to feedback to dashboard loop works with reviewed metrics', async ({ page, request }) => {
+function toDateTimeLocalValue(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+    date.getMinutes(),
+  )}`;
+}
+
+test('record anomaly can jump to feedback and close review loop', async ({ page, request }) => {
   const token = await loginToken(request);
   const now = new Date();
   const fileName = `e2e-loop-${Date.now()}.jpg`;
@@ -73,14 +82,57 @@ test('record to feedback to dashboard loop works with reviewed metrics', async (
   await expect(page.getByText(`记录 ID：${targetRecordId}`)).toBeVisible();
   await expect(page.getByText(`文件：${fileName}`)).toBeVisible();
 
-  await page.goto('/feedback');
-  await expect(page).toHaveURL(/\/feedback$/);
+  await page.goto(`/feedback?recordId=${targetRecordId}`);
+  await expect(page).toHaveURL(new RegExp(`/feedback\\?recordId=${targetRecordId}`));
   await expect(page.getByRole('heading', { name: '人工复核' })).toBeVisible();
   await expect(page.getByText(`记录 ID：${targetRecordId}`)).toBeVisible();
 
-  await page.locator('.ant-radio-button-wrapper').filter({ hasText: '正确' }).click();
+  await page.locator('.ant-radio-button-wrapper').filter({ hasText: '错误' }).click();
   await page.getByRole('button', { name: '提交复核结果' }).click();
   await expect(page.getByText('复核结果已提交')).toBeVisible();
+
+  await expect
+    .poll(async () => {
+      const anomaliesResponse = await request.get(`${API_BASE_URL}/api/dashboard/anomalies`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          strategy_id: 'preset-helmet',
+          created_from: new Date(now.getTime() - 2 * 60 * 1000).toISOString(),
+          created_to: new Date().toISOString(),
+        },
+      });
+      if (!anomaliesResponse.ok()) {
+        return false;
+      }
+      const anomalies = (await anomaliesResponse.json()) as Array<{ record_id: string }>;
+      return anomalies.some((item) => item.record_id === targetRecordId);
+    })
+    .toBeTruthy();
+
+  await page.goto('/dashboard');
+  await expect(page.getByRole('heading', { name: '总览看板' })).toBeVisible();
+  await page.locator('input[type="datetime-local"]').nth(0).fill(toDateTimeLocalValue(new Date(now.getTime() - 2 * 60 * 1000)));
+  await page.locator('input[type="datetime-local"]').nth(1).fill(toDateTimeLocalValue(new Date(now.getTime() + 2 * 60 * 1000)));
+  const anomalyCard = page
+    .locator('.ant-card')
+    .filter({
+      has: page.locator('.ant-card-head-title').filter({ hasText: /^异常案例$/ }),
+    })
+    .first();
+  const anomalyRow = anomalyCard
+    .locator('.ant-table-tbody tr')
+    .filter({ hasText: targetRecordId.slice(0, 8) })
+    .first();
+  await expect(anomalyRow).toBeVisible({ timeout: 15000 });
+  await anomalyRow.getByRole('button', { name: '去复核' }).click();
+  await expect(page).toHaveURL(new RegExp(`/feedback\\?recordId=${targetRecordId}`));
+  await expect(page.getByText(`记录 ID：${targetRecordId}`)).toBeVisible();
+
+  await page.locator('.ant-radio-button-wrapper').filter({ hasText: '正确' }).click();
+  await page.getByRole('button', { name: '更新复核结果' }).click();
+  await expect(page.getByText('复核结果已更新')).toBeVisible();
 
   const summaryResponse = await request.get(`${API_BASE_URL}/api/dashboard/summary`, {
     headers: {

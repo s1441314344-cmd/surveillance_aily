@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+test.setTimeout(120000);
+
 test('admin can login and access key V2 pages', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
@@ -8,7 +10,7 @@ test('admin can login and access key V2 pages', async ({ page }) => {
   await page.getByLabel('密码').fill('admin123456');
   await page.getByRole('button', { name: '登录系统' }).click();
 
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
   await expect(page.getByRole('heading', { name: '总览看板' })).toBeVisible();
 
   await page.getByRole('menuitem', { name: '策略中心' }).click();

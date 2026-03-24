@@ -15,7 +15,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import { listCameras, listModelProviders, listStrategies } from '@/shared/api/configCenter';
 import {
@@ -47,6 +47,7 @@ const parseDateFilter = (value: string) => {
 
 export function RecordsPage() {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
@@ -308,6 +309,13 @@ export function RecordsPage() {
         open={Boolean(selectedRecordId)}
         size="large"
         title="记录详情"
+        extra={
+          detail ? (
+            <Button size="small" onClick={() => navigate(`/feedback?recordId=${detail.id}`)}>
+              去人工复核
+            </Button>
+          ) : null
+        }
         onClose={handleCloseDetail}
       >
         {detail ? (

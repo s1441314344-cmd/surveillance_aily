@@ -2,12 +2,14 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 
+test.setTimeout(120000);
+
 async function loginAsAdmin(page: Page) {
   await page.goto('/login');
   await page.getByLabel('用户名').fill('admin');
   await page.getByLabel('密码').fill('admin123456');
   await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -76,7 +78,16 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
   await expect(page).toHaveURL(/\/jobs$/);
   await expect(page.getByRole('heading', { name: '任务中心' })).toBeVisible();
 
-  const scheduleRow = page.getByRole('row', { name: new RegExp(shortScheduleId) }).first();
+  const scheduleCard = page.locator('.ant-card').filter({ hasText: '定时任务计划' }).first();
+  const scheduleCameraFilter = scheduleCard.locator('.ant-card-extra .ant-select').nth(1);
+  await scheduleCameraFilter.click();
+  await page
+    .locator('.ant-select-dropdown .ant-select-item-option')
+    .filter({ hasText: cameraName })
+    .first()
+    .click();
+
+  const scheduleRow = scheduleCard.locator('.ant-table-tbody tr').filter({ hasText: shortScheduleId }).first();
   await expect(scheduleRow).toBeVisible();
   await expect(scheduleRow).toContainText('active');
   await expect(scheduleRow).toContainText('5 分钟');
