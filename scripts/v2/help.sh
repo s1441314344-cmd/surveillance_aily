@@ -20,6 +20,7 @@ Smart Inspection V2 local commands:
   make v2-eval         # run model evaluation dataset against provider adapters
   make v2-camera-check # run deep RTSP/mock camera diagnostic
   make v2-camera-validate # validate a whitelist manifest and export reports
+  make v2-release-drill # run cutover drill (preflight + backfill + rollback-ready report)
   make v2-deps-down    # stop postgres + redis
 
 Recommended flow:
@@ -47,4 +48,9 @@ Camera diagnostic examples:
 Camera whitelist examples:
   ./scripts/v2/camera-validate.sh --manifest ./backend-v2/examples/camera_whitelist_manifest.example.json
   ./scripts/v2/camera-validate.sh --manifest ./backend-v2/examples/camera_whitelist_manifest.example.json --markdown-output /tmp/camera-whitelist.md
+
+Release drill examples:
+  make v2-release-drill
+  ./scripts/v2/release-drill.sh --with-e2e
+  ./scripts/v2/release-drill.sh --apply-backfill
 EOF
