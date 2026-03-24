@@ -52,6 +52,8 @@ make v2-api
 make v2-worker
 make v2-scheduler
 make v2-frontend
+make v2-backend-test
+make v2-frontend-test
 make v2-smoke
 make v2-e2e
 make v2-perf
@@ -73,6 +75,8 @@ make v2-release-gate
 
 `make v2-smoke` 会对运行中的栈执行一次“上传异步链路 + 失败任务重试链路 + 定时调度链路”的冒烟验收。
 
+`make v2-backend-test` 会执行后端 `pytest` 全量用例；`make v2-frontend-test` 会执行前端 `vitest` 单元测试。
+
 `make v2-e2e` 会执行 Playwright 基线回归（登录 + 核心页面导航）。
 
 `make v2-perf` 会执行上传任务并发探测并输出创建时延、任务完成率和吞吐摘要。
@@ -93,7 +97,7 @@ make v2-release-gate
 
 `make v2-release-drill` 会串行执行 `preflight + backfill + 演练报告生成`，输出一份可用于上线评审的 JSON / Markdown 报告，并包含标准回滚步骤提示。
 
-`make v2-uat` 会串行执行 `backend pytest + frontend lint/build + e2e`，并输出一份 JSON 验收摘要；可选追加 release drill。
+`make v2-uat` 会串行执行 `backend pytest + frontend lint + frontend vitest + frontend build + e2e`，并输出一份 JSON 验收摘要；可选追加 release drill。
 
 `make v2-release-checklist` 会读取最近一次 UAT 与 release drill 产物，生成最终发布清单（JSON/Markdown）。
 
@@ -265,7 +269,7 @@ make v2-release-drill
 
 ## UAT 验收脚本
 
-默认执行基线验收（后端测试 + 前端 lint/build + e2e）：
+默认执行基线验收（后端测试 + 前端 lint + vitest + build + e2e）：
 
 ```bash
 make v2-uat

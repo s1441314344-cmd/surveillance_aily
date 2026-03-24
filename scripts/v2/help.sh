@@ -10,6 +10,8 @@ Smart Inspection V2 local commands:
   make v2-worker       # run Celery worker
   make v2-scheduler    # run scheduler process
   make v2-frontend     # run frontend dev server
+  make v2-backend-test # run backend pytest suite
+  make v2-frontend-test # run frontend vitest suite
   make v2-dev          # deps-up + startup hint
   make v2-smoke        # verify upload/schedule async flows plus failed-job retry against running stack
   make v2-e2e          # run Playwright E2E baseline (auto start test api + frontend)
@@ -21,7 +23,7 @@ Smart Inspection V2 local commands:
   make v2-camera-check # run deep RTSP/mock camera diagnostic
   make v2-camera-validate # validate a whitelist manifest and export reports
   make v2-release-drill # run cutover drill (preflight + backfill + rollback-ready report)
-  make v2-uat          # run UAT baseline and export a verification summary
+  make v2-uat          # run UAT baseline (pytest + lint + vitest + build + e2e) and export summary
   make v2-release-checklist # build final release checklist from UAT + release drill artifacts
   make v2-release-gate # run one-command release gate (UAT + checklist + final verdict)
   make v2-deps-down    # stop postgres + redis
@@ -34,6 +36,11 @@ Recommended flow:
      make v2-worker
      make v2-scheduler
      make v2-frontend
+
+Verification examples:
+  make v2-backend-test
+  make v2-frontend-test
+  make v2-uat
 
 Backfill examples:
   make v2-backfill

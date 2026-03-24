@@ -12,6 +12,7 @@ def test_release_checklist_ready_when_uat_and_drill_passed():
             "checks": {
                 "backend_pytest": {"status": "passed"},
                 "frontend_lint": {"status": "passed"},
+                "frontend_unit": {"status": "passed"},
                 "frontend_build": {"status": "passed"},
                 "e2e": {"status": "passed"},
             },
@@ -39,6 +40,7 @@ def test_release_checklist_blocked_when_required_check_fails():
             "checks": {
                 "backend_pytest": {"status": "passed"},
                 "frontend_lint": {"status": "failed"},
+                "frontend_unit": {"status": "passed"},
                 "frontend_build": {"status": "passed"},
                 "e2e": {"status": "passed"},
             },
@@ -67,6 +69,7 @@ def test_release_checklist_allow_without_release_drill():
             "checks": {
                 "backend_pytest": {"status": "passed"},
                 "frontend_lint": {"status": "passed"},
+                "frontend_unit": {"status": "passed"},
                 "frontend_build": {"status": "passed"},
                 "e2e": {"status": "passed"},
             },
@@ -88,6 +91,7 @@ def test_release_checklist_markdown_contains_sections():
             "checks": {
                 "backend_pytest": {"status": "passed"},
                 "frontend_lint": {"status": "passed"},
+                "frontend_unit": {"status": "passed"},
                 "frontend_build": {"status": "passed"},
                 "e2e": {"status": "passed"},
             },

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-REQUIRED_UAT_CHECKS = ("backend_pytest", "frontend_lint", "frontend_build", "e2e")
+REQUIRED_UAT_CHECKS = ("backend_pytest", "frontend_lint", "frontend_unit", "frontend_build", "e2e")
 
 
 @dataclass
@@ -41,7 +41,14 @@ def build_release_checklist(
     uat_checks_payload = uat_summary.get("checks") or {}
     uat_checks = {
         check_name: str((uat_checks_payload.get(check_name) or {}).get("status") or "missing")
-        for check_name in ("backend_pytest", "frontend_lint", "frontend_build", "e2e", "release_drill")
+        for check_name in (
+            "backend_pytest",
+            "frontend_lint",
+            "frontend_unit",
+            "frontend_build",
+            "e2e",
+            "release_drill",
+        )
     }
 
     if uat_result != "passed":
@@ -118,7 +125,7 @@ def render_release_checklist_markdown(
         "| --- | --- |",
     ]
 
-    for check_name in ("backend_pytest", "frontend_lint", "frontend_build", "e2e", "release_drill"):
+    for check_name in ("backend_pytest", "frontend_lint", "frontend_unit", "frontend_build", "e2e", "release_drill"):
         lines.append(f"| {check_name} | {checklist.uat_checks.get(check_name, 'missing')} |")
 
     lines.extend(["", "## 2. 阻断项", ""])

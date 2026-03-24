@@ -9,6 +9,9 @@ require_cmd npm
 require_cmd make
 require_cmd date
 require_cmd tee
+require_cmd grep
+require_cmd tail
+require_cmd sed
 
 WITH_RELEASE_DRILL="false"
 RELEASE_DRILL_WITH_E2E="false"
@@ -60,6 +63,7 @@ mkdir -p "${OUTPUT_DIR}"
 
 backend_log="${OUTPUT_DIR}/backend-pytest.log"
 frontend_lint_log="${OUTPUT_DIR}/frontend-lint.log"
+frontend_unit_log="${OUTPUT_DIR}/frontend-unit.log"
 frontend_build_log="${OUTPUT_DIR}/frontend-build.log"
 e2e_log="${OUTPUT_DIR}/e2e.log"
 release_drill_log="${OUTPUT_DIR}/release-drill.log"
@@ -68,6 +72,7 @@ summary_md="${OUTPUT_DIR}/summary.md"
 
 backend_status="skipped"
 frontend_lint_status="skipped"
+frontend_unit_status="skipped"
 frontend_build_status="skipped"
 e2e_status="skipped"
 release_drill_status="skipped"
@@ -91,6 +96,15 @@ if (
   frontend_lint_status="passed"
 else
   frontend_lint_status="failed"
+fi
+
+if (
+  cd "${FRONTEND_DIR}"
+  npm run test
+) | tee "${frontend_unit_log}"; then
+  frontend_unit_status="passed"
+else
+  frontend_unit_status="failed"
 fi
 
 if (
@@ -122,7 +136,7 @@ if [[ "${WITH_RELEASE_DRILL}" == "true" ]]; then
 fi
 
 overall_status="passed"
-if [[ "${backend_status}" != "passed" || "${frontend_lint_status}" != "passed" || "${frontend_build_status}" != "passed" || "${e2e_status}" != "passed" ]]; then
+if [[ "${backend_status}" != "passed" || "${frontend_lint_status}" != "passed" || "${frontend_unit_status}" != "passed" || "${frontend_build_status}" != "passed" || "${e2e_status}" != "passed" ]]; then
   overall_status="failed"
 fi
 if [[ "${WITH_RELEASE_DRILL}" == "true" && "${release_drill_status}" != "passed" ]]; then
@@ -139,6 +153,7 @@ summary = {
     "checks": {
         "backend_pytest": {"status": "${backend_status}", "log_path": "${backend_log}"},
         "frontend_lint": {"status": "${frontend_lint_status}", "log_path": "${frontend_lint_log}"},
+        "frontend_unit": {"status": "${frontend_unit_status}", "log_path": "${frontend_unit_log}"},
         "frontend_build": {"status": "${frontend_build_status}", "log_path": "${frontend_build_log}"},
         "e2e": {"status": "${e2e_status}", "log_path": "${e2e_log}"},
         "release_drill": {
@@ -159,7 +174,7 @@ lines = [
     "| 检查项 | 状态 | 日志 |",
     "| --- | --- | --- |",
 ]
-for check_name in ("backend_pytest", "frontend_lint", "frontend_build", "e2e", "release_drill"):
+for check_name in ("backend_pytest", "frontend_lint", "frontend_unit", "frontend_build", "e2e", "release_drill"):
     check = summary["checks"][check_name]
     log_path = check.get("log_path") or "-"
     lines.append(f"| {check_name} | {check['status']} | {log_path} |")
