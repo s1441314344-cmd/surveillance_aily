@@ -12,6 +12,7 @@ Smart Inspection V2 local commands:
   make v2-frontend     # run frontend dev server
   make v2-backend-test # run backend pytest suite
   make v2-frontend-test # run frontend vitest suite
+  make v2-verify       # run precheck + integration preflight + final UAT in sequence
   make v2-dev          # deps-up + startup hint
   make v2-smoke        # verify upload/schedule async flows plus failed-job retry against running stack
   make v2-e2e          # run Playwright E2E baseline (auto start test api + frontend)
@@ -41,6 +42,7 @@ Verification examples:
   make v2-backend-test
   make v2-frontend-test
   make v2-uat
+  make v2-verify
 
 Backfill examples:
   make v2-backfill

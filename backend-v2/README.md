@@ -54,6 +54,7 @@ make v2-scheduler
 make v2-frontend
 make v2-backend-test
 make v2-frontend-test
+make v2-verify
 make v2-smoke
 make v2-e2e
 make v2-perf
@@ -76,6 +77,8 @@ make v2-release-gate
 `make v2-smoke` 会对运行中的栈执行一次“上传异步链路 + 失败任务重试链路 + 定时调度链路”的冒烟验收。
 
 `make v2-backend-test` 会执行后端 `pytest` 全量用例；`make v2-frontend-test` 会执行前端 `vitest` 单元测试。
+
+`make v2-verify` 会按“模块单测 -> 联调 preflight -> 最终 UAT”顺序串行执行完整验证流水线，并输出统一摘要。
 
 `make v2-e2e` 会执行 Playwright 基线回归（登录 + 核心页面导航）。
 
@@ -288,6 +291,29 @@ release drill 同时带 e2e：
 ```
 
 输出目录默认在 `data/uat-logs/<timestamp>/`，包含每一步日志、`summary.json` 和可直接评审的 `summary.md`。
+
+## 全流程验证流水线
+
+默认执行三段校验：`precheck(backend/frontend unit)` -> `integration preflight` -> `final UAT`：
+
+```bash
+make v2-verify
+```
+
+跳过集成 preflight（仅跑单测 + UAT）：
+
+```bash
+./scripts/v2/verify.sh --skip-preflight
+```
+
+输出目录默认在 `data/verify-logs/<timestamp>/`，包含：
+
+- `backend-test.log`
+- `frontend-test.log`
+- `preflight.log`
+- `uat.log`
+- `summary.json`
+- `summary.md`
 
 ## 发布清单生成
 
