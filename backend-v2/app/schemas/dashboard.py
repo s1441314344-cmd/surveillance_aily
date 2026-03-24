@@ -30,4 +30,7 @@ class AnomalyCase(BaseModel):
     record_id: str
     strategy_name: str
     summary: str
+    anomaly_type: str
+    result_status: str
+    feedback_status: str
     created_at: str

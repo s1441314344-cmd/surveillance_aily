@@ -159,6 +159,9 @@ def get_dashboard_anomalies(
             record_id=record.id,
             strategy_name=record.strategy_name,
             summary=_build_anomaly_summary(record),
+            anomaly_type=_resolve_anomaly_type(record),
+            result_status=record.result_status,
+            feedback_status=record.feedback_status,
             created_at=_ensure_aware(record.created_at).isoformat() if record.created_at else "",
         )
         for record in records[:limit]
@@ -229,6 +232,16 @@ def _safe_rate(numerator: int, denominator: int) -> float:
     if denominator <= 0:
         return 0.0
     return round((numerator / denominator) * 100, 2)
+
+
+def _resolve_anomaly_type(record: TaskRecord) -> str:
+    if record.result_status == "schema_invalid":
+        return "schema_invalid"
+    if record.result_status != "completed":
+        return "task_failed"
+    if record.feedback_status == "incorrect":
+        return "feedback_incorrect"
+    return "unknown"
 
 
 def _ensure_aware(value: datetime) -> datetime:

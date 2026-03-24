@@ -12,6 +12,7 @@ import {
   Select,
   Space,
   Statistic,
+  Tag,
   Table,
   Typography,
 } from 'antd';
@@ -26,6 +27,28 @@ import {
 } from '@/shared/api/dashboard';
 
 const { Paragraph, Text, Title } = Typography;
+const resultStatusColorMap: Record<string, string> = {
+  completed: 'green',
+  failed: 'red',
+  schema_invalid: 'orange',
+};
+const feedbackStatusColorMap: Record<string, string> = {
+  unreviewed: 'default',
+  correct: 'green',
+  incorrect: 'red',
+};
+const anomalyTypeLabelMap: Record<string, string> = {
+  schema_invalid: '结构化异常',
+  task_failed: '执行失败',
+  feedback_incorrect: '人工判错',
+  unknown: '未知异常',
+};
+const anomalyTypeColorMap: Record<string, string> = {
+  schema_invalid: 'orange',
+  task_failed: 'red',
+  feedback_incorrect: 'volcano',
+  unknown: 'default',
+};
 
 const parseDateFilter = (value: string) => {
   if (!value) {
@@ -303,6 +326,32 @@ export function DashboardPage() {
                   dataIndex: 'summary',
                   render: (value: string) => (
                     <Text style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{value}</Text>
+                  ),
+                },
+                {
+                  title: '异常类型',
+                  dataIndex: 'anomaly_type',
+                  width: 120,
+                  render: (value: string) => (
+                    <Tag color={anomalyTypeColorMap[value] ?? 'default'}>
+                      {anomalyTypeLabelMap[value] ?? value}
+                    </Tag>
+                  ),
+                },
+                {
+                  title: '结果状态',
+                  dataIndex: 'result_status',
+                  width: 120,
+                  render: (value: string) => (
+                    <Tag color={resultStatusColorMap[value] ?? 'default'}>{value}</Tag>
+                  ),
+                },
+                {
+                  title: '反馈状态',
+                  dataIndex: 'feedback_status',
+                  width: 120,
+                  render: (value: string) => (
+                    <Tag color={feedbackStatusColorMap[value] ?? 'default'}>{value}</Tag>
                   ),
                 },
                 {

@@ -29,6 +29,9 @@ export type AnomalyCase = {
   record_id: string;
   strategy_name: string;
   summary: string;
+  anomaly_type: string;
+  result_status: string;
+  feedback_status: string;
   created_at: string;
 };
 

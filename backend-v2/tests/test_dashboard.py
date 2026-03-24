@@ -117,6 +117,9 @@ def test_dashboard_summary_trends_and_anomalies(client):
     assert len(anomalies) == 1
     assert anomalies[0]["record_id"] == target_record["id"]
     assert anomalies[0]["strategy_name"] == "安全帽识别"
+    assert anomalies[0]["anomaly_type"] == "feedback_incorrect"
+    assert anomalies[0]["result_status"] == "completed"
+    assert anomalies[0]["feedback_status"] == "incorrect"
 
     filtered_summary_response = client.get(
         "/api/dashboard/summary",
@@ -203,3 +206,15 @@ def test_dashboard_summary_reports_schema_invalid_metrics(client, monkeypatch):
     assert summary["schema_invalid_rate"] == 100.0
     assert summary["structured_success_rate"] == 0.0
     assert summary["anomaly_rate"] == 100.0
+
+    anomalies_response = client.get(
+        "/api/dashboard/anomalies",
+        headers=headers,
+        params={"strategy_id": "preset-helmet"},
+    )
+    assert anomalies_response.status_code == 200
+    anomalies = anomalies_response.json()
+    assert len(anomalies) == 1
+    assert anomalies[0]["anomaly_type"] == "schema_invalid"
+    assert anomalies[0]["result_status"] == "schema_invalid"
+    assert anomalies[0]["feedback_status"] == "unreviewed"
