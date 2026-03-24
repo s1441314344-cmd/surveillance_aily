@@ -8,6 +8,7 @@ from app.schemas.camera import (
     CameraCreate,
     CameraDiagnosticRead,
     CameraRead,
+    CameraStatusLogRead,
     CameraStatusRead,
     CameraStatusSweepRead,
     CameraUpdate,
@@ -20,6 +21,7 @@ from app.services.camera_service import (
     get_camera_or_404,
     get_camera_status as get_camera_status_record,
     list_cameras as list_camera_records,
+    list_camera_status_logs as list_camera_status_log_records,
     list_camera_statuses as list_camera_status_records,
     serialize_camera,
     update_camera as update_camera_record,
@@ -100,6 +102,21 @@ def get_camera_status(
 ):
     camera = get_camera_or_404(db, camera_id)
     return get_camera_status_record(db, camera)
+
+
+@router.get("/{camera_id}/status-logs", response_model=list[CameraStatusLogRead])
+def list_camera_status_logs(
+    camera_id: str,
+    limit: int = 20,
+    _: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return list_camera_status_log_records(
+        db,
+        camera_id=camera.id,
+        limit=limit,
+    )
 
 
 @router.post("/{camera_id}/check", response_model=CameraStatusRead)

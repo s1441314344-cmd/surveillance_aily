@@ -94,6 +94,15 @@ export type CameraStatusSweepSummary = {
   total_count: number;
 };
 
+export type CameraStatusLog = {
+  id: string;
+  camera_id: string;
+  connection_status: string;
+  alert_status: string;
+  last_error: string | null;
+  created_at: string;
+};
+
 export type CameraDiagnostic = {
   camera_id: string;
   camera_name: string;
@@ -198,6 +207,15 @@ export async function checkAllCamerasStatus(params?: { cameraIds?: string[] }) {
   const response = await apiClient.post<CameraStatusSweepSummary>('/api/cameras/check-all', undefined, {
     params: {
       camera_ids: params?.cameraIds?.length ? params.cameraIds.join(',') : undefined,
+    },
+  });
+  return response.data;
+}
+
+export async function listCameraStatusLogs(cameraId: string, params?: { limit?: number }) {
+  const response = await apiClient.get<CameraStatusLog[]>(`/api/cameras/${cameraId}/status-logs`, {
+    params: {
+      limit: params?.limit ?? 20,
     },
   });
   return response.data;

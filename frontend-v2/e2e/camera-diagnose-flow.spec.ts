@@ -24,7 +24,7 @@ async function loginToken(request: APIRequestContext): Promise<string> {
   return payload.access_token;
 }
 
-async function seedCamera(request: APIRequestContext, token: string, cameraName: string): Promise<string> {
+async function seedCamera(request: APIRequestContext, token: string, cameraName: string): Promise<{ id: string; name: string }> {
   const response = await request.post(`${API_BASE_URL}/api/cameras`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -45,28 +45,27 @@ async function seedCamera(request: APIRequestContext, token: string, cameraName:
     },
   });
   expect(response.ok()).toBeTruthy();
-  const payload = (await response.json()) as { id: string };
-  return payload.id;
+  const payload = (await response.json()) as { id: string; name: string };
+  return payload;
 }
 
 test('camera diagnose action shows diagnostic modal', async ({ page, request }) => {
   const token = await loginToken(request);
   const cameraName = `E2E-Diag-${Date.now()}`;
-  await seedCamera(request, token, cameraName);
+  const camera = await seedCamera(request, token, cameraName);
 
   await loginAsAdmin(page);
   await page.getByRole('menuitem', { name: '摄像头中心' }).click();
   await expect(page).toHaveURL(/\/cameras$/);
   await expect(page.getByRole('heading', { name: '摄像头中心' })).toBeVisible();
 
-  const cameraCard = page.locator('.ant-card').filter({ hasText: cameraName }).first();
+  const cameraCard = page.getByTestId(`camera-card-${camera.id}`);
   await expect(cameraCard).toBeVisible();
   await cameraCard.click();
 
   const diagnoseResponsePromise = page.waitForResponse(
     (response) =>
-      response.url().includes('/api/cameras/') &&
-      response.url().includes('/diagnose') &&
+      response.url().includes(`/api/cameras/${camera.id}/diagnose`) &&
       response.request().method() === 'POST',
   );
   await page.getByTestId('cameras-diagnose-btn').click();
@@ -75,7 +74,9 @@ test('camera diagnose action shows diagnostic modal', async ({ page, request }) 
 
   const diagnosticDialog = page.getByRole('dialog', { name: '摄像头诊断结果' });
   await expect(diagnosticDialog).toBeVisible();
+  await expect(diagnosticDialog).toContainText(cameraName);
   await expect(diagnosticDialog).toContainText('诊断状态');
   await expect(diagnosticDialog).toContainText('成功');
   await expect(diagnosticDialog).toContainText('mock');
+  await expect(page.locator('.ant-card').filter({ hasText: '状态日志' }).first()).toContainText('online');
 });

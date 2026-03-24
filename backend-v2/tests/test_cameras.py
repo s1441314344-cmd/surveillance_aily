@@ -330,6 +330,15 @@ def test_check_all_cameras_status_endpoint_supports_subset_and_all(client):
     assert all_status_map[ok_camera["id"]]["connection_status"] == "online"
     assert all_status_map[bad_camera["id"]]["connection_status"] == "offline"
 
+    status_logs_response = client.get(f"/api/cameras/{bad_camera['id']}/status-logs?limit=1", headers=headers)
+    assert status_logs_response.status_code == 200
+    status_logs = status_logs_response.json()
+    assert len(status_logs) == 1
+    assert status_logs[0]["camera_id"] == bad_camera["id"]
+    assert status_logs[0]["connection_status"] == "offline"
+    assert status_logs[0]["alert_status"] == "error"
+    assert status_logs[0]["created_at"] is not None
+
 
 def test_check_all_cameras_status_requires_system_admin_role(client):
     admin_login = login_as_admin(client)

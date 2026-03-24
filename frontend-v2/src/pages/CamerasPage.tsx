@@ -24,12 +24,14 @@ import {
   Camera,
   CameraDiagnostic,
   CameraPayload,
+  CameraStatusLog,
   checkAllCamerasStatus,
   checkCameraStatus,
   createCamera,
   deleteCamera,
   diagnoseCamera,
   getCameraStatus,
+  listCameraStatusLogs,
   listCameraStatuses,
   listCameras,
   updateCamera,
@@ -118,6 +120,13 @@ export function CamerasPage() {
     refetchInterval: 10000,
   });
 
+  const statusLogsQuery = useQuery({
+    queryKey: ['camera-status-logs', effectiveSelectedCameraId],
+    queryFn: () => listCameraStatusLogs(effectiveSelectedCameraId as string, { limit: 20 }),
+    enabled: Boolean(effectiveSelectedCameraId),
+    refetchInterval: 10000,
+  });
+
   const cameraStatusMap = useMemo(() => {
     const statuses = statusListQuery.data ?? [];
     return Object.fromEntries(statuses.map((item) => [item.camera_id, item]));
@@ -159,6 +168,10 @@ export function CamerasPage() {
     }
     return statusQuery.data ?? cameraStatusMap[effectiveSelectedCameraId] ?? null;
   }, [cameraStatusMap, effectiveSelectedCameraId, statusQuery.data]);
+  const selectedCameraStatusLogs = useMemo(
+    () => statusLogsQuery.data ?? [],
+    [statusLogsQuery.data],
+  );
 
   useEffect(() => {
     if (!activeCamera) {
@@ -187,6 +200,7 @@ export function CamerasPage() {
       queryClient.invalidateQueries({ queryKey: ['cameras'] }),
       queryClient.invalidateQueries({ queryKey: ['camera-status'] }),
       queryClient.invalidateQueries({ queryKey: ['camera-statuses'] }),
+      queryClient.invalidateQueries({ queryKey: ['camera-status-logs'] }),
     ]);
 
   const createMutation = useMutation({
@@ -363,6 +377,7 @@ export function CamerasPage() {
                     key={camera.id}
                     size="small"
                     hoverable
+                    data-testid={`camera-card-${camera.id}`}
                     style={{
                       borderColor: camera.id === effectiveSelectedCameraId ? '#1677ff' : undefined,
                     }}
@@ -557,6 +572,37 @@ export function CamerasPage() {
                 )
               ) : (
                 <Empty description="请选择一个摄像头查看状态" />
+              )}
+            </Card>
+
+            <Card title="状态日志">
+              {effectiveSelectedCameraId ? (
+                statusLogsQuery.isLoading ? (
+                  <Spin />
+                ) : selectedCameraStatusLogs.length ? (
+                  <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                    {selectedCameraStatusLogs.map((item: CameraStatusLog) => (
+                      <Card key={item.id} size="small">
+                        <Space orientation="vertical" size={2} style={{ width: '100%' }}>
+                          <Space wrap>
+                            <Tag color={statusColorMap[item.connection_status] ?? 'default'}>
+                              {item.connection_status}
+                            </Tag>
+                            <Tag color={statusColorMap[item.alert_status] ?? 'default'}>{item.alert_status}</Tag>
+                            <Text type="secondary">{new Date(item.created_at).toLocaleString()}</Text>
+                          </Space>
+                          <Text type={item.last_error ? 'danger' : 'secondary'}>
+                            {item.last_error || '无错误'}
+                          </Text>
+                        </Space>
+                      </Card>
+                    ))}
+                  </Space>
+                ) : (
+                  <Empty description="暂无状态日志" />
+                )
+              ) : (
+                <Empty description="请选择一个摄像头查看状态日志" />
               )}
             </Card>
           </Space>

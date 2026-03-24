@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session
 from app.core.security import encrypt_secret
 from app.services.camera_capture_service import diagnose_camera_capture
 from app.models.camera import Camera, CameraStatusLog
-from app.schemas.camera import CameraCreate, CameraDiagnosticRead, CameraRead, CameraStatusRead, CameraUpdate
+from app.schemas.camera import (
+    CameraCreate,
+    CameraDiagnosticRead,
+    CameraRead,
+    CameraStatusLogRead,
+    CameraStatusRead,
+    CameraUpdate,
+)
 from app.services.ids import generate_id
 from app.services.storage import ensure_storage_root
 
@@ -50,6 +57,17 @@ def serialize_camera_status(status_log: CameraStatusLog | None, camera_id: str) 
             if status_log.created_at is not None
             else None
         ),
+    )
+
+
+def serialize_camera_status_log(status_log: CameraStatusLog) -> CameraStatusLogRead:
+    return CameraStatusLogRead(
+        id=status_log.id,
+        camera_id=status_log.camera_id,
+        connection_status=status_log.connection_status,
+        alert_status=status_log.alert_status,
+        last_error=status_log.last_error,
+        created_at=status_log.created_at.astimezone(timezone.utc).isoformat(),
     )
 
 
@@ -143,6 +161,22 @@ def get_latest_camera_status_log(db: Session, camera_id: str) -> CameraStatusLog
 
 def get_camera_status(db: Session, camera: Camera) -> CameraStatusRead:
     return serialize_camera_status(get_latest_camera_status_log(db, camera.id), camera.id)
+
+
+def list_camera_status_logs(
+    db: Session,
+    *,
+    camera_id: str,
+    limit: int = 20,
+) -> list[CameraStatusLogRead]:
+    safe_limit = min(max(limit, 1), 100)
+    stmt = (
+        select(CameraStatusLog)
+        .where(CameraStatusLog.camera_id == camera_id)
+        .order_by(CameraStatusLog.created_at.desc(), CameraStatusLog.id.desc())
+        .limit(safe_limit)
+    )
+    return [serialize_camera_status_log(item) for item in db.scalars(stmt)]
 
 
 def list_camera_statuses(
