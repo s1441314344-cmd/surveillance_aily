@@ -53,6 +53,12 @@ class CameraStatusRead(BaseModel):
     last_checked_at: str | None = None
 
 
+class CameraStatusSweepRead(BaseModel):
+    checked_count: int
+    failed_count: int
+    total_count: int
+
+
 class CameraDiagnosticRead(BaseModel):
     camera_id: str
     camera_name: str

@@ -4,7 +4,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
-from app.schemas.camera import CameraCreate, CameraDiagnosticRead, CameraRead, CameraStatusRead, CameraUpdate
+from app.schemas.camera import (
+    CameraCreate,
+    CameraDiagnosticRead,
+    CameraRead,
+    CameraStatusRead,
+    CameraStatusSweepRead,
+    CameraUpdate,
+)
 from app.services.camera_service import (
     check_camera_status as check_camera_status_record,
     create_camera as create_camera_record,
@@ -18,6 +25,7 @@ from app.services.camera_service import (
     update_camera as update_camera_record,
 )
 from app.services.rbac import ROLE_SYSTEM_ADMIN
+from app.services.scheduler_service import run_camera_status_sweep_once_with_db
 
 router = APIRouter()
 
@@ -102,6 +110,16 @@ def check_camera_status(
 ):
     camera = get_camera_or_404(db, camera_id)
     return check_camera_status_record(db, camera)
+
+
+@router.post("/check-all", response_model=CameraStatusSweepRead)
+def check_all_cameras_status(
+    camera_ids: str | None = None,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN)),
+    db: Session = Depends(get_db),
+):
+    parsed_camera_ids = [item.strip() for item in (camera_ids or "").split(",") if item.strip()]
+    return run_camera_status_sweep_once_with_db(db, camera_ids=parsed_camera_ids or None)
 
 
 @router.post("/{camera_id}/diagnose", response_model=CameraDiagnosticRead)

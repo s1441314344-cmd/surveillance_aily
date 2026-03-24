@@ -21,6 +21,7 @@ import {
 import {
   Camera,
   CameraPayload,
+  checkAllCamerasStatus,
   checkCameraStatus,
   createCamera,
   deleteCamera,
@@ -225,6 +226,19 @@ export function CamerasPage() {
     },
   });
 
+  const sweepMutation = useMutation({
+    mutationFn: (cameraIds?: string[]) => checkAllCamerasStatus({ cameraIds }),
+    onSuccess: async (summary) => {
+      await invalidateCameraQueries();
+      message.success(
+        `全量巡检完成：检查 ${summary.checked_count}/${summary.total_count}，失败 ${summary.failed_count}`,
+      );
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '全量巡检失败'));
+    },
+  });
+
   const resetForCreate = () => {
     setSelectedCameraId(CREATE_CAMERA_ID);
     form.setFieldsValue(DEFAULT_CAMERA_VALUES);
@@ -267,9 +281,19 @@ export function CamerasPage() {
           <Card
             title="摄像头列表"
             extra={
-              <Button size="small" type="primary" onClick={resetForCreate}>
-                新建
-              </Button>
+              <Space>
+                <Button
+                  size="small"
+                  loading={sweepMutation.isPending}
+                  disabled={!cameras.length}
+                  onClick={() => sweepMutation.mutate(cameras.map((item) => item.id))}
+                >
+                  全量巡检
+                </Button>
+                <Button size="small" type="primary" onClick={resetForCreate}>
+                  新建
+                </Button>
+              </Space>
             }
             style={{ height: '100%' }}
           >

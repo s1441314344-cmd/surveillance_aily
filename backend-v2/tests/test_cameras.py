@@ -256,3 +256,76 @@ def test_scheduler_camera_status_sweep_returns_zero_without_cameras():
     assert summary["total_count"] == 0
     assert summary["checked_count"] == 0
     assert summary["failed_count"] == 0
+
+
+def test_check_all_cameras_status_endpoint_supports_subset_and_all(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    ok_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "批量巡检正常摄像头",
+            "location": "批量巡检位A",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/batch-check-ok",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/batch-check-ok",
+        },
+    )
+    assert ok_camera_response.status_code == 200
+    ok_camera = ok_camera_response.json()
+
+    bad_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "批量巡检异常摄像头",
+            "location": "批量巡检位B",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "bad-rtsp-url",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/batch-check-bad",
+        },
+    )
+    assert bad_camera_response.status_code == 200
+    bad_camera = bad_camera_response.json()
+
+    subset_response = client.post(f"/api/cameras/check-all?camera_ids={ok_camera['id']}", headers=headers)
+    assert subset_response.status_code == 200
+    subset_summary = subset_response.json()
+    assert subset_summary["total_count"] == 1
+    assert subset_summary["checked_count"] == 1
+    assert subset_summary["failed_count"] == 0
+
+    statuses_after_subset = client.get("/api/cameras/statuses", headers=headers)
+    assert statuses_after_subset.status_code == 200
+    subset_status_map = {item["camera_id"]: item for item in statuses_after_subset.json()}
+    assert subset_status_map[ok_camera["id"]]["connection_status"] == "online"
+    assert subset_status_map[bad_camera["id"]]["connection_status"] == "unknown"
+
+    all_response = client.post("/api/cameras/check-all", headers=headers)
+    assert all_response.status_code == 200
+    all_summary = all_response.json()
+    assert all_summary["total_count"] == 2
+    assert all_summary["checked_count"] == 2
+    assert all_summary["failed_count"] == 0
+
+    statuses_after_all = client.get("/api/cameras/statuses", headers=headers)
+    assert statuses_after_all.status_code == 200
+    all_status_map = {item["camera_id"]: item for item in statuses_after_all.json()}
+    assert all_status_map[ok_camera["id"]]["connection_status"] == "online"
+    assert all_status_map[bad_camera["id"]]["connection_status"] == "offline"

@@ -88,6 +88,12 @@ export type CameraStatus = {
   last_checked_at: string | null;
 };
 
+export type CameraStatusSweepSummary = {
+  checked_count: number;
+  failed_count: number;
+  total_count: number;
+};
+
 export async function listModelProviders() {
   const response = await apiClient.get<ModelProvider[]>('/api/model-providers');
   return response.data;
@@ -168,5 +174,14 @@ export async function listCameraStatuses(params?: { cameraIds?: string[]; alertO
 
 export async function checkCameraStatus(cameraId: string) {
   const response = await apiClient.post<CameraStatus>(`/api/cameras/${cameraId}/check`);
+  return response.data;
+}
+
+export async function checkAllCamerasStatus(params?: { cameraIds?: string[] }) {
+  const response = await apiClient.post<CameraStatusSweepSummary>('/api/cameras/check-all', undefined, {
+    params: {
+      camera_ids: params?.cameraIds?.length ? params.cameraIds.join(',') : undefined,
+    },
+  });
   return response.data;
 }
