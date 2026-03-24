@@ -1,5 +1,5 @@
 from app.services.scheduler_service import run_camera_status_sweep_once
-from .test_auth_and_users import auth_headers, login_as_admin
+from .test_auth_and_users import auth_headers, login_as_admin, login_as_user
 
 
 def test_camera_crud_and_status_check(client):
@@ -329,3 +329,26 @@ def test_check_all_cameras_status_endpoint_supports_subset_and_all(client):
     all_status_map = {item["camera_id"]: item for item in statuses_after_all.json()}
     assert all_status_map[ok_camera["id"]]["connection_status"] == "online"
     assert all_status_map[bad_camera["id"]]["connection_status"] == "offline"
+
+
+def test_check_all_cameras_status_requires_system_admin_role(client):
+    admin_login = login_as_admin(client)
+    admin_headers = auth_headers(admin_login["access_token"])
+
+    create_operator_response = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "username": "camera_operator_only",
+            "password": "Operator123!",
+            "display_name": "摄像头操作员",
+            "roles": ["task_operator"],
+        },
+    )
+    assert create_operator_response.status_code == 200
+
+    operator_login = login_as_user(client, username="camera_operator_only", password="Operator123!")
+    operator_headers = auth_headers(operator_login["access_token"])
+
+    response = client.post("/api/cameras/check-all", headers=operator_headers)
+    assert response.status_code == 403
