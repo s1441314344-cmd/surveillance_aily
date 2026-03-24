@@ -133,9 +133,10 @@ export function RecordsPage() {
     setSearchParams(nextParams, { replace: true });
   };
 
-  const handleExport = async () => {
+  const handleExport = async (format: 'csv' | 'xlsx') => {
     try {
       const blob = await exportTaskRecords({
+        format,
         status: statusFilter === 'all' ? undefined : statusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
@@ -147,12 +148,12 @@ export function RecordsPage() {
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = 'task-records.csv';
+      link.download = format === 'xlsx' ? 'task-records.xlsx' : 'task-records.csv';
       link.click();
       URL.revokeObjectURL(objectUrl);
-      message.success('CSV 导出成功');
+      message.success(format === 'xlsx' ? 'Excel 导出成功' : 'CSV 导出成功');
     } catch (error) {
-      message.error(getApiErrorMessage(error, 'CSV 导出失败'));
+      message.error(getApiErrorMessage(error, format === 'xlsx' ? 'Excel 导出失败' : 'CSV 导出失败'));
     }
   };
 
@@ -166,7 +167,7 @@ export function RecordsPage() {
           任务记录
         </Title>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          查看上传任务生成的记录、结构化 JSON 和原图预览，并支持按状态/策略/摄像头/模型/反馈/时间导出 CSV。
+          查看上传任务生成的记录、结构化 JSON 和原图预览，并支持按状态/策略/摄像头/模型/反馈/时间导出 CSV/Excel。
         </Paragraph>
       </div>
 
@@ -250,8 +251,11 @@ export function RecordsPage() {
               onChange={(event) => setCreatedToFilter(event.target.value)}
               style={{ width: 190 }}
             />
-            <Button size="small" onClick={handleExport}>
+            <Button size="small" onClick={() => handleExport('csv')}>
               导出 CSV
+            </Button>
+            <Button size="small" onClick={() => handleExport('xlsx')}>
+              导出 Excel
             </Button>
           </Space>
         }

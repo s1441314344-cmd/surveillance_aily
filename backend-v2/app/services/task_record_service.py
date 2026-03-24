@@ -1,11 +1,13 @@
 import csv
 from datetime import datetime, timezone
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from xml.sax.saxutils import escape
 
 from app.core.config import get_settings
 from app.core.database import database_url
@@ -13,6 +15,20 @@ from app.models.task_record import TaskRecord
 from app.schemas.task_record import TaskRecordRead
 
 settings = get_settings()
+EXPORT_HEADERS = [
+    "record_id",
+    "job_id",
+    "created_at",
+    "strategy_id",
+    "strategy_name",
+    "input_filename",
+    "source_type",
+    "model_provider",
+    "model_name",
+    "result_status",
+    "feedback_status",
+    "duration_ms",
+]
 
 
 def serialize_task_record(record: TaskRecord) -> TaskRecordRead:
@@ -89,22 +105,7 @@ def get_task_record_or_404(db: Session, record_id: str) -> TaskRecord:
 def export_task_records_csv(records: list[TaskRecordRead]) -> str:
     buffer = StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(
-        [
-            "record_id",
-            "job_id",
-            "created_at",
-            "strategy_id",
-            "strategy_name",
-            "input_filename",
-            "source_type",
-            "model_provider",
-            "model_name",
-            "result_status",
-            "feedback_status",
-            "duration_ms",
-        ]
-    )
+    writer.writerow(EXPORT_HEADERS)
 
     for record in records:
         writer.writerow(
@@ -123,6 +124,105 @@ def export_task_records_csv(records: list[TaskRecordRead]) -> str:
                 record.duration_ms,
             ]
         )
+
+    return buffer.getvalue()
+
+
+def export_task_records_xlsx(records: list[TaskRecordRead]) -> bytes:
+    rows: list[list[str | int]] = [EXPORT_HEADERS]
+    rows.extend(
+        [
+            [
+                record.id,
+                record.job_id,
+                record.created_at or "",
+                record.strategy_id,
+                record.strategy_name,
+                record.input_filename,
+                record.source_type,
+                record.model_provider,
+                record.model_name,
+                record.result_status,
+                record.feedback_status,
+                record.duration_ms,
+            ]
+            for record in records
+        ]
+    )
+
+    worksheet_rows = []
+    for index, row in enumerate(rows, start=1):
+        worksheet_rows.append(f'<row r="{index}">{_xlsx_row_cells(row)}</row>')
+
+    worksheet_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f"<sheetData>{''.join(worksheet_rows)}</sheetData>"
+        "</worksheet>"
+    )
+
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            '<Override PartName="/xl/worksheets/sheet1.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            '<Override PartName="/xl/styles.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+            "</Types>",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="xl/workbook.xml"/>'
+            "</Relationships>",
+        )
+        archive.writestr(
+            "xl/workbook.xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            "<sheets>"
+            '<sheet name="task_records" sheetId="1" r:id="rId1"/>'
+            "</sheets>"
+            "</workbook>",
+        )
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            'Target="worksheets/sheet1.xml"/>'
+            '<Relationship Id="rId2" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" '
+            'Target="styles.xml"/>'
+            "</Relationships>",
+        )
+        archive.writestr(
+            "xl/styles.xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            '<fonts count="1"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font></fonts>'
+            '<fills count="2"><fill><patternFill patternType="none"/></fill>'
+            '<fill><patternFill patternType="gray125"/></fill></fills>'
+            '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+            '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+            '<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>'
+            '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+            "</styleSheet>",
+        )
+        archive.writestr("xl/worksheets/sheet1.xml", worksheet_xml)
 
     return buffer.getvalue()
 
@@ -146,3 +246,14 @@ def _ensure_aware(value: datetime) -> datetime:
     if database_url.get_backend_name().startswith("sqlite"):
         return normalized.replace(tzinfo=None)
     return normalized
+
+
+def _xlsx_row_cells(values: list[str | int]) -> str:
+    return "".join(_xlsx_cell(value) for value in values)
+
+
+def _xlsx_cell(value: str | int) -> str:
+    if isinstance(value, int):
+        return f"<c><v>{value}</v></c>"
+    safe_text = escape(str(value)).replace("\r\n", "\n").replace("\r", "\n")
+    return f'<c t="inlineStr"><is><t xml:space="preserve">{safe_text}</t></is></c>'

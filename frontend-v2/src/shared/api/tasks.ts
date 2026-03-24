@@ -237,9 +237,11 @@ export async function exportTaskRecords(params?: {
   feedbackStatus?: string;
   createdFrom?: string;
   createdTo?: string;
+  format?: 'csv' | 'xlsx';
 }) {
   const response = await apiClient.get<Blob>('/api/task-records/export', {
     params: {
+      format: params?.format || 'csv',
       status: params?.status || undefined,
       strategy_id: params?.strategyId || undefined,
       job_id: params?.jobId || undefined,

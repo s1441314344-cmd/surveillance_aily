@@ -1,7 +1,8 @@
 import csv
 from datetime import datetime, timedelta
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
+from zipfile import ZipFile
 
 from app.core.database import SessionLocal
 from app.models.job import Job
@@ -69,6 +70,20 @@ def test_upload_job_and_task_records_flow(client):
     assert export_response.status_code == 200
     assert "record_id,job_id,created_at" in export_response.text
 
+    export_xlsx_response = client.get("/api/task-records/export?format=xlsx", headers=headers)
+    assert export_xlsx_response.status_code == 200
+    assert (
+        export_xlsx_response.headers["content-type"]
+        == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert 'filename="task-records.xlsx"' in export_xlsx_response.headers["content-disposition"]
+    assert export_xlsx_response.content.startswith(b"PK")
+
+    with ZipFile(BytesIO(export_xlsx_response.content), "r") as workbook:
+        sheet_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        assert "record_id" in sheet_xml
+        assert "helmet-1.jpg" in sheet_xml or "helmet-2.png" in sheet_xml
+
 
 def test_upload_job_rejects_unsupported_file_extension(client):
     login_data = login_as_admin(client)
@@ -125,6 +140,15 @@ def test_upload_job_rejects_unsupported_content_type(client):
     )
     assert create_job_response.status_code == 400
     assert "Unsupported content type" in create_job_response.json()["detail"]
+
+
+def test_task_records_export_rejects_unsupported_format(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    export_response = client.get("/api/task-records/export?format=pdf", headers=headers)
+    assert export_response.status_code == 400
+    assert "Unsupported export format" in export_response.json()["detail"]
 
 
 def test_upload_job_rejects_empty_file(client):

@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -10,6 +10,7 @@ from app.schemas.auth import CurrentUser
 from app.schemas.task_record import TaskRecordRead
 from app.services.task_record_service import (
     export_task_records_csv,
+    export_task_records_xlsx,
     get_record_image_path,
     get_task_record_or_404,
     list_task_records as list_task_record_rows,
@@ -47,6 +48,7 @@ def list_task_records(
 
 @router.get("/export")
 def export_task_records(
+    format: str = "csv",
     status: str | None = None,
     strategy_id: str | None = None,
     job_id: str | None = None,
@@ -69,11 +71,26 @@ def export_task_records(
         created_from=created_from,
         created_to=created_to,
     )
-    csv_content = export_task_records_csv(records)
-    return PlainTextResponse(
-        csv_content,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="task-records.csv"'},
+    export_format = format.lower().strip()
+    if export_format == "csv":
+        csv_content = export_task_records_csv(records)
+        return PlainTextResponse(
+            csv_content,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="task-records.csv"'},
+        )
+
+    if export_format == "xlsx":
+        xlsx_content = export_task_records_xlsx(records)
+        return Response(
+            xlsx_content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="task-records.xlsx"'},
+        )
+
+    raise HTTPException(
+        status_code=http_status.HTTP_400_BAD_REQUEST,
+        detail="Unsupported export format, expected csv or xlsx",
     )
 
 

@@ -63,6 +63,11 @@ test('camera once job is queued and can be cancelled in job center', async ({ pa
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
 
+  const strategySelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '分析策略' }).locator('.ant-select');
+  await strategySelect.click();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+
   const cameraSelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '选择摄像头' }).locator('.ant-select');
   await cameraSelect.click();
   await page.keyboard.press('ArrowDown');
@@ -71,6 +76,11 @@ test('camera once job is queued and can be cancelled in job center', async ({ pa
   await page.getByRole('button', { name: '执行摄像头单次任务' }).click();
 
   const detailCard = page.locator('.ant-card-small').filter({ hasText: '任务详情' }).first();
+  if (!(await detailCard.isVisible())) {
+    const firstRow = page.locator('.ant-table-tbody tr').first();
+    await expect(firstRow).toBeVisible();
+    await firstRow.click();
+  }
   await expect(detailCard).toBeVisible();
   await expect(detailCard).toContainText('camera_once');
   await expect(detailCard).toContainText('queued');
