@@ -550,7 +550,7 @@ export function JobsPage() {
                   type="warning"
                   showIcon
                   style={{ marginBottom: 12 }}
-                  message="当前摄像头协议暂不支持"
+                  title="当前摄像头协议暂不支持"
                   description="V1 正式任务链路仅支持 RTSP 摄像头，ONVIF 计划在后续版本扩展。"
                 />
               ) : null}
