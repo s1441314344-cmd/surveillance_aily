@@ -1,14 +1,17 @@
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.camera import Camera
 from app.core.database import SessionLocal
+from app.models.camera import Camera
 from app.models.job import JobSchedule
 from app.services.camera_service import check_camera_status
 from app.services.job_schedule_service import calculate_next_run_at
 from app.services.job_service import create_camera_schedule_job
+
+logger = logging.getLogger(__name__)
 
 
 def run_due_job_schedules_once(
@@ -91,9 +94,10 @@ def run_camera_status_sweep_once_with_db(
         try:
             check_camera_status(db, camera)
             checked_count += 1
-        except Exception:
+        except Exception as exc:
             db.rollback()
             failed_count += 1
+            logger.warning("camera status sweep failed for camera_id=%s: %s", camera.id, exc)
 
     return {
         "checked_count": checked_count,
