@@ -12,21 +12,59 @@ import {
 import { Button, Layout, Menu, Space, Typography } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { useAuthStore } from '@/shared/state/authStore';
+import {
+  ROLE_MANUAL_REVIEWER,
+  ROLE_STRATEGY_CONFIGURATOR,
+  ROLE_SYSTEM_ADMIN,
+  ROLE_TASK_OPERATOR,
+  hasAnyRole,
+} from '@/shared/auth/permissions';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
-const menuItems = [
+const menuItems: Array<{
+  key: string;
+  icon: ReactNode;
+  label: string;
+  requiredRoles?: readonly string[];
+}> = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '总览看板' },
-  { key: '/strategies', icon: <RobotOutlined />, label: '策略中心' },
-  { key: '/cameras', icon: <CameraOutlined />, label: '摄像头中心' },
-  { key: '/jobs', icon: <ScheduleOutlined />, label: '任务中心' },
+  {
+    key: '/strategies',
+    icon: <RobotOutlined />,
+    label: '策略中心',
+    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR],
+  },
+  {
+    key: '/cameras',
+    icon: <CameraOutlined />,
+    label: '摄像头中心',
+    requiredRoles: [ROLE_SYSTEM_ADMIN],
+  },
+  {
+    key: '/jobs',
+    icon: <ScheduleOutlined />,
+    label: '任务中心',
+    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR],
+  },
   { key: '/records', icon: <FileSearchOutlined />, label: '任务记录' },
-  { key: '/feedback', icon: <SafetyCertificateOutlined />, label: '人工复核' },
-  { key: '/audit-logs', icon: <AuditOutlined />, label: '操作审计' },
-  { key: '/settings', icon: <SettingOutlined />, label: '模型与设置' },
-  { key: '/users', icon: <TeamOutlined />, label: '用户与权限' },
+  {
+    key: '/feedback',
+    icon: <SafetyCertificateOutlined />,
+    label: '人工复核',
+    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_MANUAL_REVIEWER],
+  },
+  { key: '/audit-logs', icon: <AuditOutlined />, label: '操作审计', requiredRoles: [ROLE_SYSTEM_ADMIN] },
+  {
+    key: '/settings',
+    icon: <SettingOutlined />,
+    label: '模型与设置',
+    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR],
+  },
+  { key: '/users', icon: <TeamOutlined />, label: '用户与权限', requiredRoles: [ROLE_SYSTEM_ADMIN] },
 ];
 
 export function AppLayout() {
@@ -34,11 +72,19 @@ export function AppLayout() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const canViewAuditLogs = user?.roles.includes('system_admin') ?? false;
 
   const filteredMenuItems = useMemo(
-    () => menuItems.filter((item) => (item.key === '/audit-logs' ? canViewAuditLogs : true)),
-    [canViewAuditLogs],
+    () => menuItems.filter((item) => hasAnyRole(user?.roles, item.requiredRoles)),
+    [user?.roles],
+  );
+  const renderedMenuItems = useMemo(
+    () =>
+      filteredMenuItems.map((item) => {
+        const nextItem = { ...item };
+        delete nextItem.requiredRoles;
+        return nextItem;
+      }),
+    [filteredMenuItems],
   );
 
   const selectedKeys = useMemo(() => {
@@ -58,7 +104,7 @@ export function AppLayout() {
         <Menu
           mode="inline"
           selectedKeys={selectedKeys}
-          items={filteredMenuItems}
+          items={renderedMenuItems}
           onClick={({ key }) => navigate(key)}
           style={{ borderInlineEnd: 0 }}
         />
