@@ -71,12 +71,19 @@ def test_upload_job_and_task_records_flow(client):
 
     export_response = client.get("/api/task-records/export", headers=headers)
     assert export_response.status_code == 200
-    assert "record_id,job_id,job_type,schedule_id,created_at" in export_response.text
+    assert (
+        "record_id,job_id,job_type,schedule_id,created_at,strategy_id,strategy_name,input_filename,source_type,"
+        "camera_id,input_image_path,model_provider,model_name,strategy_snapshot,normalized_json,raw_model_response,"
+        "result_status,feedback_status,duration_ms"
+    ) in export_response.text
     export_rows = list(csv.DictReader(StringIO(export_response.text)))
     assert len(export_rows) == 2
     assert all(row["job_type"] == "upload_batch" for row in export_rows)
     assert all(row["schedule_id"] == "" for row in export_rows)
     assert all(row["camera_id"] == "" for row in export_rows)
+    assert all(row["strategy_snapshot"] for row in export_rows)
+    assert all(row["normalized_json"] for row in export_rows)
+    assert all(row["raw_model_response"] for row in export_rows)
 
     export_xlsx_response = client.get("/api/task-records/export?format=xlsx", headers=headers)
     assert export_xlsx_response.status_code == 200
@@ -91,6 +98,7 @@ def test_upload_job_and_task_records_flow(client):
         sheet_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
         assert "record_id" in sheet_xml
         assert "job_type" in sheet_xml
+        assert "raw_model_response" in sheet_xml
         assert "helmet-1.jpg" in sheet_xml or "helmet-2.png" in sheet_xml
 
 
@@ -713,6 +721,8 @@ def test_task_records_filter_by_camera_and_time_range(client):
     assert export_rows[0]["record_id"] == camera_records[0]["id"]
     assert export_rows[0]["camera_id"] == camera["id"]
     assert export_rows[0]["job_type"] == "camera_once"
+    assert export_rows[0]["source_type"] == "camera"
+    assert export_rows[0]["input_image_path"]
 
     export_by_job_type_response = client.get(
         "/api/task-records/export",

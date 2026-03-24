@@ -1,4 +1,5 @@
 import csv
+import json
 from datetime import datetime, timezone
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -27,8 +28,12 @@ EXPORT_HEADERS = [
     "input_filename",
     "source_type",
     "camera_id",
+    "input_image_path",
     "model_provider",
     "model_name",
+    "strategy_snapshot",
+    "normalized_json",
+    "raw_model_response",
     "result_status",
     "feedback_status",
     "duration_ms",
@@ -162,8 +167,12 @@ def export_task_records_csv(records: list[TaskRecordRead]) -> str:
                 record.input_filename,
                 record.source_type,
                 record.camera_id or "",
+                record.input_image_path,
                 record.model_provider,
                 record.model_name,
+                _dump_json(record.strategy_snapshot),
+                _dump_json(record.normalized_json),
+                record.raw_model_response,
                 record.result_status,
                 record.feedback_status,
                 record.duration_ms,
@@ -188,8 +197,12 @@ def export_task_records_xlsx(records: list[TaskRecordRead]) -> bytes:
                 record.input_filename,
                 record.source_type,
                 record.camera_id or "",
+                record.input_image_path,
                 record.model_provider,
                 record.model_name,
+                _dump_json(record.strategy_snapshot),
+                _dump_json(record.normalized_json),
+                record.raw_model_response,
                 record.result_status,
                 record.feedback_status,
                 record.duration_ms,
@@ -305,6 +318,12 @@ def _xlsx_cell(value: str | int) -> str:
         return f"<c><v>{value}</v></c>"
     safe_text = escape(str(value)).replace("\r\n", "\n").replace("\r", "\n")
     return f'<c t="inlineStr"><is><t xml:space="preserve">{safe_text}</t></is></c>'
+
+
+def _dump_json(value: dict | None) -> str:
+    if value is None:
+        return ""
+    return json.dumps(value, ensure_ascii=False)
 
 
 def _build_job_runtime_map(db: Session, job_ids: set[str]) -> dict[str, dict[str, str | None]]:
