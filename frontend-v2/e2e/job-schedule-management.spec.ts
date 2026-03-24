@@ -5,11 +5,21 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginAsAdmin(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('用户名').fill('admin');
-  await page.getByLabel('密码').fill('admin123456');
-  await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.goto('/login');
+    await page.getByLabel('用户名').fill('admin');
+    await page.getByLabel('密码').fill('admin123456');
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+      return;
+    } catch (error) {
+      if (attempt === 1) {
+        throw error;
+      }
+      await page.waitForTimeout(500);
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -101,6 +111,6 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
   await scheduleRow.getByRole('button', { name: '查看任务' }).click();
 
   const taskQueueCard = page.locator('.ant-card').filter({ hasText: '任务队列' }).first();
-  await expect(taskQueueCard.locator('.ant-select').nth(1)).toContainText('定时触发');
-  await expect(taskQueueCard.locator('.ant-select').nth(3)).toContainText(shortScheduleId);
+  await expect(taskQueueCard.locator('[data-testid="jobs-filter-trigger"]')).toContainText('定时触发');
+  await expect(taskQueueCard.locator('[data-testid="jobs-filter-schedule"]')).toContainText(shortScheduleId);
 });

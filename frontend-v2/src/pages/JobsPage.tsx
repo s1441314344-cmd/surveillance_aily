@@ -586,6 +586,7 @@ export function JobsPage() {
             extra={
               <Space wrap>
                 <Select
+                  data-testid="jobs-filter-status"
                   size="small"
                   value={statusFilter}
                   onChange={setStatusFilter}
@@ -600,6 +601,7 @@ export function JobsPage() {
                   style={{ width: 120 }}
                 />
                 <Select
+                  data-testid="jobs-filter-strategy"
                   size="small"
                   value={strategyFilter}
                   onChange={setStrategyFilter}
@@ -613,6 +615,7 @@ export function JobsPage() {
                   style={{ width: 160 }}
                 />
                 <Select
+                  data-testid="jobs-filter-trigger"
                   size="small"
                   value={triggerModeFilter}
                   onChange={setTriggerModeFilter}
@@ -624,6 +627,7 @@ export function JobsPage() {
                   style={{ width: 120 }}
                 />
                 <Select
+                  data-testid="jobs-filter-camera"
                   size="small"
                   value={cameraFilter}
                   onChange={setCameraFilter}
@@ -637,6 +641,7 @@ export function JobsPage() {
                   style={{ width: 170 }}
                 />
                 <Select
+                  data-testid="jobs-filter-schedule"
                   size="small"
                   value={scheduleFilter}
                   onChange={(value) => {

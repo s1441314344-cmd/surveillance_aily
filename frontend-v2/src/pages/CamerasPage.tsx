@@ -278,7 +278,7 @@ export function CamerasPage() {
                 type={statusSummary.abnormal > 0 ? 'warning' : 'success'}
                 showIcon
                 style={{ marginBottom: 12 }}
-                message={`在线 ${statusSummary.online} / 告警 ${statusSummary.abnormal}`}
+                title={`在线 ${statusSummary.online} / 告警 ${statusSummary.abnormal}`}
                 description={
                   <Space wrap size={8}>
                     <Tag color={statusColorMap.online}>online: {statusSummary.online}</Tag>
