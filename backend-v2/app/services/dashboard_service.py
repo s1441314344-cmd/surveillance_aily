@@ -138,6 +138,7 @@ def get_dashboard_anomalies(
     *,
     strategy_id: str | None = None,
     model_provider: str | None = None,
+    anomaly_type: str | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
     limit: int = 10,
@@ -153,6 +154,8 @@ def get_dashboard_anomalies(
         )
         if record.result_status != "completed" or record.feedback_status == "incorrect"
     ]
+    if anomaly_type:
+        records = [record for record in records if _resolve_anomaly_type(record) == anomaly_type]
 
     return [
         AnomalyCase(

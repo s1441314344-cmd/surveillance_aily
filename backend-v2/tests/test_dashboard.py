@@ -121,6 +121,24 @@ def test_dashboard_summary_trends_and_anomalies(client):
     assert anomalies[0]["result_status"] == "completed"
     assert anomalies[0]["feedback_status"] == "incorrect"
 
+    filtered_feedback_anomalies_response = client.get(
+        "/api/dashboard/anomalies",
+        headers=headers,
+        params={"anomaly_type": "feedback_incorrect"},
+    )
+    assert filtered_feedback_anomalies_response.status_code == 200
+    filtered_feedback_anomalies = filtered_feedback_anomalies_response.json()
+    assert len(filtered_feedback_anomalies) == 1
+    assert filtered_feedback_anomalies[0]["record_id"] == target_record["id"]
+
+    filtered_schema_anomalies_response = client.get(
+        "/api/dashboard/anomalies",
+        headers=headers,
+        params={"anomaly_type": "schema_invalid"},
+    )
+    assert filtered_schema_anomalies_response.status_code == 200
+    assert filtered_schema_anomalies_response.json() == []
+
     filtered_summary_response = client.get(
         "/api/dashboard/summary",
         headers=headers,
@@ -218,3 +236,16 @@ def test_dashboard_summary_reports_schema_invalid_metrics(client, monkeypatch):
     assert anomalies[0]["anomaly_type"] == "schema_invalid"
     assert anomalies[0]["result_status"] == "schema_invalid"
     assert anomalies[0]["feedback_status"] == "unreviewed"
+
+    filtered_anomalies_response = client.get(
+        "/api/dashboard/anomalies",
+        headers=headers,
+        params={
+            "strategy_id": "preset-helmet",
+            "anomaly_type": "schema_invalid",
+        },
+    )
+    assert filtered_anomalies_response.status_code == 200
+    filtered_anomalies = filtered_anomalies_response.json()
+    assert len(filtered_anomalies) == 1
+    assert filtered_anomalies[0]["anomaly_type"] == "schema_invalid"

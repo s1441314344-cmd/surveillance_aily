@@ -75,6 +75,7 @@ def get_dashboard_strategies(
 def get_dashboard_anomalies(
     strategy_id: str | None = None,
     model_provider: str | None = None,
+    anomaly_type: str | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
     _: CurrentUser = Depends(get_current_user),
@@ -84,6 +85,7 @@ def get_dashboard_anomalies(
         db,
         strategy_id=strategy_id,
         model_provider=model_provider,
+        anomaly_type=anomaly_type,
         created_from=created_from,
         created_to=created_to,
     )

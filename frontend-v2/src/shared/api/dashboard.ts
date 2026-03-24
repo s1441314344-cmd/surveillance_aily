@@ -38,6 +38,7 @@ export type AnomalyCase = {
 export type DashboardQueryParams = {
   strategyId?: string;
   modelProvider?: string;
+  anomalyType?: string;
   createdFrom?: string;
   createdTo?: string;
 };
@@ -45,6 +46,7 @@ export type DashboardQueryParams = {
 const buildDashboardQueryParams = (params?: DashboardQueryParams) => ({
   strategy_id: params?.strategyId || undefined,
   model_provider: params?.modelProvider || undefined,
+  anomaly_type: params?.anomalyType || undefined,
   created_from: params?.createdFrom || undefined,
   created_to: params?.createdTo || undefined,
 });

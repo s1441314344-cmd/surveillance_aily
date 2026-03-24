@@ -65,6 +65,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
+  const [anomalyTypeFilter, setAnomalyTypeFilter] = useState<string>('all');
   const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
   const [createdToFilter, setCreatedToFilter] = useState<string>('');
 
@@ -104,8 +105,12 @@ export function DashboardPage() {
   });
 
   const anomaliesQuery = useQuery({
-    queryKey: ['dashboard', 'anomalies', queryFilters],
-    queryFn: () => getDashboardAnomalies(queryFilters),
+    queryKey: ['dashboard', 'anomalies', queryFilters, anomalyTypeFilter],
+    queryFn: () =>
+      getDashboardAnomalies({
+        ...queryFilters,
+        anomalyType: anomalyTypeFilter === 'all' ? undefined : anomalyTypeFilter,
+      }),
     refetchInterval: 15000,
   });
 
@@ -165,6 +170,18 @@ export function DashboardPage() {
             value={createdToFilter}
             onChange={(event) => setCreatedToFilter(event.target.value)}
             style={{ width: 200 }}
+          />
+          <Select
+            size="small"
+            value={anomalyTypeFilter}
+            onChange={setAnomalyTypeFilter}
+            options={[
+              { label: '全部异常类型', value: 'all' },
+              { label: '结构化异常', value: 'schema_invalid' },
+              { label: '执行失败', value: 'task_failed' },
+              { label: '人工判错', value: 'feedback_incorrect' },
+            ]}
+            style={{ width: 160 }}
           />
         </Space>
       </Card>
