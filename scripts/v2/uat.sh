@@ -64,6 +64,7 @@ frontend_build_log="${OUTPUT_DIR}/frontend-build.log"
 e2e_log="${OUTPUT_DIR}/e2e.log"
 release_drill_log="${OUTPUT_DIR}/release-drill.log"
 summary_json="${OUTPUT_DIR}/summary.json"
+summary_md="${OUTPUT_DIR}/summary.md"
 
 backend_status="skipped"
 frontend_lint_status="skipped"
@@ -148,9 +149,30 @@ summary = {
     },
 }
 Path("${summary_json}").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+
+lines = [
+    "# 智能巡检系统 V2 UAT 验收摘要",
+    "",
+    f"- 结果: **{summary['result'].upper()}**",
+    f"- 输出目录: {summary['output_dir']}",
+    "",
+    "| 检查项 | 状态 | 日志 |",
+    "| --- | --- | --- |",
+]
+for check_name in ("backend_pytest", "frontend_lint", "frontend_build", "e2e", "release_drill"):
+    check = summary["checks"][check_name]
+    log_path = check.get("log_path") or "-"
+    lines.append(f"| {check_name} | {check['status']} | {log_path} |")
+
+release_drill_report = summary["checks"]["release_drill"].get("report_path")
+if release_drill_report:
+    lines.extend(["", f"- release drill report: {release_drill_report}"])
+
+Path("${summary_md}").write_text("\\n".join(lines), encoding="utf-8")
 PY
 
 echo "[v2-uat] summary: ${summary_json}"
+echo "[v2-uat] markdown: ${summary_md}"
 if [[ "${overall_status}" != "passed" ]]; then
   echo "[v2-uat] failed, review logs under ${OUTPUT_DIR}" >&2
   exit 1

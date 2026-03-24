@@ -277,7 +277,7 @@ release drill 同时带 e2e：
 ./scripts/v2/uat.sh --with-release-drill --release-drill-with-e2e
 ```
 
-输出目录默认在 `data/uat-logs/<timestamp>/`，包含每一步日志和 `summary.json`。
+输出目录默认在 `data/uat-logs/<timestamp>/`，包含每一步日志、`summary.json` 和可直接评审的 `summary.md`。
 
 ## 当前包含
 
