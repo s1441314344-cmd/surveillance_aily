@@ -59,6 +59,7 @@ export function FeedbackPage() {
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>(
     selectedRecordId ? 'all' : 'unreviewed',
   );
+  const [resultStatusFilter, setResultStatusFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
 
   const strategyQuery = useQuery({
@@ -67,9 +68,10 @@ export function FeedbackPage() {
   });
 
   const recordsQuery = useQuery({
-    queryKey: ['task-records', 'feedback', feedbackStatusFilter, strategyFilter],
+    queryKey: ['task-records', 'feedback', feedbackStatusFilter, resultStatusFilter, strategyFilter],
     queryFn: () =>
       listTaskRecords({
+        status: resultStatusFilter === 'all' ? undefined : resultStatusFilter,
         strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         feedbackStatus: feedbackStatusFilter === 'all' ? undefined : feedbackStatusFilter,
       }),
@@ -210,6 +212,18 @@ export function FeedbackPage() {
                     { label: '全部记录', value: 'all' },
                     { label: '已判定正确', value: 'correct' },
                     { label: '已判定错误', value: 'incorrect' },
+                  ]}
+                  style={{ width: 130 }}
+                />
+                <Select
+                  size="small"
+                  value={resultStatusFilter}
+                  onChange={setResultStatusFilter}
+                  options={[
+                    { label: '全部结果', value: 'all' },
+                    { label: '已完成', value: 'completed' },
+                    { label: '失败', value: 'failed' },
+                    { label: '结构化异常', value: 'schema_invalid' },
                   ]}
                   style={{ width: 130 }}
                 />
