@@ -104,6 +104,7 @@ export function JobsPage() {
   const [form] = Form.useForm<UploadFormValues>();
   const [scheduleEditForm] = Form.useForm<EditScheduleFormValues>();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [triggerModeFilter, setTriggerModeFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [scheduleFilter, setScheduleFilter] = useState<string>('all');
@@ -126,10 +127,11 @@ export function JobsPage() {
   });
 
   const jobsQuery = useQuery({
-    queryKey: ['jobs', statusFilter, triggerModeFilter, cameraFilter, scheduleFilter],
+    queryKey: ['jobs', statusFilter, strategyFilter, triggerModeFilter, cameraFilter, scheduleFilter],
     queryFn: () =>
       listJobs({
         status: statusFilter === 'all' ? undefined : statusFilter,
+        strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
         triggerMode: triggerModeFilter === 'all' ? undefined : triggerModeFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         scheduleId: scheduleFilter === 'all' ? undefined : scheduleFilter,
@@ -596,6 +598,19 @@ export function JobsPage() {
                     { label: '已取消', value: 'cancelled' },
                   ]}
                   style={{ width: 120 }}
+                />
+                <Select
+                  size="small"
+                  value={strategyFilter}
+                  onChange={setStrategyFilter}
+                  options={[
+                    { label: '全部策略', value: 'all' },
+                    ...strategies.map((item) => ({
+                      label: item.name,
+                      value: item.id,
+                    })),
+                  ]}
+                  style={{ width: 160 }}
                 />
                 <Select
                   size="small"
