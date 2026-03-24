@@ -10,6 +10,7 @@ import {
   Empty,
   Form,
   Input,
+  Modal,
   Popconfirm,
   Row,
   Select,
@@ -21,11 +22,13 @@ import {
 } from 'antd';
 import {
   Camera,
+  CameraDiagnostic,
   CameraPayload,
   checkAllCamerasStatus,
   checkCameraStatus,
   createCamera,
   deleteCamera,
+  diagnoseCamera,
   getCameraStatus,
   listCameraStatuses,
   listCameras,
@@ -79,6 +82,8 @@ export function CamerasPage() {
   const [form] = Form.useForm<CameraFormValues>();
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const [alertOnly, setAlertOnly] = useState(false);
+  const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
+  const [lastDiagnostic, setLastDiagnostic] = useState<CameraDiagnostic | null>(null);
 
   const cameraQuery = useQuery({
     queryKey: ['cameras'],
@@ -248,6 +253,23 @@ export function CamerasPage() {
     },
   });
 
+  const diagnoseMutation = useMutation({
+    mutationFn: (cameraId: string) => diagnoseCamera(cameraId),
+    onSuccess: async (diagnostic) => {
+      setLastDiagnostic(diagnostic);
+      setDiagnosticModalOpen(true);
+      await invalidateCameraQueries();
+      if (diagnostic.success) {
+        message.success('摄像头深度诊断完成');
+      } else {
+        message.warning('摄像头深度诊断完成，发现异常');
+      }
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '摄像头深度诊断失败'));
+    },
+  });
+
   const resetForCreate = () => {
     setSelectedCameraId(CREATE_CAMERA_ID);
     form.setFieldsValue(DEFAULT_CAMERA_VALUES);
@@ -386,6 +408,14 @@ export function CamerasPage() {
                       loading={checkMutation.isPending}
                     >
                       立即检查
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => diagnoseMutation.mutate(activeCamera.id)}
+                      loading={diagnoseMutation.isPending}
+                      data-testid="cameras-diagnose-btn"
+                    >
+                      深度诊断
                     </Button>
                     <Popconfirm
                       title="确定删除该摄像头吗？"
@@ -532,6 +562,64 @@ export function CamerasPage() {
           </Space>
         </Col>
       </Row>
+
+      <Modal
+        open={diagnosticModalOpen}
+        title="摄像头诊断结果"
+        onCancel={() => setDiagnosticModalOpen(false)}
+        footer={
+          <Button type="primary" onClick={() => setDiagnosticModalOpen(false)}>
+            关闭
+          </Button>
+        }
+      >
+        {lastDiagnostic ? (
+          <Descriptions column={1} size="small" bordered>
+            <Descriptions.Item label="摄像头">
+              {lastDiagnostic.camera_name} ({lastDiagnostic.camera_id})
+            </Descriptions.Item>
+            <Descriptions.Item label="诊断状态">
+              <Tag color={lastDiagnostic.success ? 'green' : 'red'}>
+                {lastDiagnostic.success ? '成功' : '失败'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="协议">
+              {lastDiagnostic.protocol.toUpperCase()}
+            </Descriptions.Item>
+            <Descriptions.Item label="采集模式">
+              {lastDiagnostic.capture_mode}
+            </Descriptions.Item>
+            <Descriptions.Item label="时延">
+              {lastDiagnostic.latency_ms} ms
+            </Descriptions.Item>
+            <Descriptions.Item label="图像尺寸">
+              {lastDiagnostic.width && lastDiagnostic.height
+                ? `${lastDiagnostic.width} x ${lastDiagnostic.height}`
+                : '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="文件大小">
+              {lastDiagnostic.frame_size_bytes ? `${lastDiagnostic.frame_size_bytes} bytes` : '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="媒体类型">
+              {lastDiagnostic.mime_type ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="脱敏地址">
+              {lastDiagnostic.stream_url_masked ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="诊断快照路径">
+              {lastDiagnostic.snapshot_path ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="错误信息">
+              {lastDiagnostic.error_message ?? '无'}
+            </Descriptions.Item>
+            <Descriptions.Item label="诊断时间">
+              {lastDiagnostic.checked_at}
+            </Descriptions.Item>
+          </Descriptions>
+        ) : (
+          <Empty description="暂无诊断结果" />
+        )}
+      </Modal>
     </Space>
   );
 }

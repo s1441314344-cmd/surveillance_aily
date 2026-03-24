@@ -94,6 +94,23 @@ export type CameraStatusSweepSummary = {
   total_count: number;
 };
 
+export type CameraDiagnostic = {
+  camera_id: string;
+  camera_name: string;
+  protocol: string;
+  stream_url_masked: string | null;
+  success: boolean;
+  capture_mode: string;
+  latency_ms: number;
+  frame_size_bytes: number | null;
+  mime_type: string | null;
+  width: number | null;
+  height: number | null;
+  snapshot_path: string | null;
+  error_message: string | null;
+  checked_at: string;
+};
+
 export async function listModelProviders() {
   const response = await apiClient.get<ModelProvider[]>('/api/model-providers');
   return response.data;
@@ -181,6 +198,15 @@ export async function checkAllCamerasStatus(params?: { cameraIds?: string[] }) {
   const response = await apiClient.post<CameraStatusSweepSummary>('/api/cameras/check-all', undefined, {
     params: {
       camera_ids: params?.cameraIds?.length ? params.cameraIds.join(',') : undefined,
+    },
+  });
+  return response.data;
+}
+
+export async function diagnoseCamera(cameraId: string, params?: { saveSnapshot?: boolean }) {
+  const response = await apiClient.post<CameraDiagnostic>(`/api/cameras/${cameraId}/diagnose`, undefined, {
+    params: {
+      save_snapshot: params?.saveSnapshot ?? true,
     },
   });
   return response.data;
