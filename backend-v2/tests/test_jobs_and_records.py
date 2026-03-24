@@ -71,7 +71,12 @@ def test_upload_job_and_task_records_flow(client):
 
     export_response = client.get("/api/task-records/export", headers=headers)
     assert export_response.status_code == 200
-    assert "record_id,job_id,created_at" in export_response.text
+    assert "record_id,job_id,job_type,schedule_id,created_at" in export_response.text
+    export_rows = list(csv.DictReader(StringIO(export_response.text)))
+    assert len(export_rows) == 2
+    assert all(row["job_type"] == "upload_batch" for row in export_rows)
+    assert all(row["schedule_id"] == "" for row in export_rows)
+    assert all(row["camera_id"] == "" for row in export_rows)
 
     export_xlsx_response = client.get("/api/task-records/export?format=xlsx", headers=headers)
     assert export_xlsx_response.status_code == 200
@@ -85,6 +90,7 @@ def test_upload_job_and_task_records_flow(client):
     with ZipFile(BytesIO(export_xlsx_response.content), "r") as workbook:
         sheet_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
         assert "record_id" in sheet_xml
+        assert "job_type" in sheet_xml
         assert "helmet-1.jpg" in sheet_xml or "helmet-2.png" in sheet_xml
 
 
@@ -692,6 +698,8 @@ def test_task_records_filter_by_camera_and_time_range(client):
     export_rows = list(csv.DictReader(StringIO(export_in_range_response.text)))
     assert len(export_rows) == 1
     assert export_rows[0]["record_id"] == camera_records[0]["id"]
+    assert export_rows[0]["camera_id"] == camera["id"]
+    assert export_rows[0]["job_type"] == "camera_once"
 
     export_out_of_range_response = client.get(
         "/api/task-records/export",
