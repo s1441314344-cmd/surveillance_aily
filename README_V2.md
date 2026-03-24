@@ -172,6 +172,7 @@ npm run dev
 ## 当前阶段
 
 - 已完成：V2 backlog 拆分、前后端基础骨架、核心路由占位、本地依赖编排、统一异步任务链路、独立 scheduler 进程、本地联调脚本、历史数据回填 dry-run / apply 工具
+- 已补充：scheduler 摄像头状态后台巡检（周期写入状态日志，供摄像头监控页聚合展示）
 - 已补充：OpenAI / 智谱 provider adapter 真实调用实现，开发环境可通过 `PROVIDER_MOCK_FALLBACK_ENABLED=true` 保持无密钥可联调
 - 已补充：模型样本评估脚本、示例样本清单、价格表和指标汇总输出
 - 已补充：RTSP 深度诊断 CLI / API、评估 Markdown 报告导出、迁移决策策略输出

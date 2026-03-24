@@ -1,3 +1,4 @@
+from app.services.scheduler_service import run_camera_status_sweep_once
 from .test_auth_and_users import auth_headers, login_as_admin
 
 
@@ -185,3 +186,73 @@ def test_list_camera_statuses_with_alert_filter_and_camera_ids(client):
     filtered_statuses = filtered_response.json()
     assert len(filtered_statuses) == 1
     assert filtered_statuses[0]["camera_id"] == ok_camera["id"]
+
+
+def test_scheduler_camera_status_sweep_generates_status_logs(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    ok_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "状态巡检正常摄像头",
+            "location": "巡检位A",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/sweep-ok",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/sweep-ok",
+        },
+    )
+    assert ok_camera_response.status_code == 200
+    ok_camera = ok_camera_response.json()
+
+    bad_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "状态巡检异常摄像头",
+            "location": "巡检位B",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "bad-rtsp-url",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/sweep-bad",
+        },
+    )
+    assert bad_camera_response.status_code == 200
+    bad_camera = bad_camera_response.json()
+
+    summary = run_camera_status_sweep_once()
+    assert summary["total_count"] == 2
+    assert summary["checked_count"] == 2
+    assert summary["failed_count"] == 0
+
+    statuses_response = client.get("/api/cameras/statuses", headers=headers)
+    assert statuses_response.status_code == 200
+    statuses = statuses_response.json()
+    assert len(statuses) == 2
+    status_map = {item["camera_id"]: item for item in statuses}
+    assert status_map[ok_camera["id"]]["connection_status"] == "online"
+    assert status_map[ok_camera["id"]]["alert_status"] == "normal"
+    assert status_map[bad_camera["id"]]["connection_status"] == "offline"
+    assert status_map[bad_camera["id"]]["alert_status"] == "error"
+    assert status_map[bad_camera["id"]]["last_error"] is not None
+
+
+def test_scheduler_camera_status_sweep_returns_zero_without_cameras():
+    summary = run_camera_status_sweep_once()
+    assert summary["total_count"] == 0
+    assert summary["checked_count"] == 0
+    assert summary["failed_count"] == 0

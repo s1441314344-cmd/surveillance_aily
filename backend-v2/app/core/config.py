@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     celery_enabled: bool = True
     scheduler_poll_interval_seconds: int = 30
+    scheduler_camera_status_sweep_enabled: bool = True
+    scheduler_camera_status_sweep_interval_seconds: int = 60
     storage_root: str = "./data/storage"
     provider_mock_fallback_enabled: bool = True
     cors_origins: Annotated[list[str], NoDecode] = DEFAULT_CORS_ORIGINS

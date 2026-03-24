@@ -40,6 +40,12 @@ python3 -m celery -A app.core.celery_app.celery_app worker --loglevel=info
 python -m app.schedulers.runner
 ```
 
+可选环境变量（默认值见 `.env.example`）：
+
+- `SCHEDULER_POLL_INTERVAL_SECONDS`：定时任务扫描周期（秒）
+- `SCHEDULER_CAMERA_STATUS_SWEEP_ENABLED`：是否启用摄像头状态后台巡检
+- `SCHEDULER_CAMERA_STATUS_SWEEP_INTERVAL_SECONDS`：摄像头状态巡检周期（秒）
+
 ## 推荐联调方式
 
 仓库根目录已经提供轻量命令入口，适合日常开发：
@@ -112,6 +118,7 @@ make v2-release-gate
 - `POST /api/jobs/cameras/once` 只负责校验输入并创建 `queued` 状态的 Job。
 - Celery worker 通过 `jobs.process(job_id)` 执行抓帧、模型调用、Schema 校验和记录写入。
 - scheduler 进程负责扫描到期的 `job_schedules`，创建 `camera_schedule` Job，并派发到 worker。
+- scheduler 进程会按配置周期执行摄像头状态巡检，批量写入 `camera_status_logs`，供监控页面读取。
 - `task_records`、`feedback`、`dashboard` 继续复用统一的任务闭环。
 
 ## 历史数据回填
