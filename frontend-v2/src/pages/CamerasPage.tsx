@@ -13,6 +13,7 @@ import {
   Popconfirm,
   Row,
   Select,
+  Switch,
   Space,
   Spin,
   Tag,
@@ -77,6 +78,7 @@ export function CamerasPage() {
   const queryClient = useQueryClient();
   const [form] = Form.useForm<CameraFormValues>();
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [alertOnly, setAlertOnly] = useState(false);
 
   const cameraQuery = useQuery({
     queryKey: ['cameras'],
@@ -115,6 +117,13 @@ export function CamerasPage() {
     const statuses = statusListQuery.data ?? [];
     return Object.fromEntries(statuses.map((item) => [item.camera_id, item]));
   }, [statusListQuery.data]);
+
+  const visibleCameras = useMemo(() => {
+    if (!alertOnly) {
+      return cameras;
+    }
+    return cameras.filter((camera) => (cameraStatusMap[camera.id]?.alert_status ?? 'normal') !== 'normal');
+  }, [alertOnly, cameraStatusMap, cameras]);
 
   const statusSummary = useMemo(() => {
     const summary = {
@@ -282,6 +291,15 @@ export function CamerasPage() {
             title="摄像头列表"
             extra={
               <Space>
+                <Space size={6}>
+                  <Text type="secondary">仅看告警</Text>
+                  <Switch
+                    size="small"
+                    checked={alertOnly}
+                    onChange={setAlertOnly}
+                    data-testid="cameras-alert-only-switch"
+                  />
+                </Space>
                 <Button
                   size="small"
                   loading={sweepMutation.isPending}
@@ -316,9 +334,9 @@ export function CamerasPage() {
             ) : null}
             {cameraQuery.isLoading ? (
               <Spin />
-            ) : cameras.length ? (
+            ) : visibleCameras.length ? (
               <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-                {cameras.map((camera: Camera) => (
+                {visibleCameras.map((camera: Camera) => (
                   <Card
                     key={camera.id}
                     size="small"
@@ -347,6 +365,8 @@ export function CamerasPage() {
                   </Card>
                 ))}
               </Space>
+            ) : alertOnly ? (
+              <Empty description="当前没有告警摄像头" />
             ) : (
               <Empty description="暂无摄像头配置" />
             )}

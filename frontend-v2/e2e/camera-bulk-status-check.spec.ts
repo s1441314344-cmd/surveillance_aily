@@ -101,5 +101,9 @@ test('bulk camera status check updates status summary and cards', async ({ page,
   const badCard = page.locator('.ant-card').filter({ hasText: abnormalCameraName }).first();
   await expect(badCard).toContainText('offline');
 
+  await page.getByTestId('cameras-alert-only-switch').click();
+  await expect(page.locator('.ant-card').filter({ hasText: abnormalCameraName }).first()).toBeVisible();
+  await expect(page.locator('.ant-card').filter({ hasText: normalCameraName }).first()).toHaveCount(0);
+
   await expect(page.getByText(/在线\s+\d+\s+\/\s+告警\s+\d+/)).toBeVisible();
 });
