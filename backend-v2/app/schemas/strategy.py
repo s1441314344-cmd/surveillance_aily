@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StrategyBase(BaseModel):
@@ -40,9 +40,20 @@ class StrategyRead(StrategyBase):
 
 
 class StrategySchemaValidateRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(extra="forbid")
 
-    schema_definition: dict = Field(alias="schema")
+    schema_definition: dict
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_schema_aliases(cls, value):
+        if not isinstance(value, dict):
+            return value
+        if "schema_definition" in value:
+            return value
+        if "schema" in value:
+            return {"schema_definition": value["schema"]}
+        return value
 
 
 class StrategySchemaValidateResponse(BaseModel):
