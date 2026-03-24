@@ -1,18 +1,8 @@
 import { apiClient } from './client';
+import type { AuthApiUser, TokenSessionResponse } from '@/shared/auth/session';
 
-export type AuthUserResponse = {
-  id: string;
-  username: string;
-  display_name: string;
-  roles: string[];
-};
-
-export type LoginResponse = {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  user: AuthUserResponse;
-};
+export type AuthUserResponse = AuthApiUser;
+export type LoginResponse = TokenSessionResponse;
 
 export async function login(payload: { username: string; password: string }) {
   const response = await apiClient.post<LoginResponse>('/api/auth/login', payload);
