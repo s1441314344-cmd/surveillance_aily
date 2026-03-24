@@ -1,5 +1,5 @@
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from io import BytesIO, StringIO
 from pathlib import Path
 from zipfile import ZipFile
@@ -617,6 +617,59 @@ def test_camera_schedule_task_record_contains_job_runtime_fields(client):
     filtered_records = filtered_records_response.json()
     assert len(filtered_records) == 1
     assert filtered_records[0]["id"] == records[0]["id"]
+
+
+def test_jobs_filter_by_created_time_range(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    first_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("jobs-time-filter-1.jpg", b"fake-jpg-content-1", "image/jpeg"))],
+    )
+    assert first_job_response.status_code == 200
+    first_job = first_job_response.json()
+
+    second_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("jobs-time-filter-2.jpg", b"fake-jpg-content-2", "image/jpeg"))],
+    )
+    assert second_job_response.status_code == 200
+    second_job = second_job_response.json()
+
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        first_job_model = db.get(Job, first_job["id"])
+        second_job_model = db.get(Job, second_job["id"])
+        assert first_job_model is not None
+        assert second_job_model is not None
+        first_job_model.created_at = (now - timedelta(days=2)).replace(tzinfo=None)
+        second_job_model.created_at = now.replace(tzinfo=None)
+        db.commit()
+
+    recent_jobs_response = client.get(
+        "/api/jobs",
+        headers=headers,
+        params={"created_from": (now - timedelta(hours=1)).isoformat()},
+    )
+    assert recent_jobs_response.status_code == 200
+    recent_ids = {item["id"] for item in recent_jobs_response.json()}
+    assert second_job["id"] in recent_ids
+    assert first_job["id"] not in recent_ids
+
+    old_jobs_response = client.get(
+        "/api/jobs",
+        headers=headers,
+        params={"created_to": (now - timedelta(days=1)).isoformat()},
+    )
+    assert old_jobs_response.status_code == 200
+    old_ids = {item["id"] for item in old_jobs_response.json()}
+    assert first_job["id"] in old_ids
+    assert second_job["id"] not in old_ids
 
 
 def test_task_records_filter_by_camera_and_time_range(client):

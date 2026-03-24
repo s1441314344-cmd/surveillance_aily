@@ -169,6 +169,8 @@ export async function listJobs(params?: {
   triggerMode?: string;
   cameraId?: string;
   scheduleId?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }) {
   const response = await apiClient.get<Job[]>('/api/jobs', {
     params: {
@@ -178,6 +180,8 @@ export async function listJobs(params?: {
       trigger_mode: params?.triggerMode || undefined,
       camera_id: params?.cameraId || undefined,
       schedule_id: params?.scheduleId || undefined,
+      created_from: params?.createdFrom || undefined,
+      created_to: params?.createdTo || undefined,
     },
   });
   return response.data;

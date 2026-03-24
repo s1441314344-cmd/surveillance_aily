@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.config import get_settings
+from app.core.database import database_url
 from app.models.file_asset import FileAsset
 from app.models.job import Job, JobSchedule
 from app.schemas.auth import CurrentUser
@@ -60,6 +61,8 @@ def list_jobs(
     trigger_mode: str | None = None,
     camera_id: str | None = None,
     schedule_id: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
 ) -> list[JobRead]:
     stmt = select(Job).order_by(Job.created_at.desc(), Job.id.desc())
     if status_filter:
@@ -74,6 +77,10 @@ def list_jobs(
         stmt = stmt.where(Job.camera_id == camera_id)
     if schedule_id:
         stmt = stmt.where(Job.schedule_id == schedule_id)
+    if created_from:
+        stmt = stmt.where(Job.created_at >= _ensure_aware_for_db(created_from))
+    if created_to:
+        stmt = stmt.where(Job.created_at <= _ensure_aware_for_db(created_to))
     return [serialize_job(job) for job in db.scalars(stmt)]
 
 
@@ -408,6 +415,13 @@ def _serialize_datetime(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.astimezone(timezone.utc).isoformat() if value.tzinfo else value.replace(tzinfo=timezone.utc).isoformat()
+
+
+def _ensure_aware_for_db(value: datetime) -> datetime:
+    normalized = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    if database_url.get_backend_name().startswith("sqlite"):
+        return normalized.replace(tzinfo=None)
+    return normalized
 
 
 def _utcnow() -> datetime:

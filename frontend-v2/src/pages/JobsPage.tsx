@@ -99,6 +99,17 @@ function formatDateTime(value: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
 }
 
+function parseDateFilter(value: string) {
+  if (!value) {
+    return undefined;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  return date.toISOString();
+}
+
 export function JobsPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -109,6 +120,8 @@ export function JobsPage() {
   const [triggerModeFilter, setTriggerModeFilter] = useState<string>('all');
   const [cameraFilter, setCameraFilter] = useState<string>('all');
   const [scheduleFilter, setScheduleFilter] = useState<string>('all');
+  const [createdFromFilter, setCreatedFromFilter] = useState<string>('');
+  const [createdToFilter, setCreatedToFilter] = useState<string>('');
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<string>('all');
   const [scheduleCameraFilter, setScheduleCameraFilter] = useState<string>('all');
   const [scheduleStrategyFilter, setScheduleStrategyFilter] = useState<string>('all');
@@ -128,7 +141,16 @@ export function JobsPage() {
   });
 
   const jobsQuery = useQuery({
-    queryKey: ['jobs', statusFilter, strategyFilter, triggerModeFilter, cameraFilter, scheduleFilter],
+    queryKey: [
+      'jobs',
+      statusFilter,
+      strategyFilter,
+      triggerModeFilter,
+      cameraFilter,
+      scheduleFilter,
+      createdFromFilter,
+      createdToFilter,
+    ],
     queryFn: () =>
       listJobs({
         status: statusFilter === 'all' ? undefined : statusFilter,
@@ -136,6 +158,8 @@ export function JobsPage() {
         triggerMode: triggerModeFilter === 'all' ? undefined : triggerModeFilter,
         cameraId: cameraFilter === 'all' ? undefined : cameraFilter,
         scheduleId: scheduleFilter === 'all' ? undefined : scheduleFilter,
+        createdFrom: parseDateFilter(createdFromFilter),
+        createdTo: parseDateFilter(createdToFilter),
       }),
     refetchInterval: 5000,
   });
@@ -694,6 +718,20 @@ export function JobsPage() {
                     }
                   }}
                   options={scheduleFilterOptions}
+                  style={{ width: 190 }}
+                />
+                <Input
+                  size="small"
+                  type="datetime-local"
+                  value={createdFromFilter}
+                  onChange={(event) => setCreatedFromFilter(event.target.value)}
+                  style={{ width: 190 }}
+                />
+                <Input
+                  size="small"
+                  type="datetime-local"
+                  value={createdToFilter}
+                  onChange={(event) => setCreatedToFilter(event.target.value)}
                   style={{ width: 190 }}
                 />
               </Space>
