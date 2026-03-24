@@ -31,6 +31,26 @@ function toDateTimeLocalValue(date: Date): string {
   )}`;
 }
 
+async function getWithRetry(
+  request: APIRequestContext,
+  url: string,
+  options: Parameters<APIRequestContext['get']>[1],
+  retries = 3,
+) {
+  for (let attempt = 0; attempt < retries; attempt += 1) {
+    try {
+      return await request.get(url, options);
+    } catch (error) {
+      const isConnectionReset = String(error).includes('ECONNRESET');
+      if (!isConnectionReset || attempt === retries - 1) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+  }
+  throw new Error('request retry exhausted');
+}
+
 test('record anomaly can jump to feedback and close review loop', async ({ page, request }) => {
   const token = await loginToken(request);
   const now = new Date();
@@ -62,7 +82,7 @@ test('record anomaly can jump to feedback and close review loop', async ({ page,
   const processedJob = (await runJobResponse.json()) as { status: string };
   expect(processedJob.status).toBe('completed');
 
-  const recordsResponse = await request.get(`${API_BASE_URL}/api/task-records`, {
+  const recordsResponse = await getWithRetry(request, `${API_BASE_URL}/api/task-records`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -93,16 +113,21 @@ test('record anomaly can jump to feedback and close review loop', async ({ page,
 
   await expect
     .poll(async () => {
-      const anomaliesResponse = await request.get(`${API_BASE_URL}/api/dashboard/anomalies`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        params: {
-          strategy_id: 'preset-helmet',
-          created_from: new Date(now.getTime() - 2 * 60 * 1000).toISOString(),
-          created_to: new Date().toISOString(),
-        },
-      });
+      let anomaliesResponse;
+      try {
+        anomaliesResponse = await getWithRetry(request, `${API_BASE_URL}/api/dashboard/anomalies`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: {
+            strategy_id: 'preset-helmet',
+            created_from: new Date(now.getTime() - 2 * 60 * 1000).toISOString(),
+            created_to: new Date().toISOString(),
+          },
+        });
+      } catch {
+        return false;
+      }
       if (!anomaliesResponse.ok()) {
         return false;
       }
@@ -134,7 +159,7 @@ test('record anomaly can jump to feedback and close review loop', async ({ page,
   await page.getByRole('button', { name: '更新复核结果' }).click();
   await expect(page.getByText('复核结果已更新')).toBeVisible();
 
-  const summaryResponse = await request.get(`${API_BASE_URL}/api/dashboard/summary`, {
+  const summaryResponse = await getWithRetry(request, `${API_BASE_URL}/api/dashboard/summary`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
