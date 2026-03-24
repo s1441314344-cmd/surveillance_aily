@@ -8,7 +8,7 @@ export function AccessDeniedPage() {
 
   return (
     <Card>
-      <Space direction="vertical" size={12}>
+      <Space orientation="vertical" size={12}>
         <Title level={4} style={{ margin: 0 }}>
           无权限访问
         </Title>
