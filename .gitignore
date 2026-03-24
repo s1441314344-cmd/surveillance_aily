@@ -103,3 +103,4 @@ data/detections/*
 data/storage/
 data/preflight-logs/
 data/release-drill-logs/
+data/uat-logs/

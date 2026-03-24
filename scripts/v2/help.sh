@@ -21,6 +21,7 @@ Smart Inspection V2 local commands:
   make v2-camera-check # run deep RTSP/mock camera diagnostic
   make v2-camera-validate # validate a whitelist manifest and export reports
   make v2-release-drill # run cutover drill (preflight + backfill + rollback-ready report)
+  make v2-uat          # run UAT baseline and export a verification summary
   make v2-deps-down    # stop postgres + redis
 
 Recommended flow:
@@ -53,4 +54,9 @@ Release drill examples:
   make v2-release-drill
   ./scripts/v2/release-drill.sh --with-e2e
   ./scripts/v2/release-drill.sh --apply-backfill
+
+UAT examples:
+  make v2-uat
+  ./scripts/v2/uat.sh --with-release-drill
+  ./scripts/v2/uat.sh --with-release-drill --release-drill-with-e2e
 EOF

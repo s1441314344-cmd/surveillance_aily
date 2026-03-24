@@ -62,6 +62,7 @@ make v2-eval
 make v2-camera-check
 make v2-camera-validate
 make v2-release-drill
+make v2-uat
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
@@ -89,6 +90,8 @@ make v2-release-drill
 `make v2-camera-validate` 会按白名单清单批量执行摄像头诊断，输出 JSON / Markdown 报告，并根据期望门槛给出通过/失败结果。
 
 `make v2-release-drill` 会串行执行 `preflight + backfill + 演练报告生成`，输出一份可用于上线评审的 JSON / Markdown 报告，并包含标准回滚步骤提示。
+
+`make v2-uat` 会串行执行 `backend pytest + frontend lint/build + e2e`，并输出一份 JSON 验收摘要；可选追加 release drill。
 
 ## 异步执行说明
 
@@ -253,6 +256,28 @@ make v2-release-drill
 - `backfill.json`
 - `release-drill-report.json`
 - `release-drill-report.md`
+
+## UAT 验收脚本
+
+默认执行基线验收（后端测试 + 前端 lint/build + e2e）：
+
+```bash
+make v2-uat
+```
+
+验收后追加 release drill：
+
+```bash
+./scripts/v2/uat.sh --with-release-drill
+```
+
+release drill 同时带 e2e：
+
+```bash
+./scripts/v2/uat.sh --with-release-drill --release-drill-with-e2e
+```
+
+输出目录默认在 `data/uat-logs/<timestamp>/`，包含每一步日志和 `summary.json`。
 
 ## 当前包含
 
