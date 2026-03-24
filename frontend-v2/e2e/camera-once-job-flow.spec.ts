@@ -68,14 +68,6 @@ test('camera once job is queued and can be cancelled in job center', async ({ pa
     .first()
     .click();
 
-  const strategySelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '分析策略' }).locator('.ant-select');
-  await strategySelect.click();
-  await page
-    .locator('.ant-select-dropdown .ant-select-item-option')
-    .filter({ hasText: '火情识别' })
-    .first()
-    .click();
-
   const cameraSelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '选择摄像头' }).locator('.ant-select');
   await cameraSelect.click();
   await page
