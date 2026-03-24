@@ -108,9 +108,20 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
   await scheduleRow.getByRole('button', { name: /启\s*用/ }).click();
   await expect(scheduleRow).toContainText('active');
 
+  const runNowResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/job-schedules/${scheduleId}/run-now`) &&
+      response.request().method() === 'POST',
+  );
+  await scheduleRow.getByRole('button', { name: '立即执行' }).click();
+  const runNowResponse = await runNowResponsePromise;
+  expect(runNowResponse.ok()).toBeTruthy();
+  const runNowJob = (await runNowResponse.json()) as { id: string };
+
   await scheduleRow.getByRole('button', { name: '查看任务' }).click();
 
   const taskQueueCard = page.locator('.ant-card').filter({ hasText: '任务队列' }).first();
   await expect(taskQueueCard.locator('[data-testid="jobs-filter-trigger"]')).toContainText('定时触发');
   await expect(taskQueueCard.locator('[data-testid="jobs-filter-schedule"]')).toContainText(shortScheduleId);
+  await expect(taskQueueCard.locator('.ant-table-tbody tr').filter({ hasText: runNowJob.id.slice(0, 8) }).first()).toBeVisible();
 });

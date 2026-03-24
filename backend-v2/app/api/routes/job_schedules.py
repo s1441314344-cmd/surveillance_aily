@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
-from app.schemas.job import JobScheduleCreate, JobScheduleRead, JobScheduleStatusUpdate, JobScheduleUpdate
+from app.schemas.job import JobRead, JobScheduleCreate, JobScheduleRead, JobScheduleStatusUpdate, JobScheduleUpdate
 from app.services.job_schedule_service import (
     delete_job_schedule as delete_job_schedule_record,
     get_job_schedule_or_404,
@@ -13,6 +13,7 @@ from app.services.job_schedule_service import (
     update_job_schedule_status as update_job_schedule_status_record,
 )
 from app.services.job_schedule_service import create_job_schedule as create_job_schedule_record
+from app.services.job_service import create_camera_schedule_job as create_camera_schedule_job_record
 from app.services.rbac import ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR
 
 router = APIRouter()
@@ -78,3 +79,17 @@ def delete_job_schedule(
     db: Session = Depends(get_db),
 ):
     return delete_job_schedule_record(db, get_job_schedule_or_404(db, schedule_id))
+
+
+@router.post("/{schedule_id}/run-now", response_model=JobRead)
+def run_schedule_now(
+    schedule_id: str,
+    current_user: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    schedule = get_job_schedule_or_404(db, schedule_id)
+    return create_camera_schedule_job_record(
+        db,
+        schedule=schedule,
+        requested_by=current_user.username,
+    )

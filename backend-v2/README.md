@@ -120,6 +120,7 @@ make v2-release-gate
 - scheduler 进程负责扫描到期的 `job_schedules`，创建 `camera_schedule` Job，并派发到 worker。
 - scheduler 进程会按配置周期执行摄像头状态巡检，批量写入 `camera_status_logs`，供监控页面读取。
 - 管理端可通过 `POST /api/cameras/check-all` 手动触发全量或指定摄像头的状态巡检。
+- 管理端可通过 `POST /api/job-schedules/{id}/run-now` 对某个计划进行一次立即触发（仍按 `camera_schedule` 入队）。
 - `task_records`、`feedback`、`dashboard` 继续复用统一的任务闭环。
 
 ## 历史数据回填

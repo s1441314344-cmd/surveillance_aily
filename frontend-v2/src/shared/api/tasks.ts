@@ -155,6 +155,11 @@ export async function deleteJobSchedule(scheduleId: string) {
   return response.data;
 }
 
+export async function runJobScheduleNow(scheduleId: string) {
+  const response = await apiClient.post<Job>(`/api/job-schedules/${scheduleId}/run-now`);
+  return response.data;
+}
+
 export async function listJobs(params?: {
   status?: string;
   jobType?: string;

@@ -34,6 +34,7 @@ import {
   listJobs,
   listJobSchedules,
   retryJob,
+  runJobScheduleNow,
   updateJobSchedule,
   updateJobScheduleStatus,
   uploadJob,
@@ -271,6 +272,20 @@ export function JobsPage() {
     },
     onError: (error) => {
       message.error(getApiErrorMessage(error, '删除计划失败'));
+    },
+  });
+
+  const runScheduleNowMutation = useMutation({
+    mutationFn: runJobScheduleNow,
+    onSuccess: async (job) => {
+      await Promise.all([invalidateJobs(), invalidateSchedules()]);
+      setSelectedJobId(job.id);
+      setTriggerModeFilter('schedule');
+      setScheduleFilter(job.schedule_id ?? 'all');
+      message.success('已按计划立即触发一次任务');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '计划立即执行失败'));
     },
   });
 
@@ -911,6 +926,13 @@ export function JobsPage() {
                     }}
                   >
                     查看任务
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => runScheduleNowMutation.mutate(record.id)}
+                    loading={runScheduleNowMutation.isPending}
+                  >
+                    立即执行
                   </Button>
                   <Button
                     size="small"
