@@ -54,6 +54,55 @@ const DEFAULT_DEFINITION_TEXT = JSON.stringify(
   2,
 );
 
+const ALLOWED_FILTER_KEYS = new Set(['strategy_id', 'model_provider', 'anomaly_type', 'time_range']);
+
+function validateDashboardDefinition(definition: unknown): string[] {
+  const errors: string[] = [];
+  if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+    return ['看板定义必须是 JSON 对象'];
+  }
+
+  const typedDefinition = definition as { widgets?: unknown; filters?: unknown };
+
+  if (typedDefinition.widgets !== undefined) {
+    if (!Array.isArray(typedDefinition.widgets)) {
+      errors.push('widgets 必须是数组');
+    } else {
+      typedDefinition.widgets.forEach((widget, index) => {
+        if (!widget || typeof widget !== 'object' || Array.isArray(widget)) {
+          errors.push(`widgets[${index}] 必须是对象`);
+          return;
+        }
+        const typedWidget = widget as { type?: unknown; metric?: unknown };
+        if (typeof typedWidget.type !== 'string' || !typedWidget.type.trim()) {
+          errors.push(`widgets[${index}].type 必须是非空字符串`);
+        }
+        if (typeof typedWidget.metric !== 'string' || !typedWidget.metric.trim()) {
+          errors.push(`widgets[${index}].metric 必须是非空字符串`);
+        }
+      });
+    }
+  }
+
+  if (typedDefinition.filters !== undefined) {
+    if (!typedDefinition.filters || typeof typedDefinition.filters !== 'object' || Array.isArray(typedDefinition.filters)) {
+      errors.push('filters 必须是对象');
+    } else {
+      Object.entries(typedDefinition.filters).forEach(([key, value]) => {
+        if (!ALLOWED_FILTER_KEYS.has(key)) {
+          errors.push(`filters 不支持字段：${key}`);
+          return;
+        }
+        if (value !== null && typeof value !== 'string') {
+          errors.push(`filters.${key} 必须是字符串或 null`);
+        }
+      });
+    }
+  }
+
+  return errors;
+}
+
 export function DashboardsPage() {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
@@ -168,6 +217,21 @@ export function DashboardsPage() {
       definition = JSON.parse(values.definition_text);
     } catch {
       message.error('看板定义 JSON 不是合法格式');
+      return;
+    }
+
+    const definitionErrors = validateDashboardDefinition(definition);
+    if (definitionErrors.length > 0) {
+      modal.error({
+        title: '看板定义校验失败',
+        content: (
+          <ul style={{ marginBottom: 0, paddingLeft: 18 }}>
+            {definitionErrors.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ),
+      });
       return;
     }
 
