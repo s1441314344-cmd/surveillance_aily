@@ -282,16 +282,7 @@ export function DashboardsPage() {
         </Col>
 
         <Col xs={24} lg={16}>
-          <Card
-            title={effectiveSelectedDashboardId ? '编辑看板定义' : '新建看板定义'}
-            extra={
-              effectiveSelectedDashboardId ? (
-                <Button danger onClick={handleDelete} loading={deleteMutation.isPending}>
-                  删除
-                </Button>
-              ) : null
-            }
-          >
+          <Card title={effectiveSelectedDashboardId ? '编辑看板定义' : '新建看板定义'}>
             <Form layout="vertical" form={form} onFinish={handleSubmit}>
               <Row gutter={16}>
                 <Col xs={24} md={12}>
@@ -337,6 +328,11 @@ export function DashboardsPage() {
                   {effectiveSelectedDashboardId ? '保存修改' : '创建看板'}
                 </Button>
                 <Button onClick={resetForCreate}>重置为新建</Button>
+                {effectiveSelectedDashboardId ? (
+                  <Button danger onClick={handleDelete} loading={deleteMutation.isPending}>
+                    删除看板
+                  </Button>
+                ) : null}
               </Space>
             </Form>
           </Card>
