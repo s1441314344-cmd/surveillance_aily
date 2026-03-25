@@ -109,5 +109,6 @@ data/release-gates/
 data/verify-logs/
 data/manual_captures/
 data/terminal_captures/
+data/hik_verify_*/
 data/screenshot_*
 data/screenshot_probe_*

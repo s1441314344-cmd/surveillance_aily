@@ -98,3 +98,55 @@ def test_render_release_drill_markdown_contains_core_sections():
     assert "| smoke | passed |" in markdown
     assert "## 4. 标准回滚步骤" in markdown
     assert "流量切回 legacy 入口" in markdown
+
+
+def test_release_drill_report_ignores_expected_work_order_warning_in_risk():
+    report = build_release_drill_report(
+        preflight_summary_path="/tmp/preflight-summary.json",
+        preflight_summary={
+            "result": "passed",
+            "checks": {
+                "smoke": {"status": "passed"},
+                "perf": {"status": "passed"},
+                "soak": {"status": "passed"},
+                "e2e": {"status": "passed"},
+            },
+        },
+        backfill_report_path="/tmp/backfill.json",
+        backfill_report={
+            "dry_run": False,
+            "warnings": [
+                "Skipped 2 legacy work_orders from core migration; keep them in the legacy database."
+            ],
+            "missing_files": [],
+        },
+    )
+
+    assert report.gate_status == "passed"
+    assert report.warning_count == 1
+    assert report.risks == []
+
+
+def test_release_drill_report_keeps_unexpected_warning_as_risk():
+    report = build_release_drill_report(
+        preflight_summary_path="/tmp/preflight-summary.json",
+        preflight_summary={
+            "result": "passed",
+            "checks": {
+                "smoke": {"status": "passed"},
+                "perf": {"status": "passed"},
+                "soak": {"status": "passed"},
+                "e2e": {"status": "passed"},
+            },
+        },
+        backfill_report_path="/tmp/backfill.json",
+        backfill_report={
+            "dry_run": False,
+            "warnings": ["camera mapping conflicted with existing records"],
+            "missing_files": [],
+        },
+    )
+
+    assert report.gate_status == "passed"
+    assert report.warning_count == 1
+    assert any("unexpected warning" in item for item in report.risks)
