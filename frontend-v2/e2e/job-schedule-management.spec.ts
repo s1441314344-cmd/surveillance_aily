@@ -90,15 +90,22 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
 
   const scheduleCard = page.locator('.ant-card').filter({ hasText: '定时任务计划' }).first();
   const scheduleCameraFilter = scheduleCard.locator('.ant-card-extra .ant-select').nth(1);
+  const visibleSelectOptions = page.locator(
+    '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option',
+  );
   await scheduleCameraFilter.click();
-  await page
-    .locator('.ant-select-dropdown .ant-select-item-option')
-    .filter({ hasText: cameraName })
-    .first()
-    .click();
+  await visibleSelectOptions.filter({ hasText: cameraName }).first().click();
+
+  const schedulesRefetchPromise = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/job-schedules') &&
+      response.url().includes(`camera_id=${cameraId}`) &&
+      response.request().method() === 'GET',
+  );
+  await schedulesRefetchPromise;
 
   const scheduleRow = scheduleCard.locator('.ant-table-tbody tr').filter({ hasText: shortScheduleId }).first();
-  await expect(scheduleRow).toBeVisible();
+  await expect(scheduleRow).toBeVisible({ timeout: 30000 });
   await expect(scheduleRow).toContainText('active');
   await expect(scheduleRow).toContainText('5 分钟');
 

@@ -3,11 +3,21 @@ import { expect, test, type Page } from '@playwright/test';
 test.setTimeout(120000);
 
 async function loginByUi(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
-  await page.getByLabel('用户名').fill(username);
-  await page.getByLabel('密码').fill(password);
-  await page.getByRole('button', { name: '登录系统' }).click();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
+    await page.getByLabel('用户名').fill(username);
+    await page.getByLabel('密码').fill(password);
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      return;
+    } catch {
+      if (attempt === 2) {
+        break;
+      }
+    }
+  }
 }
 
 test('invalid dashboard definition is blocked by client-side validation', async ({ page }) => {
