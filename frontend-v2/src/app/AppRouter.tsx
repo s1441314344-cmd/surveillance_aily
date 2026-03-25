@@ -14,6 +14,9 @@ import {
 
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((module) => ({ default: module.LoginPage })));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
+const DashboardsPage = lazy(() =>
+  import('@/pages/DashboardsPage').then((module) => ({ default: module.DashboardsPage })),
+);
 const StrategiesPage = lazy(() => import('@/pages/StrategiesPage').then((module) => ({ default: module.StrategiesPage })));
 const CamerasPage = lazy(() => import('@/pages/CamerasPage').then((module) => ({ default: module.CamerasPage })));
 const JobsPage = lazy(() => import('@/pages/JobsPage').then((module) => ({ default: module.JobsPage })));
@@ -58,6 +61,10 @@ export function AppRouter() {
         <Route path="/" element={<ProtectedRoute />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route
+            path="dashboards"
+            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN]} element={<DashboardsPage />} />}
+          />
           <Route
             path="strategies"
             element={

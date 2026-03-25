@@ -16,6 +16,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   Upload,
 } from 'antd';
@@ -108,6 +109,31 @@ function parseDateFilter(value: string) {
     return undefined;
   }
   return date.toISOString();
+}
+
+function formatDuration(startedAt: string | null, finishedAt: string | null): string {
+  if (!startedAt || !finishedAt) {
+    return '-';
+  }
+
+  const start = new Date(startedAt).getTime();
+  const end = new Date(finishedAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) {
+    return '-';
+  }
+
+  const totalSeconds = Math.round((end - start) / 1000);
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return `${minutes}m ${seconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainMinutes = minutes % 60;
+  return `${hours}h ${remainMinutes}m ${seconds}s`;
 }
 
 export function JobsPage() {
@@ -757,6 +783,10 @@ export function JobsPage() {
                   dataIndex: 'strategy_name',
                 },
                 {
+                  title: '模型',
+                  render: (_, record) => `${record.model_provider}/${record.model_name}`,
+                },
+                {
                   title: '类型',
                   dataIndex: 'job_type',
                 },
@@ -789,6 +819,25 @@ export function JobsPage() {
                   title: '创建时间',
                   dataIndex: 'created_at',
                   render: formatDateTime,
+                },
+                {
+                  title: '耗时',
+                  render: (_, record) => formatDuration(record.started_at, record.finished_at),
+                },
+                {
+                  title: '失败原因',
+                  dataIndex: 'error_message',
+                  width: 220,
+                  render: (value: string | null) =>
+                    value ? (
+                      <Tooltip title={value}>
+                        <Text type="danger" ellipsis style={{ maxWidth: 200, display: 'inline-block' }}>
+                          {value}
+                        </Text>
+                      </Tooltip>
+                    ) : (
+                      <Text type="secondary">-</Text>
+                    ),
                 },
                 {
                   title: '操作',

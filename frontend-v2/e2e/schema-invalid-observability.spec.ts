@@ -152,7 +152,8 @@ test('schema invalid record is visible in records and dashboard metrics', async 
       has: page.locator('.ant-card-head-title').filter({ hasText: /^筛选条件$/ }),
     })
     .first();
-  const strategyFilter = filterCard.locator('.ant-select').first();
+  const filterSelects = filterCard.locator('.ant-select');
+  const strategyFilter = filterSelects.nth(1);
   await strategyFilter.click();
   await page
     .locator('.ant-select-dropdown .ant-select-item-option')
@@ -181,7 +182,7 @@ test('schema invalid record is visible in records and dashboard metrics', async 
   await expect(anomalyRow).toContainText('结构化异常');
   await expect(anomalyRow).toContainText('schema_invalid');
 
-  const anomalyTypeFilter = filterCard.locator('.ant-select').nth(2);
+  const anomalyTypeFilter = filterSelects.nth(3);
   await anomalyTypeFilter.click();
   await page
     .locator('.ant-select-dropdown .ant-select-item-option')

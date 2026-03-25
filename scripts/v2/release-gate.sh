@@ -14,7 +14,9 @@ ensure_backend_env
 RUN_UAT="true"
 WITH_RELEASE_DRILL="true"
 RELEASE_DRILL_WITH_E2E="true"
+RELEASE_DRILL_APPLY_BACKFILL="false"
 ALLOW_WITHOUT_RELEASE_DRILL="false"
+REQUIRE_DRILL_APPLY_BACKFILL="false"
 
 UAT_SUMMARY_PATH="${V2_RELEASE_GATE_UAT_SUMMARY_PATH:-}"
 RELEASE_DRILL_REPORT_PATH="${V2_RELEASE_GATE_DRILL_REPORT_PATH:-}"
@@ -29,6 +31,8 @@ Options:
   --skip-uat                    Skip running UAT; require existing summary artifacts
   --without-release-drill       Run UAT without release drill
   --without-drill-e2e           Keep release drill but skip e2e in preflight
+  --release-drill-apply-backfill Run release drill backfill in apply mode
+  --require-drill-apply-backfill Block final checklist when release drill is dry-run
   --allow-without-release-drill Allow checklist generation without release drill report
   --uat-summary <path>          Explicit UAT summary path
   --release-drill-report <path> Explicit release drill report path
@@ -59,6 +63,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --without-drill-e2e)
       RELEASE_DRILL_WITH_E2E="false"
+      shift
+      ;;
+    --release-drill-apply-backfill)
+      RELEASE_DRILL_APPLY_BACKFILL="true"
+      shift
+      ;;
+    --require-drill-apply-backfill)
+      REQUIRE_DRILL_APPLY_BACKFILL="true"
       shift
       ;;
     --allow-without-release-drill)
@@ -106,6 +118,9 @@ if [[ "${RUN_UAT}" == "true" ]]; then
     if [[ "${RELEASE_DRILL_WITH_E2E}" == "true" ]]; then
       uat_args+=(--release-drill-with-e2e)
     fi
+    if [[ "${RELEASE_DRILL_APPLY_BACKFILL}" == "true" ]]; then
+      uat_args+=(--release-drill-apply-backfill)
+    fi
   fi
   ./scripts/v2/uat.sh "${uat_args[@]}" | tee "${uat_log}"
   UAT_SUMMARY_PATH="${OUTPUT_DIR}/uat/summary.json"
@@ -143,6 +158,9 @@ if [[ -n "${RELEASE_DRILL_REPORT_PATH}" ]]; then
 fi
 if [[ "${ALLOW_WITHOUT_RELEASE_DRILL}" == "true" ]]; then
   checklist_args+=(--allow-without-release-drill)
+fi
+if [[ "${REQUIRE_DRILL_APPLY_BACKFILL}" == "true" ]]; then
+  checklist_args+=(--require-drill-apply-backfill)
 fi
 ./scripts/v2/release-checklist.sh "${checklist_args[@]}" | tee "${checklist_log}"
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Alert,
@@ -17,7 +17,7 @@ import {
   Typography,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { listModelProviders, listStrategies } from '@/shared/api/configCenter';
+import { listDashboardDefinitions, listModelProviders, listStrategies } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import {
   getDashboardAnomalies,
@@ -61,8 +61,31 @@ const parseDateFilter = (value: string) => {
   return date.toISOString();
 };
 
+const formatDateTimeLocal = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+    date.getMinutes(),
+  )}`;
+};
+
+const resolveRangeStart = (range: string): Date | null => {
+  const matched = range.trim().toLowerCase().match(/^(\d+)([hd])$/);
+  if (!matched) {
+    return null;
+  }
+  const amount = Number(matched[1]);
+  const unit = matched[2];
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+  const now = Date.now();
+  const deltaMs = unit === 'h' ? amount * 60 * 60 * 1000 : amount * 24 * 60 * 60 * 1000;
+  return new Date(now - deltaMs);
+};
+
 export function DashboardPage() {
   const navigate = useNavigate();
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string>('auto');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [modelProviderFilter, setModelProviderFilter] = useState<string>('all');
   const [anomalyTypeFilter, setAnomalyTypeFilter] = useState<string>('all');
@@ -85,6 +108,58 @@ export function DashboardPage() {
     queryKey: ['model-providers', 'all-for-dashboard'],
     queryFn: () => listModelProviders(),
   });
+
+  const dashboardDefinitionsQuery = useQuery({
+    queryKey: ['dashboard-definitions', 'active-for-dashboard'],
+    queryFn: () => listDashboardDefinitions({ status: 'active' }),
+  });
+
+  const activeDashboardDefinition = useMemo(() => {
+    const definitions = dashboardDefinitionsQuery.data ?? [];
+    if (!definitions.length) {
+      return null;
+    }
+    if (selectedDashboardId !== 'auto') {
+      const selected = definitions.find((item) => item.id === selectedDashboardId);
+      if (selected) {
+        return selected;
+      }
+    }
+    return definitions.find((item) => item.is_default) ?? definitions[0];
+  }, [dashboardDefinitionsQuery.data, selectedDashboardId]);
+
+  const applyDashboardPresetFilters = () => {
+    if (!activeDashboardDefinition) {
+      return;
+    }
+    const definition = activeDashboardDefinition.definition;
+    const filters =
+      definition && typeof definition === 'object' && !Array.isArray(definition)
+        ? (definition as { filters?: unknown }).filters
+        : undefined;
+    if (!filters || typeof filters !== 'object' || Array.isArray(filters)) {
+      return;
+    }
+    const filterMap = filters as Record<string, unknown>;
+
+    const strategyId = filterMap.strategy_id;
+    setStrategyFilter(typeof strategyId === 'string' && strategyId ? strategyId : 'all');
+
+    const modelProvider = filterMap.model_provider;
+    setModelProviderFilter(typeof modelProvider === 'string' && modelProvider ? modelProvider : 'all');
+
+    const anomalyType = filterMap.anomaly_type;
+    setAnomalyTypeFilter(typeof anomalyType === 'string' && anomalyType ? anomalyType : 'all');
+
+    const timeRange = filterMap.time_range;
+    if (typeof timeRange === 'string' && timeRange) {
+      const start = resolveRangeStart(timeRange);
+      if (start) {
+        setCreatedFromFilter(formatDateTimeLocal(start));
+        setCreatedToFilter(formatDateTimeLocal(new Date()));
+      }
+    }
+  };
 
   const summaryQuery = useQuery({
     queryKey: ['dashboard', 'summary', queryFilters],
@@ -116,7 +191,11 @@ export function DashboardPage() {
 
   const summary = summaryQuery.data;
   const dashboardError =
-    summaryQuery.error || trendsQuery.error || strategiesQuery.error || anomaliesQuery.error;
+    dashboardDefinitionsQuery.error ||
+    summaryQuery.error ||
+    trendsQuery.error ||
+    strategiesQuery.error ||
+    anomaliesQuery.error;
 
   return (
     <Space orientation="vertical" size={16} style={{ width: '100%' }}>
@@ -131,6 +210,27 @@ export function DashboardPage() {
 
       <Card size="small" title="筛选条件">
         <Space wrap>
+          <Select
+            size="small"
+            value={selectedDashboardId}
+            onChange={setSelectedDashboardId}
+            loading={dashboardDefinitionsQuery.isLoading}
+            options={[
+              { label: '自动选择默认看板', value: 'auto' },
+              ...((dashboardDefinitionsQuery.data ?? []).map((item) => ({
+                label: item.is_default ? `${item.name}（默认）` : item.name,
+                value: item.id,
+              })) ?? []),
+            ]}
+            style={{ width: 220 }}
+          />
+          <Button
+            size="small"
+            onClick={applyDashboardPresetFilters}
+            disabled={!activeDashboardDefinition}
+          >
+            应用看板预设筛选
+          </Button>
           <Select
             size="small"
             value={strategyFilter}
@@ -184,6 +284,16 @@ export function DashboardPage() {
             style={{ width: 160 }}
           />
         </Space>
+        {activeDashboardDefinition ? (
+          <Paragraph type="secondary" style={{ margin: '8px 0 0' }}>
+            当前看板：<Text strong>{activeDashboardDefinition.name}</Text>
+            {activeDashboardDefinition.description ? ` · ${activeDashboardDefinition.description}` : ''}
+          </Paragraph>
+        ) : (
+          <Paragraph type="secondary" style={{ margin: '8px 0 0' }}>
+            当前未配置可用看板定义，已使用系统默认展示。
+          </Paragraph>
+        )}
       </Card>
 
       {dashboardError ? (

@@ -17,7 +17,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        'cd ../backend-v2 && APP_ENV=test DATABASE_URL=sqlite:///./data/e2e.db CELERY_ENABLED=false CORS_ORIGINS=http://127.0.0.1:5280,http://localhost:5280 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 5800',
+        'cd ../backend-v2 && rm -f ./data/e2e.db && APP_ENV=test DATABASE_URL=sqlite:///./data/e2e.db CELERY_ENABLED=false CORS_ORIGINS=http://127.0.0.1:5280,http://localhost:5280 python3 -m uvicorn app.main:app --host 127.0.0.1 --port 5800',
       url: 'http://127.0.0.1:5800/api/health',
       reuseExistingServer: true,
       timeout: 120_000,

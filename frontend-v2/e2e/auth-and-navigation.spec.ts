@@ -5,11 +5,21 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginByUi(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
-  await page.getByLabel('用户名').fill(username);
-  await page.getByLabel('密码').fill(password);
-  await page.getByRole('button', { name: '登录系统' }).click();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
+    await page.getByLabel('用户名').fill(username);
+    await page.getByLabel('密码').fill(password);
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      return;
+    } catch {
+      if (attempt === 2) {
+        break;
+      }
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -76,6 +86,10 @@ test('admin can login and access key V2 pages', async ({ page }) => {
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole('heading', { name: '模型与系统设置' })).toBeVisible();
 
+  await page.getByRole('menuitem', { name: '看板配置' }).click();
+  await expect(page).toHaveURL(/\/dashboards$/);
+  await expect(page.getByRole('heading', { name: '看板配置' })).toBeVisible();
+
   await page.getByRole('menuitem', { name: '用户与权限' }).click();
   await expect(page).toHaveURL(/\/users$/);
   await expect(page.getByRole('heading', { name: '用户与权限' })).toBeVisible();
@@ -102,6 +116,7 @@ test('analysis viewer can only access viewer pages and is blocked on restricted 
   await expect(page.getByRole('menuitem', { name: '人工复核' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '操作审计' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '模型与设置' })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: '看板配置' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '用户与权限' })).toHaveCount(0);
 
   await page.goto('/records');

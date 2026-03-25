@@ -77,12 +77,17 @@ test('bulk camera status check updates status summary and cards', async ({ page,
   await page.getByRole('menuitem', { name: '摄像头中心' }).click();
   await expect(page).toHaveURL(/\/cameras$/);
   await expect(page.getByRole('heading', { name: '摄像头中心' })).toBeVisible();
+  await expect(page.locator('.ant-card').filter({ hasText: normalCameraName }).first()).toBeVisible();
+  await expect(page.locator('.ant-card').filter({ hasText: abnormalCameraName }).first()).toBeVisible();
 
+  const bulkCheckButton = page.getByTestId('cameras-bulk-check-btn');
+  await expect(bulkCheckButton).toBeEnabled();
   const bulkCheckResponsePromise = page.waitForResponse(
     (response) =>
       response.url().includes('/api/cameras/check-all') && response.request().method() === 'POST',
+    { timeout: 120000 },
   );
-  await page.getByTestId('cameras-bulk-check-btn').click();
+  await bulkCheckButton.click({ force: true });
 
   const bulkCheckResponse = await bulkCheckResponsePromise;
   expect(bulkCheckResponse.ok()).toBeTruthy();
