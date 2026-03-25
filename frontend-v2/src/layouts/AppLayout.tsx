@@ -1,4 +1,5 @@
 import {
+  AppstoreOutlined,
   AuditOutlined,
   CameraOutlined,
   DashboardOutlined,
@@ -32,6 +33,7 @@ const menuItems: Array<{
   requiredRoles?: readonly string[];
 }> = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '总览看板' },
+  { key: '/dashboards', icon: <AppstoreOutlined />, label: '看板配置', requiredRoles: [ROLE_SYSTEM_ADMIN] },
   {
     key: '/strategies',
     icon: <RobotOutlined />,
@@ -88,7 +90,9 @@ export function AppLayout() {
   );
 
   const selectedKeys = useMemo(() => {
-    const matched = filteredMenuItems.find((item) => location.pathname.startsWith(item.key));
+    const matched = [...filteredMenuItems]
+      .sort((left, right) => right.key.length - left.key.length)
+      .find((item) => location.pathname === item.key || location.pathname.startsWith(`${item.key}/`));
     return matched ? [matched.key] : ['/dashboard'];
   }, [filteredMenuItems, location.pathname]);
 

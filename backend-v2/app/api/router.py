@@ -5,6 +5,7 @@ from app.api.routes import (
     auth,
     cameras,
     dashboard,
+    dashboards,
     feedback,
     health,
     job_schedules,
@@ -30,3 +31,4 @@ api_router.include_router(job_schedules.router, prefix="/job-schedules", tags=["
 api_router.include_router(task_records.router, prefix="/task-records", tags=["task-records"])
 api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(dashboards.router, prefix="/dashboards", tags=["dashboards"])
