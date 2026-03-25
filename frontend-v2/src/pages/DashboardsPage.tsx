@@ -156,11 +156,11 @@ export function DashboardsPage() {
   };
 
   useEffect(() => {
-    if (!activeDashboard) {
+    if (!activeDashboard && dashboards.length === 0) {
       resetForCreate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDashboard]);
+  }, [activeDashboard, dashboards.length]);
 
   const handleSubmit = async (values: DashboardFormValues) => {
     let definition: Record<string, unknown>;

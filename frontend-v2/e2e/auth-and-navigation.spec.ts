@@ -76,6 +76,10 @@ test('admin can login and access key V2 pages', async ({ page }) => {
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole('heading', { name: '模型与系统设置' })).toBeVisible();
 
+  await page.getByRole('menuitem', { name: '看板配置' }).click();
+  await expect(page).toHaveURL(/\/dashboards$/);
+  await expect(page.getByRole('heading', { name: '看板配置' })).toBeVisible();
+
   await page.getByRole('menuitem', { name: '用户与权限' }).click();
   await expect(page).toHaveURL(/\/users$/);
   await expect(page.getByRole('heading', { name: '用户与权限' })).toBeVisible();
@@ -102,6 +106,7 @@ test('analysis viewer can only access viewer pages and is blocked on restricted 
   await expect(page.getByRole('menuitem', { name: '人工复核' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '操作审计' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '模型与设置' })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: '看板配置' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '用户与权限' })).toHaveCount(0);
 
   await page.goto('/records');
