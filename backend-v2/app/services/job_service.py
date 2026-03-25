@@ -9,10 +9,12 @@ from sqlalchemy.orm import Session
 from app.core.celery_app import celery_app
 from app.core.config import get_settings
 from app.core.database import database_url
+from app.models.camera_media import CameraMedia
 from app.models.file_asset import FileAsset
 from app.models.job import Job, JobSchedule
 from app.schemas.auth import CurrentUser
 from app.schemas.job import JobRead
+from app.services.camera_media_service import capture_photo as capture_camera_photo_record
 from app.services.camera_service import get_camera_or_404
 from app.services.ids import generate_id
 from app.services.job_schedule_service import SCHEDULE_STATUS_ACTIVE, calculate_next_run_at
@@ -107,36 +109,63 @@ def create_upload_job(
     strategy_snapshot = build_strategy_snapshot(strategy)
     job_id = generate_id()
     saved_assets = _save_upload_inputs(db, job_id=job_id, files=files)
-
-    job = Job(
-        id=job_id,
-        job_type="upload_batch" if len(saved_assets) > 1 else "upload_single",
-        trigger_mode="manual",
-        strategy_id=strategy.id,
-        strategy_name=strategy.name,
+    job = _build_upload_job_from_assets(
+        job_id=job_id,
+        requested_by=current_user.username,
+        strategy=strategy,
+        strategy_snapshot=strategy_snapshot,
+        assets=saved_assets,
         camera_id=None,
-        schedule_id=None,
-        model_provider=strategy.model_provider,
-        model_name=strategy.model_name,
-        status="queued",
-        celery_task_id=None,
-        total_items=len(saved_assets),
-        completed_items=0,
-        failed_items=0,
-        error_message=None,
-        started_at=None,
-        finished_at=None,
-        payload={
-            "requested_by": current_user.username,
-            "input_asset_ids": [asset.id for asset in saved_assets],
-            "input_file_names": [asset.original_name for asset in saved_assets],
-            "strategy_snapshot": strategy_snapshot,
-            "source_type": "upload",
-        },
+        source_type="upload",
     )
     db.add(job)
     db.commit()
     db.refresh(job)
+    _queue_job_processing(db, job)
+    db.refresh(job)
+    return serialize_job(job)
+
+
+def create_camera_snapshot_upload_job(
+    db: Session,
+    *,
+    camera_id: str,
+    strategy_id: str,
+    current_user: CurrentUser,
+) -> JobRead:
+    camera = get_camera_or_404(db, camera_id)
+    strategy = get_strategy_or_404(db, strategy_id)
+    strategy_snapshot = build_strategy_snapshot(strategy)
+    capture_result = capture_camera_photo_record(db, camera=camera, source_kind="job_upload")
+    if not capture_result.success or capture_result.media is None or not capture_result.media.file_asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=capture_result.error_message or "Camera snapshot capture failed",
+        )
+
+    input_asset = db.get(FileAsset, capture_result.media.file_asset_id)
+    if input_asset is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Captured asset not found")
+
+    job_id = generate_id()
+    job = _build_upload_job_from_assets(
+        job_id=job_id,
+        requested_by=current_user.username,
+        strategy=strategy,
+        strategy_snapshot=strategy_snapshot,
+        assets=[input_asset],
+        camera_id=camera.id,
+        source_type="upload_camera_snapshot",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    _link_camera_media_to_job(
+        db,
+        camera_id=camera.id,
+        file_asset_id=input_asset.id,
+        job_id=job.id,
+    )
     _queue_job_processing(db, job)
     db.refresh(job)
     return serialize_job(job)
@@ -297,6 +326,58 @@ def _save_upload_inputs(db: Session, *, job_id: str, files: list[UploadFile]) ->
         db.flush()
         assets.append(asset)
     return assets
+
+
+def _build_upload_job_from_assets(
+    *,
+    job_id: str,
+    requested_by: str,
+    strategy,
+    strategy_snapshot: dict,
+    assets: list[FileAsset],
+    camera_id: str | None,
+    source_type: str,
+) -> Job:
+    return Job(
+        id=job_id,
+        job_type="upload_batch" if len(assets) > 1 else "upload_single",
+        trigger_mode="manual",
+        strategy_id=strategy.id,
+        strategy_name=strategy.name,
+        camera_id=camera_id,
+        schedule_id=None,
+        model_provider=strategy.model_provider,
+        model_name=strategy.model_name,
+        status="queued",
+        celery_task_id=None,
+        total_items=len(assets),
+        completed_items=0,
+        failed_items=0,
+        error_message=None,
+        started_at=None,
+        finished_at=None,
+        payload={
+            "requested_by": requested_by,
+            "input_asset_ids": [asset.id for asset in assets],
+            "input_file_names": [asset.original_name for asset in assets],
+            "strategy_snapshot": strategy_snapshot,
+            "source_type": source_type,
+        },
+    )
+
+
+def _link_camera_media_to_job(db: Session, *, camera_id: str, file_asset_id: str, job_id: str) -> None:
+    stmt = (
+        select(CameraMedia)
+        .where(CameraMedia.camera_id == camera_id)
+        .where(CameraMedia.file_asset_id == file_asset_id)
+        .order_by(CameraMedia.created_at.desc())
+    )
+    media = db.scalar(stmt)
+    if media is None:
+        return
+    media.related_job_id = job_id
+    db.commit()
 
 
 def _build_camera_job(

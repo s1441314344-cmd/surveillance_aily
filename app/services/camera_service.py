@@ -9,11 +9,34 @@ class CameraService:
     @staticmethod
     def capture_from_stream(link, path):
         """链接摄像头视频流，截取视频帧数"""
-        # 打开视频文件
-        video = cv2.VideoCapture(link)
+        # 支持本地摄像头索引（0/1/2...）和 RTSP/文件链接
+        source = link
+        if isinstance(link, str):
+            stripped = link.strip()
+            if stripped.isdigit():
+                source = int(stripped)
 
-        # 读取视频的第一帧
-        ret, frame = video.read()
+        if isinstance(source, int):
+            # macOS 优先使用 AVFoundation，本地摄像头兼容性更好
+            video = cv2.VideoCapture(source, cv2.CAP_AVFOUNDATION)
+            if not video.isOpened():
+                video.release()
+                video = cv2.VideoCapture(source)
+        else:
+            video = cv2.VideoCapture(source)
+
+        if not video.isOpened():
+            print(f"Failed to open video source: {link}")
+            video.release()
+            return None
+
+        # 读取帧（预热多次，避免首帧为空）
+        ret, frame = False, None
+        for _ in range(20):
+            ret, frame = video.read()
+            if ret and frame is not None:
+                break
+            time.sleep(0.05)
 
         # 生成文件名
         random_num = random.randint(0, 1000000)
@@ -24,6 +47,14 @@ class CameraService:
         
         filename = os.path.join(path, 'screenshot_{}.png'.format(r))
         is_written = False
+
+        # 逆光场景自动提亮，避免抓拍全黑/过暗
+        if ret and frame is not None:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            mean_luma = cv2.mean(gray)[0]
+            _, max_luma, _, _ = cv2.minMaxLoc(gray)
+            if mean_luma < 45 and max_luma > 180:
+                frame = cv2.convertScaleAbs(frame, alpha=2.2, beta=20)
         
         if ret:
             is_written = cv2.imwrite(filename, frame)

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -6,6 +7,11 @@ from app.core.database import get_db
 from app.schemas.auth import CurrentUser
 from app.schemas.camera import (
     CameraCreate,
+    CameraMediaRead,
+    CameraPhotoCaptureRead,
+    CameraPhotoCaptureRequest,
+    CameraRecordingStartRequest,
+    CameraRecordingStatusRead,
     CameraDiagnosticRead,
     CameraRead,
     CameraStatusLogRead,
@@ -26,7 +32,16 @@ from app.services.camera_service import (
     serialize_camera,
     update_camera as update_camera_record,
 )
-from app.services.rbac import ROLE_SYSTEM_ADMIN
+from app.services.camera_media_service import (
+    capture_photo as capture_camera_photo_record,
+    get_camera_media_file_path_or_404,
+    get_camera_media_or_404,
+    list_camera_media as list_camera_media_records,
+    serialize_camera_media,
+    start_video_recording as start_video_recording_record,
+    stop_video_recording as stop_video_recording_record,
+)
+from app.services.rbac import ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR
 from app.services.scheduler_service import run_camera_status_sweep_once_with_db
 
 router = APIRouter()
@@ -73,6 +88,43 @@ def get_camera(
     return serialize_camera(get_camera_or_404(db, camera_id))
 
 
+@router.get("/{camera_id}/media", response_model=list[CameraMediaRead])
+def list_camera_media(
+    camera_id: str,
+    media_type: str | None = None,
+    limit: int = 50,
+    _: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return list_camera_media_records(db, camera_id=camera.id, media_type=media_type, limit=limit)
+
+
+@router.get("/{camera_id}/media/{media_id}", response_model=CameraMediaRead)
+def get_camera_media(
+    camera_id: str,
+    media_id: str,
+    _: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    media = get_camera_media_or_404(db, camera_id=camera.id, media_id=media_id)
+    return serialize_camera_media(media)
+
+
+@router.get("/{camera_id}/media/{media_id}/file")
+def get_camera_media_file(
+    camera_id: str,
+    media_id: str,
+    _: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    media = get_camera_media_or_404(db, camera_id=camera.id, media_id=media_id)
+    file_path = get_camera_media_file_path_or_404(media)
+    return FileResponse(file_path, filename=media.original_name, media_type=media.mime_type)
+
+
 @router.patch("/{camera_id}", response_model=CameraRead)
 def update_camera(
     camera_id: str,
@@ -92,6 +144,46 @@ def delete_camera(
 ):
     camera = get_camera_or_404(db, camera_id)
     return delete_camera_record(db, camera)
+
+
+@router.post("/{camera_id}/capture-photo", response_model=CameraPhotoCaptureRead)
+def capture_camera_photo(
+    camera_id: str,
+    payload: CameraPhotoCaptureRequest | None = None,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    source_kind = payload.source_kind if payload is not None else "manual"
+    return capture_camera_photo_record(db, camera=camera, source_kind=source_kind)
+
+
+@router.post("/{camera_id}/recordings/start", response_model=CameraRecordingStatusRead)
+def start_video_recording(
+    camera_id: str,
+    payload: CameraRecordingStartRequest,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return start_video_recording_record(
+        db,
+        camera=camera,
+        duration_seconds=payload.duration_seconds,
+        source_kind=payload.source_kind,
+    )
+
+
+@router.post("/{camera_id}/recordings/{media_id}/stop", response_model=CameraRecordingStatusRead)
+def stop_video_recording(
+    camera_id: str,
+    media_id: str,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    media = get_camera_media_or_404(db, camera_id=camera.id, media_id=media_id)
+    return stop_video_recording_record(db, media=media)
 
 
 @router.get("/{camera_id}/status", response_model=CameraStatusRead)

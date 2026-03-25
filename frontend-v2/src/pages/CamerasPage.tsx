@@ -9,7 +9,9 @@ import {
   Descriptions,
   Empty,
   Form,
+  Image,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
   Row,
@@ -22,21 +24,36 @@ import {
 } from 'antd';
 import {
   Camera,
+  CameraMedia,
   CameraDiagnostic,
+  CameraPhotoCaptureResult,
+  CameraRecordingResult,
   CameraPayload,
   CameraStatusLog,
   checkAllCamerasStatus,
   checkCameraStatus,
+  captureCameraPhoto,
   createCamera,
   deleteCamera,
   diagnoseCamera,
+  fetchCameraMediaFile,
   getCameraStatus,
+  listCameraMedia,
   listCameraStatusLogs,
   listCameraStatuses,
   listCameras,
+  listStrategies,
+  startCameraRecording,
+  stopCameraRecording,
+  Strategy,
   updateCamera,
 } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
+import {
+  createCameraOnceJob,
+  createCameraSnapshotUploadJob,
+  Job,
+} from '@/shared/api/tasks';
 
 const { Paragraph, Text, Title } = Typography;
 const CREATE_CAMERA_ID = '__create__';
@@ -86,13 +103,27 @@ export function CamerasPage() {
   const [alertOnly, setAlertOnly] = useState(false);
   const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
   const [lastDiagnostic, setLastDiagnostic] = useState<CameraDiagnostic | null>(null);
+  const [recordDurationSeconds, setRecordDurationSeconds] = useState(30);
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<CameraMedia | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [countdownTick, setCountdownTick] = useState(0);
+  const [inspectionStrategyId, setInspectionStrategyId] = useState<string | null>(null);
+  const [lastInspectionJob, setLastInspectionJob] = useState<Job | null>(null);
 
   const cameraQuery = useQuery({
     queryKey: ['cameras'],
     queryFn: listCameras,
   });
 
+  const strategyQuery = useQuery({
+    queryKey: ['strategies', 'active', 'camera-center'],
+    queryFn: () => listStrategies({ status: 'active' }),
+  });
+
   const cameras = useMemo(() => cameraQuery.data ?? [], [cameraQuery.data]);
+  const activeStrategies = useMemo(() => strategyQuery.data ?? [], [strategyQuery.data]);
   const effectiveSelectedCameraId = useMemo(() => {
     if (selectedCameraId === CREATE_CAMERA_ID) {
       return null;
@@ -125,6 +156,13 @@ export function CamerasPage() {
     queryFn: () => listCameraStatusLogs(effectiveSelectedCameraId as string, { limit: 20 }),
     enabled: Boolean(effectiveSelectedCameraId),
     refetchInterval: 10000,
+  });
+
+  const mediaQuery = useQuery({
+    queryKey: ['camera-media', effectiveSelectedCameraId],
+    queryFn: () => listCameraMedia(effectiveSelectedCameraId as string, { limit: 40 }),
+    enabled: Boolean(effectiveSelectedCameraId),
+    refetchInterval: 5000,
   });
 
   const cameraStatusMap = useMemo(() => {
@@ -172,6 +210,19 @@ export function CamerasPage() {
     () => statusLogsQuery.data ?? [],
     [statusLogsQuery.data],
   );
+  const selectedCameraMedia = useMemo(() => mediaQuery.data ?? [], [mediaQuery.data]);
+  const activeRecordingMedia = useMemo(
+    () =>
+      selectedCameraMedia.find(
+        (item) => item.media_type === 'video' && item.status === 'recording',
+      ) ?? null,
+    [selectedCameraMedia],
+  );
+  const inspectionStrategy = useMemo(
+    () => activeStrategies.find((item) => item.id === inspectionStrategyId) ?? null,
+    [activeStrategies, inspectionStrategyId],
+  );
+  const hasUnsupportedInspectionProtocol = (activeCamera?.protocol || 'rtsp').toLowerCase() !== 'rtsp';
 
   useEffect(() => {
     if (!activeCamera) {
@@ -195,12 +246,95 @@ export function CamerasPage() {
     });
   }, [activeCamera, form]);
 
+  useEffect(() => {
+    if (!inspectionStrategyId && activeStrategies.length > 0) {
+      setInspectionStrategyId(activeStrategies[0].id);
+    }
+  }, [activeStrategies, inspectionStrategyId]);
+
+  useEffect(() => {
+    if (!activeRecordingMedia) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setCountdownTick((value) => value + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeRecordingMedia]);
+
+  useEffect(() => {
+    return () => {
+      for (const objectUrl of Object.values(thumbnailUrls)) {
+        URL.revokeObjectURL(objectUrl);
+      }
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    setThumbnailUrls((previous) => {
+      for (const objectUrl of Object.values(previous)) {
+        URL.revokeObjectURL(objectUrl);
+      }
+      return {};
+    });
+  }, [effectiveSelectedCameraId]);
+
+  useEffect(() => {
+    if (!effectiveSelectedCameraId || !selectedCameraMedia.length) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadThumbnails = async () => {
+      const targets = selectedCameraMedia
+        .filter((item) => item.status !== 'recording')
+        .slice(0, 12)
+        .filter((item) => !thumbnailUrls[item.id]);
+
+      for (const item of targets) {
+        try {
+          const blob = await fetchCameraMediaFile(effectiveSelectedCameraId, item.id);
+          if (cancelled) {
+            return;
+          }
+          const objectUrl = URL.createObjectURL(blob);
+          setThumbnailUrls((previous) => {
+            if (previous[item.id]) {
+              URL.revokeObjectURL(objectUrl);
+              return previous;
+            }
+            return { ...previous, [item.id]: objectUrl };
+          });
+        } catch {
+          // Ignore single thumbnail failures; item can still be previewed on demand.
+        }
+      }
+    };
+
+    void loadThumbnails();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSelectedCameraId, selectedCameraMedia, thumbnailUrls]);
+
   const invalidateCameraQueries = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['cameras'] }),
       queryClient.invalidateQueries({ queryKey: ['camera-status'] }),
       queryClient.invalidateQueries({ queryKey: ['camera-statuses'] }),
       queryClient.invalidateQueries({ queryKey: ['camera-status-logs'] }),
+      queryClient.invalidateQueries({ queryKey: ['camera-media'] }),
+    ]);
+
+  const invalidateInspectionQueries = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['jobs'] }),
+      queryClient.invalidateQueries({ queryKey: ['task-records'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
     ]);
 
   const createMutation = useMutation({
@@ -284,6 +418,119 @@ export function CamerasPage() {
     },
   });
 
+  const capturePhotoMutation = useMutation({
+    mutationFn: (cameraId: string) => captureCameraPhoto(cameraId, { sourceKind: 'manual' }),
+    onSuccess: async (result: CameraPhotoCaptureResult) => {
+      await invalidateCameraQueries();
+      if (result.success) {
+        message.success('拍照成功，照片已写入媒体库');
+      } else {
+        message.error(result.error_message || '拍照失败');
+      }
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '拍照失败'));
+    },
+  });
+
+  const startRecordingMutation = useMutation({
+    mutationFn: ({ cameraId, durationSeconds }: { cameraId: string; durationSeconds: number }) =>
+      startCameraRecording(cameraId, { durationSeconds, sourceKind: 'manual' }),
+    onSuccess: async (result: CameraRecordingResult) => {
+      await invalidateCameraQueries();
+      if (result.success) {
+        message.success('视频录制已启动');
+      } else {
+        message.error(result.message || result.media.error_message || '视频录制启动失败');
+      }
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '视频录制启动失败'));
+    },
+  });
+
+  const stopRecordingMutation = useMutation({
+    mutationFn: ({ cameraId, mediaId }: { cameraId: string; mediaId: string }) =>
+      stopCameraRecording(cameraId, mediaId),
+    onSuccess: async () => {
+      await invalidateCameraQueries();
+      message.success('已发送停止录制请求');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '停止录制失败'));
+    },
+  });
+
+  const snapshotInspectionMutation = useMutation({
+    mutationFn: ({ cameraId, strategyId }: { cameraId: string; strategyId: string }) =>
+      createCameraSnapshotUploadJob({ cameraId, strategyId }),
+    onSuccess: async (job) => {
+      setLastInspectionJob(job);
+      await invalidateInspectionQueries();
+      message.success('拍照巡检任务已创建并进入队列');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '拍照巡检任务创建失败'));
+    },
+  });
+
+  const cameraOnceInspectionMutation = useMutation({
+    mutationFn: ({ cameraId, strategyId }: { cameraId: string; strategyId: string }) =>
+      createCameraOnceJob({ cameraId, strategyId }),
+    onSuccess: async (job) => {
+      setLastInspectionJob(job);
+      await invalidateInspectionQueries();
+      message.success('单次抽帧巡检任务已创建并进入队列');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '单次巡检任务创建失败'));
+    },
+  });
+
+  const handlePreviewMedia = async (media: CameraMedia) => {
+    if (!effectiveSelectedCameraId) {
+      return;
+    }
+    try {
+      const blob = await fetchCameraMediaFile(effectiveSelectedCameraId, media.id);
+      setPreviewMedia(media);
+      setPreviewOpen(true);
+      setPreviewUrl((previous) => {
+        if (previous) {
+          URL.revokeObjectURL(previous);
+        }
+        return URL.createObjectURL(blob);
+      });
+    } catch (error) {
+      message.error(getApiErrorMessage(error, '媒体预览加载失败'));
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewOpen(false);
+    setPreviewMedia(null);
+    setPreviewUrl((previous) => {
+      if (previous) {
+        URL.revokeObjectURL(previous);
+      }
+      return null;
+    });
+  };
+
+  const recordingCountdown = useMemo(() => {
+    if (!activeRecordingMedia?.started_at || !activeRecordingMedia.duration_seconds) {
+      return null;
+    }
+    const nowTs = Date.now() + countdownTick * 0;
+    const startedAtMs = new Date(activeRecordingMedia.started_at).getTime();
+    if (Number.isNaN(startedAtMs)) {
+      return null;
+    }
+    const elapsedSeconds = Math.floor((nowTs - startedAtMs) / 1000);
+    const remaining = Math.max(activeRecordingMedia.duration_seconds - elapsedSeconds, 0);
+    return remaining;
+  }, [activeRecordingMedia, countdownTick]);
+
   const resetForCreate = () => {
     setSelectedCameraId(CREATE_CAMERA_ID);
     form.setFieldsValue(DEFAULT_CAMERA_VALUES);
@@ -308,6 +555,44 @@ export function CamerasPage() {
     }
 
     await createMutation.mutateAsync(payload);
+  };
+
+  const handleCreateSnapshotInspection = async () => {
+    if (!activeCamera) {
+      message.warning('请先选择摄像头');
+      return;
+    }
+    if (!inspectionStrategy) {
+      message.warning('请先选择巡检策略');
+      return;
+    }
+    if (activeCamera.protocol.toLowerCase() !== 'rtsp') {
+      message.warning('当前 V1 巡检链路仅支持 RTSP 摄像头');
+      return;
+    }
+    await snapshotInspectionMutation.mutateAsync({
+      cameraId: activeCamera.id,
+      strategyId: inspectionStrategy.id,
+    });
+  };
+
+  const handleCreateCameraOnceInspection = async () => {
+    if (!activeCamera) {
+      message.warning('请先选择摄像头');
+      return;
+    }
+    if (!inspectionStrategy) {
+      message.warning('请先选择巡检策略');
+      return;
+    }
+    if (activeCamera.protocol.toLowerCase() !== 'rtsp') {
+      message.warning('当前 V1 巡检链路仅支持 RTSP 摄像头');
+      return;
+    }
+    await cameraOnceInspectionMutation.mutateAsync({
+      cameraId: activeCamera.id,
+      strategyId: inspectionStrategy.id,
+    });
   };
 
   return (
@@ -605,6 +890,245 @@ export function CamerasPage() {
                 <Empty description="请选择一个摄像头查看状态日志" />
               )}
             </Card>
+
+            <Card title="拍照与录制控制">
+              {effectiveSelectedCameraId ? (
+                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  <Alert
+                    type="info"
+                    showIcon
+                    message="支持手动拍照与本地视频录制"
+                    description="视频默认输出 MP4(H.264, yuv420p) 以兼容主流播放器。"
+                  />
+                  <Space wrap>
+                    <Button
+                      type="primary"
+                      onClick={() => capturePhotoMutation.mutate(effectiveSelectedCameraId)}
+                      loading={capturePhotoMutation.isPending}
+                    >
+                      手动拍照
+                    </Button>
+                    <InputNumber
+                      min={3}
+                      max={3600}
+                      value={recordDurationSeconds}
+                      onChange={(value) => setRecordDurationSeconds(Number(value || 30))}
+                      addonAfter="秒"
+                    />
+                    <Button
+                      onClick={() =>
+                        startRecordingMutation.mutate({
+                          cameraId: effectiveSelectedCameraId,
+                          durationSeconds: recordDurationSeconds,
+                        })
+                      }
+                      disabled={Boolean(activeRecordingMedia)}
+                      loading={startRecordingMutation.isPending}
+                    >
+                      开始录制
+                    </Button>
+                    <Button
+                      danger
+                      onClick={() => {
+                        if (!activeRecordingMedia) {
+                          return;
+                        }
+                        stopRecordingMutation.mutate({
+                          cameraId: effectiveSelectedCameraId,
+                          mediaId: activeRecordingMedia.id,
+                        });
+                      }}
+                      disabled={!activeRecordingMedia}
+                      loading={stopRecordingMutation.isPending}
+                    >
+                      停止录制
+                    </Button>
+                  </Space>
+
+                  {activeRecordingMedia ? (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="录制进行中"
+                      description={
+                        recordingCountdown !== null
+                          ? `预计剩余 ${recordingCountdown} 秒，媒体 ID：${activeRecordingMedia.id.slice(0, 8)}`
+                          : `媒体 ID：${activeRecordingMedia.id.slice(0, 8)}`
+                      }
+                    />
+                  ) : (
+                    <Text type="secondary">当前没有进行中的录制任务。</Text>
+                  )}
+                </Space>
+              ) : (
+                <Empty description="请选择一个摄像头后进行拍照或录制" />
+              )}
+            </Card>
+
+            <Card title="巡检任务联动">
+              {effectiveSelectedCameraId ? (
+                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  <Form layout="vertical">
+                    <Form.Item label="巡检策略">
+                      <Select
+                        placeholder="请选择巡检策略"
+                        loading={strategyQuery.isLoading}
+                        value={inspectionStrategyId ?? undefined}
+                        onChange={(value) => setInspectionStrategyId(value)}
+                        options={activeStrategies.map((item: Strategy) => ({
+                          label: `${item.name} (${item.model_provider}/${item.model_name})`,
+                          value: item.id,
+                        }))}
+                      />
+                    </Form.Item>
+                  </Form>
+
+                  {hasUnsupportedInspectionProtocol ? (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="当前摄像头协议暂不支持巡检联动"
+                      description="V1 巡检任务链路仅支持 RTSP 摄像头。"
+                    />
+                  ) : null}
+
+                  <Space wrap>
+                    <Button
+                      type="primary"
+                      onClick={() => {
+                        void handleCreateSnapshotInspection();
+                      }}
+                      loading={snapshotInspectionMutation.isPending}
+                      disabled={!inspectionStrategy || hasUnsupportedInspectionProtocol}
+                    >
+                      拍照并巡检
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        void handleCreateCameraOnceInspection();
+                      }}
+                      loading={cameraOnceInspectionMutation.isPending}
+                      disabled={!inspectionStrategy || hasUnsupportedInspectionProtocol}
+                    >
+                      单次抽帧巡检
+                    </Button>
+                    <Button href="/jobs" target="_self">
+                      前往任务中心
+                    </Button>
+                  </Space>
+
+                  {lastInspectionJob ? (
+                    <Descriptions column={1} size="small" bordered>
+                      <Descriptions.Item label="最近任务 ID">
+                        <Text code>{lastInspectionJob.id.slice(0, 12)}</Text>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="任务类型">{lastInspectionJob.job_type}</Descriptions.Item>
+                      <Descriptions.Item label="状态">
+                        <Tag>{lastInspectionJob.status}</Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="策略">{lastInspectionJob.strategy_name}</Descriptions.Item>
+                    </Descriptions>
+                  ) : (
+                    <Text type="secondary">未创建联动巡检任务。</Text>
+                  )}
+                </Space>
+              ) : (
+                <Empty description="请选择一个摄像头后创建联动巡检任务" />
+              )}
+            </Card>
+
+            <Card title="媒体文件管理">
+              {effectiveSelectedCameraId ? (
+                mediaQuery.isLoading ? (
+                  <Spin />
+                ) : selectedCameraMedia.length ? (
+                  <Row gutter={[12, 12]}>
+                    {selectedCameraMedia.map((item: CameraMedia) => (
+                      <Col xs={24} sm={12} xl={8} key={item.id}>
+                        <Card
+                          size="small"
+                          hoverable
+                          onClick={() => {
+                            if (item.status !== 'recording') {
+                              void handlePreviewMedia(item);
+                            }
+                          }}
+                        >
+                          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                            {item.media_type === 'photo' ? (
+                              thumbnailUrls[item.id] ? (
+                                <Image
+                                  src={thumbnailUrls[item.id]}
+                                  alt={item.original_name}
+                                  preview={false}
+                                  style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    height: 120,
+                                    borderRadius: 8,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: '#fafafa',
+                                  }}
+                                >
+                                  <Text type="secondary">缩略图加载中</Text>
+                                </div>
+                              )
+                            ) : thumbnailUrls[item.id] ? (
+                              <video
+                                src={thumbnailUrls[item.id]}
+                                muted
+                                playsInline
+                                style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  height: 120,
+                                  borderRadius: 8,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: '#fafafa',
+                                }}
+                              >
+                                <Text type="secondary">{item.status === 'recording' ? '录制中' : '视频预览加载中'}</Text>
+                              </div>
+                            )}
+
+                            <Space wrap size={6}>
+                              <Tag color={item.media_type === 'photo' ? 'blue' : 'purple'}>
+                                {item.media_type}
+                              </Tag>
+                              <Tag color={item.status === 'completed' ? 'green' : item.status === 'recording' ? 'processing' : 'default'}>
+                                {item.status}
+                              </Tag>
+                              {item.related_job_id ? (
+                                <Tag color="cyan">job:{item.related_job_id.slice(0, 8)}</Tag>
+                              ) : null}
+                            </Space>
+                            <Text ellipsis>{item.original_name}</Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: 12 }} ellipsis>
+                              {item.storage_path}
+                            </Text>
+                          </Space>
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                ) : (
+                  <Empty description="暂无媒体文件，请先执行拍照或录制" />
+                )
+              ) : (
+                <Empty description="请选择一个摄像头查看媒体文件" />
+              )}
+            </Card>
           </Space>
         </Col>
       </Row>
@@ -664,6 +1188,28 @@ export function CamerasPage() {
           </Descriptions>
         ) : (
           <Empty description="暂无诊断结果" />
+        )}
+      </Modal>
+
+      <Modal
+        open={previewOpen}
+        title={previewMedia?.original_name || '媒体预览'}
+        onCancel={closePreview}
+        footer={
+          <Button type="primary" onClick={closePreview}>
+            关闭
+          </Button>
+        }
+        width={900}
+      >
+        {previewMedia && previewUrl ? (
+          previewMedia.media_type === 'photo' ? (
+            <Image src={previewUrl} alt={previewMedia.original_name} style={{ width: '100%' }} />
+          ) : (
+            <video src={previewUrl} controls style={{ width: '100%' }} />
+          )
+        ) : (
+          <Spin />
         )}
       </Modal>
     </Space>

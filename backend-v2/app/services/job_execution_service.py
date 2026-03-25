@@ -5,6 +5,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
+from app.models.camera_media import CameraMedia
 from app.models.file_asset import FileAsset
 from app.models.job import Job, JobSchedule
 from app.models.task_record import TaskRecord
@@ -73,6 +74,8 @@ def process_job(job_id: str) -> dict[str, str]:
 def _process_upload_job(db: Session, job: Job) -> None:
     payload = job.payload or {}
     strategy_snapshot = payload.get("strategy_snapshot") or {}
+    source_type = str(payload.get("source_type") or "upload")
+    normalized_source_type = "upload" if source_type.startswith("upload") else source_type
     asset_ids = [str(item) for item in payload.get("input_asset_ids") or []]
     input_file_names = [str(item) for item in payload.get("input_file_names") or []]
 
@@ -97,6 +100,8 @@ def _process_upload_job(db: Session, job: Job) -> None:
                 job=job,
                 strategy_snapshot=strategy_snapshot,
                 input_filename=display_name,
+                source_type=normalized_source_type,
+                camera_id=job.camera_id,
                 error_message="Input asset not found",
                 duration_ms=int((time.perf_counter() - started_at) * 1000),
             )
@@ -110,6 +115,8 @@ def _process_upload_job(db: Session, job: Job) -> None:
                 job=job,
                 strategy_snapshot=strategy_snapshot,
                 input_filename=file_asset.original_name,
+                source_type=normalized_source_type,
+                camera_id=job.camera_id,
                 error_message="Input asset is missing or empty",
                 duration_ms=int((time.perf_counter() - started_at) * 1000),
             )
@@ -143,8 +150,8 @@ def _process_upload_job(db: Session, job: Job) -> None:
             input_filename=file_asset.original_name,
             input_image_path=file_asset.storage_path,
             preview_image_path=None,
-            source_type="upload",
-            camera_id=None,
+            source_type=normalized_source_type,
+            camera_id=job.camera_id,
             model_provider=job.model_provider,
             model_name=job.model_name,
             raw_model_response=provider_response.raw_response or "",
@@ -222,6 +229,25 @@ def _process_camera_job(db: Session, job: Job) -> None:
         mime_type=captured_frame.mime_type,
     )
     db.add(file_asset)
+    db.flush()
+    camera_media = CameraMedia(
+        id=generate_id(),
+        camera_id=job.camera_id or str(camera_snapshot.get("id") or ""),
+        related_job_id=job.id,
+        file_asset_id=file_asset.id,
+        media_type="photo",
+        source_kind=job.job_type,
+        status=JOB_STATUS_COMPLETED,
+        original_name=captured_frame.original_name,
+        storage_path=storage_path,
+        mime_type=captured_frame.mime_type,
+        duration_seconds=0,
+        stop_requested=False,
+        started_at=_utcnow(),
+        finished_at=_utcnow(),
+        error_message=None,
+    )
+    db.add(camera_media)
     db.flush()
 
     provider_response = adapter.analyze(
@@ -303,6 +329,8 @@ def _create_failed_upload_record(
     job: Job,
     strategy_snapshot: dict,
     input_filename: str,
+    source_type: str,
+    camera_id: str | None,
     error_message: str,
     duration_ms: int,
 ) -> None:
@@ -316,8 +344,8 @@ def _create_failed_upload_record(
         input_filename=input_filename,
         input_image_path="",
         preview_image_path=None,
-        source_type="upload",
-        camera_id=None,
+        source_type=source_type,
+        camera_id=camera_id,
         model_provider=job.model_provider,
         model_name=job.model_name,
         raw_model_response=error_message,

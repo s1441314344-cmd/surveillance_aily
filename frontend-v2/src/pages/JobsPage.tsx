@@ -27,6 +27,7 @@ import { getApiErrorMessage } from '@/shared/api/errors';
 import {
   cancelJob,
   createCameraOnceJob,
+  createCameraSnapshotUploadJob,
   createJobSchedule,
   deleteJobSchedule,
   getJob,
@@ -46,6 +47,8 @@ const { Dragger } = Upload;
 
 type UploadFormValues = {
   taskMode: 'upload' | 'camera_once' | 'camera_schedule';
+  uploadSource?: 'local_file' | 'camera_snapshot';
+  uploadCameraId?: string;
   strategyId: string;
   cameraId?: string;
   scheduleType?: 'interval_minutes' | 'daily_time';
@@ -61,6 +64,8 @@ type EditScheduleFormValues = {
 
 const DEFAULT_FORM_VALUES: UploadFormValues = {
   taskMode: 'upload',
+  uploadSource: 'local_file',
+  uploadCameraId: undefined,
   strategyId: '',
   cameraId: undefined,
   scheduleType: 'interval_minutes',
@@ -213,16 +218,27 @@ export function JobsPage() {
   const schedules = schedulesQuery.data ?? EMPTY_JOB_SCHEDULES;
   const selectedJob = useMemo(() => selectedJobQuery.data ?? null, [selectedJobQuery.data]);
   const taskMode = Form.useWatch('taskMode', form) ?? 'upload';
+  const uploadSource = Form.useWatch('uploadSource', form) ?? 'local_file';
   const scheduleType = Form.useWatch('scheduleType', form) ?? 'interval_minutes';
   const selectedCameraIdInForm = Form.useWatch('cameraId', form) ?? undefined;
+  const selectedUploadCameraIdInForm = Form.useWatch('uploadCameraId', form) ?? undefined;
   const selectedCameraInForm = useMemo(
     () => cameras.find((item) => item.id === selectedCameraIdInForm) ?? null,
     [cameras, selectedCameraIdInForm],
+  );
+  const selectedUploadCameraInForm = useMemo(
+    () => cameras.find((item) => item.id === selectedUploadCameraIdInForm) ?? null,
+    [cameras, selectedUploadCameraIdInForm],
   );
   const hasUnsupportedCameraProtocol =
     taskMode !== 'upload' &&
     Boolean(selectedCameraInForm) &&
     (selectedCameraInForm?.protocol || '').toLowerCase() !== 'rtsp';
+  const hasUnsupportedUploadCameraProtocol =
+    taskMode === 'upload' &&
+    uploadSource === 'camera_snapshot' &&
+    Boolean(selectedUploadCameraInForm) &&
+    (selectedUploadCameraInForm?.protocol || '').toLowerCase() !== 'rtsp';
   const scheduleFilterOptions = useMemo(
     () => [
       { label: '全部计划', value: 'all' },
@@ -278,12 +294,27 @@ export function JobsPage() {
     },
   });
 
+  const cameraSnapshotUploadMutation = useMutation({
+    mutationFn: createCameraSnapshotUploadJob,
+    onSuccess: async (job) => {
+      await invalidateJobs();
+      setSelectedJobId(job.id);
+      form.setFieldsValue(DEFAULT_FORM_VALUES);
+      message.success('摄像头拍照上传任务已进入队列');
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '摄像头拍照上传失败'));
+    },
+  });
+
   const scheduleMutation = useMutation({
     mutationFn: createJobSchedule,
     onSuccess: async () => {
       await invalidateSchedules();
       form.setFieldsValue({
         taskMode: 'camera_schedule',
+        uploadSource: 'local_file',
+        uploadCameraId: undefined,
         strategyId: form.getFieldValue('strategyId'),
         cameraId: form.getFieldValue('cameraId'),
         scheduleType: DEFAULT_FORM_VALUES.scheduleType,
@@ -419,6 +450,23 @@ export function JobsPage() {
       return;
     }
 
+    if (values.uploadSource === 'camera_snapshot') {
+      if (!values.uploadCameraId) {
+        message.warning('请先选择拍照摄像头');
+        return;
+      }
+      if ((selectedUploadCameraInForm?.protocol || '').toLowerCase() !== 'rtsp') {
+        message.warning('当前 V1 仅支持 RTSP 摄像头拍照上传');
+        return;
+      }
+
+      await cameraSnapshotUploadMutation.mutateAsync({
+        cameraId: values.uploadCameraId,
+        strategyId: values.strategyId,
+      });
+      return;
+    }
+
     const files = fileList
       .map((item) => item.originFileObj)
       .filter((item): item is RcFile => Boolean(item));
@@ -436,7 +484,10 @@ export function JobsPage() {
 
   const handleResetInput = () => {
     if (taskMode === 'upload') {
-      setFileList([]);
+      if (uploadSource === 'local_file') {
+        setFileList([]);
+      }
+      form.setFieldValue('uploadCameraId', undefined);
       return;
     }
 
@@ -447,30 +498,40 @@ export function JobsPage() {
   };
 
   const handleFormValuesChange = (changedValues: Partial<UploadFormValues>) => {
-    if (!changedValues.taskMode) {
-      return;
+    if (changedValues.taskMode) {
+      if (changedValues.taskMode !== 'upload') {
+        setFileList([]);
+      }
+
+      if (changedValues.taskMode === 'upload') {
+        form.setFieldsValue({
+          uploadSource: 'local_file',
+          uploadCameraId: undefined,
+          cameraId: undefined,
+          scheduleType: DEFAULT_FORM_VALUES.scheduleType,
+          intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
+          dailyTime: DEFAULT_FORM_VALUES.dailyTime,
+        });
+        return;
+      }
+
+      if (changedValues.taskMode === 'camera_once') {
+        form.setFieldsValue({
+          uploadSource: 'local_file',
+          uploadCameraId: undefined,
+          scheduleType: DEFAULT_FORM_VALUES.scheduleType,
+          intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
+          dailyTime: DEFAULT_FORM_VALUES.dailyTime,
+        });
+      }
     }
 
-    if (changedValues.taskMode !== 'upload') {
+    if (changedValues.uploadSource === 'local_file') {
+      form.setFieldValue('uploadCameraId', undefined);
+    }
+
+    if (changedValues.uploadSource === 'camera_snapshot') {
       setFileList([]);
-    }
-
-    if (changedValues.taskMode === 'upload') {
-      form.setFieldsValue({
-        cameraId: undefined,
-        scheduleType: DEFAULT_FORM_VALUES.scheduleType,
-        intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
-        dailyTime: DEFAULT_FORM_VALUES.dailyTime,
-      });
-      return;
-    }
-
-    if (changedValues.taskMode === 'camera_once') {
-      form.setFieldsValue({
-        scheduleType: DEFAULT_FORM_VALUES.scheduleType,
-        intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
-        dailyTime: DEFAULT_FORM_VALUES.dailyTime,
-      });
     }
   };
 
@@ -561,21 +622,60 @@ export function JobsPage() {
               </Form.Item>
 
               {taskMode === 'upload' ? (
-                <Form.Item label="上传图片">
-                  <Dragger
-                    multiple
-                    accept=".jpg,.jpeg,.png,.bmp,.webp"
-                    fileList={fileList}
-                    beforeUpload={() => false}
-                    onChange={({ fileList: nextFileList }) => setFileList(nextFileList)}
-                  >
-                    <p className="ant-upload-drag-icon">
-                      <InboxOutlined />
-                    </p>
-                    <p className="ant-upload-text">点击或拖拽上传单张/多张图片</p>
-                    <p className="ant-upload-hint">支持 JPG、PNG、JPEG、BMP、WEBP</p>
-                  </Dragger>
-                </Form.Item>
+                <>
+                  <Form.Item label="上传来源" name="uploadSource">
+                    <Select
+                      options={[
+                        { label: '本地文件上传', value: 'local_file' },
+                        { label: '摄像头拍照上传', value: 'camera_snapshot' },
+                      ]}
+                    />
+                  </Form.Item>
+
+                  {uploadSource === 'local_file' ? (
+                    <Form.Item label="上传图片">
+                      <Dragger
+                        multiple
+                        accept=".jpg,.jpeg,.png,.bmp,.webp"
+                        fileList={fileList}
+                        beforeUpload={() => false}
+                        onChange={({ fileList: nextFileList }) => setFileList(nextFileList)}
+                      >
+                        <p className="ant-upload-drag-icon">
+                          <InboxOutlined />
+                        </p>
+                        <p className="ant-upload-text">点击或拖拽上传单张/多张图片</p>
+                        <p className="ant-upload-hint">支持 JPG、PNG、JPEG、BMP、WEBP</p>
+                      </Dragger>
+                    </Form.Item>
+                  ) : (
+                    <>
+                      <Form.Item
+                        label="拍照摄像头"
+                        name="uploadCameraId"
+                        rules={[{ required: true, message: '请选择拍照摄像头' }]}
+                      >
+                        <Select
+                          placeholder="请选择一个可用摄像头"
+                          loading={camerasQuery.isLoading}
+                          options={cameras.map((item) => ({
+                            label: `${item.name} [${item.protocol.toUpperCase()}] (${item.location || item.rtsp_url || '未配置位置'})`,
+                            value: item.id,
+                          }))}
+                        />
+                      </Form.Item>
+                      {hasUnsupportedUploadCameraProtocol ? (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          style={{ marginBottom: 12 }}
+                          title="当前摄像头协议暂不支持"
+                          description="V1 拍照上传链路仅支持 RTSP 摄像头。"
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </>
               ) : null}
 
               {taskMode !== 'upload' ? (
@@ -640,13 +740,18 @@ export function JobsPage() {
                 <Button
                   type="primary"
                   htmlType="submit"
-                  disabled={hasUnsupportedCameraProtocol}
+                  disabled={hasUnsupportedCameraProtocol || hasUnsupportedUploadCameraProtocol}
                   loading={
-                    uploadMutation.isPending || cameraOnceMutation.isPending || scheduleMutation.isPending
+                    uploadMutation.isPending ||
+                    cameraOnceMutation.isPending ||
+                    cameraSnapshotUploadMutation.isPending ||
+                    scheduleMutation.isPending
                   }
                 >
                   {taskMode === 'upload'
-                    ? '提交上传任务'
+                    ? uploadSource === 'camera_snapshot'
+                      ? '拍照并提交任务'
+                      : '提交上传任务'
                     : taskMode === 'camera_once'
                       ? '执行摄像头单次任务'
                       : '创建定时任务计划'}
@@ -664,7 +769,9 @@ export function JobsPage() {
               title="当前范围"
               description={
                 taskMode === 'upload'
-                  ? '上传图片会先保存输入文件并创建 queued 任务，后续由异步 worker 执行分析。'
+                  ? uploadSource === 'camera_snapshot'
+                    ? '摄像头拍照上传会先执行即时抓帧，再按文件上传同一链路创建 queued 任务并进入异步 worker。'
+                    : '上传图片会先保存输入文件并创建 queued 任务，后续由异步 worker 执行分析。'
                   : taskMode === 'camera_once'
                     ? '摄像头单次任务会先进入队列，worker 再按当前 RTSP 配置抓帧并写入记录。'
                     : '定时任务计划支持按分钟间隔和每日固定时间触发，独立 scheduler 会按 next_run_at 生成执行任务。'
