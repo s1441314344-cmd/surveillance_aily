@@ -19,12 +19,25 @@ test('upload job is queued and can be cancelled in job center', async ({ page })
   await expect(page).toHaveURL(/\/jobs$/);
   await expect(page.getByRole('heading', { name: '任务中心' })).toBeVisible();
 
+  const createTaskCard = page.locator('.ant-card').filter({ hasText: '创建任务' }).first();
+  const strategySelect = createTaskCard
+    .locator('.ant-form-item')
+    .filter({ hasText: '分析策略' })
+    .locator('.ant-select')
+    .first();
+  const strategyPlaceholder = strategySelect.locator('.ant-select-selection-placeholder');
+  if (await strategyPlaceholder.isVisible().catch(() => false)) {
+    await strategySelect.click();
+    await page.locator('.ant-select-dropdown .ant-select-item-option').first().click();
+  }
+
   const uploadInput = page.locator('input[type="file"]');
   const sampleImagePath = fileURLToPath(new URL('../../test_media/test_cam_1.jpg', import.meta.url));
   await uploadInput.setInputFiles(sampleImagePath);
 
   const createJobResponsePromise = page.waitForResponse(
     (response) => response.url().includes('/api/jobs/uploads') && response.request().method() === 'POST',
+    { timeout: 30000 },
   );
   await page.getByRole('button', { name: '提交上传任务' }).click();
   const createJobResponse = await createJobResponsePromise;
