@@ -5,11 +5,11 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginByUi(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
-  await page.getByLabel('用户名').fill(username);
-  await page.getByLabel('密码').fill(password);
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
+    await page.getByLabel('用户名').fill(username);
+    await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '登录系统' }).click();
     try {
       await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
@@ -18,8 +18,6 @@ async function loginByUi(page: Page, username: string, password: string) {
       if (attempt === 2) {
         break;
       }
-      await page.getByLabel('用户名').fill(username);
-      await page.getByLabel('密码').fill(password);
     }
   }
 }
