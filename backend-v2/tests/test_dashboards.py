@@ -163,7 +163,9 @@ def test_analysis_viewer_can_read_dashboards_but_cannot_write(client):
 
     list_response = client.get("/api/dashboards", headers=viewer_headers)
     assert list_response.status_code == 200
-    assert len(list_response.json()) == 1
+    listed_dashboards = list_response.json()
+    assert len(listed_dashboards) >= 1
+    assert any(item["id"] == dashboard["id"] for item in listed_dashboards)
 
     get_response = client.get(f"/api/dashboards/{dashboard['id']}", headers=viewer_headers)
     assert get_response.status_code == 200

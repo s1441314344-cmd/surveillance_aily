@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.security import get_password_hash
+from app.models.dashboard_definition import DashboardDefinition
 from app.models.model_provider import ModelProvider
 from app.models.rbac import Role, User, UserRole
 from app.models.strategy import AnalysisStrategy, StrategyVersion
@@ -94,12 +95,39 @@ PRESET_STRATEGIES = [
     },
 ]
 
+PRESET_DASHBOARDS = [
+    {
+        "id": "preset-overview-dashboard",
+        "name": "巡检总览看板",
+        "description": "默认总览：任务规模、结构化质量、异常案例与策略使用分布。",
+        "definition": {
+            "widgets": [
+                {"type": "kpi", "metric": "total_jobs"},
+                {"type": "kpi", "metric": "total_records"},
+                {"type": "kpi", "metric": "structured_success_rate"},
+                {"type": "line", "metric": "jobs_trend"},
+                {"type": "bar", "metric": "strategy_usage"},
+                {"type": "table", "metric": "anomalies"},
+            ],
+            "filters": {
+                "strategy_id": None,
+                "model_provider": None,
+                "anomaly_type": None,
+                "time_range": "7d",
+            },
+        },
+        "status": "active",
+        "is_default": True,
+    }
+]
+
 
 def seed_defaults(db: Session) -> None:
     _seed_roles(db)
     _seed_admin_user(db)
     _seed_model_providers(db)
     _seed_preset_strategies(db)
+    _seed_preset_dashboards(db)
     db.commit()
 
 
@@ -171,3 +199,25 @@ def _seed_preset_strategies(db: Session) -> None:
             strategy = db.get(AnalysisStrategy, preset["id"])
             if strategy is not None:
                 record_strategy_version(db, strategy)
+
+
+def _seed_preset_dashboards(db: Session) -> None:
+    existing_dashboards = {dashboard.id for dashboard in db.scalars(select(DashboardDefinition))}
+    for preset in PRESET_DASHBOARDS:
+        if preset["id"] in existing_dashboards:
+            continue
+
+        if preset["is_default"]:
+            for item in db.scalars(select(DashboardDefinition).where(DashboardDefinition.is_default.is_(True))):
+                item.is_default = False
+
+        db.add(
+            DashboardDefinition(
+                id=preset["id"],
+                name=preset["name"],
+                description=preset["description"],
+                definition=preset["definition"],
+                status=preset["status"],
+                is_default=preset["is_default"],
+            )
+        )
