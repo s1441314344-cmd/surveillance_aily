@@ -33,6 +33,7 @@ def build_release_checklist(
     release_drill_report_path: str | Path | None = None,
     release_drill_report: dict | None = None,
     allow_without_release_drill: bool = False,
+    require_release_drill_apply_backfill: bool = False,
 ) -> ReleaseChecklist:
     blockers: list[str] = []
     notes: list[str] = []
@@ -73,6 +74,12 @@ def build_release_checklist(
 
         for issue in release_drill_report.get("blocking_issues") or []:
             blockers.append(f"Release drill blocking issue: {issue}")
+
+        if require_release_drill_apply_backfill:
+            if bool(release_drill_report.get("backfill_dry_run", True)):
+                blockers.append(
+                    "Release drill backfill is still dry-run; rerun with apply mode before final release."
+                )
 
         for risk in release_drill_report.get("risks") or []:
             notes.append(f"Release drill risk: {risk}")

@@ -299,6 +299,12 @@ release drill 同时带 e2e：
 ./scripts/v2/uat.sh --with-release-drill --release-drill-with-e2e
 ```
 
+release drill 使用真实回填 apply：
+
+```bash
+./scripts/v2/uat.sh --with-release-drill --release-drill-apply-backfill
+```
+
 输出目录默认在 `data/uat-logs/<timestamp>/`，包含每一步日志、`summary.json` 和可直接评审的 `summary.md`。
 
 ## 全流程验证流水线
@@ -338,6 +344,12 @@ make v2-release-checklist
 ./scripts/v2/release-checklist.sh --allow-without-release-drill
 ```
 
+强制要求 release drill 不是 dry-run：
+
+```bash
+./scripts/v2/release-checklist.sh --require-drill-apply-backfill
+```
+
 输出目录默认在 `data/release-checklists/<timestamp>/`，包含：
 
 - `release-checklist.json`
@@ -351,6 +363,12 @@ make v2-release-checklist
 make v2-release-gate
 ```
 
+最终放行模式（强制 release drill 使用 apply-backfill 且禁止 dry-run）：
+
+```bash
+make v2-release-gate-final
+```
+
 复用已有 UAT / release drill 产物进行快速判定：
 
 ```bash
@@ -358,6 +376,12 @@ make v2-release-gate
   --skip-uat \
   --uat-summary ./data/uat-logs/<timestamp>/summary.json \
   --release-drill-report ./data/release-drill-logs/<timestamp>/release-drill-report.json
+```
+
+执行强制 apply 的闸门判定：
+
+```bash
+./scripts/v2/release-gate.sh --release-drill-apply-backfill --require-drill-apply-backfill
 ```
 
 输出目录默认在 `data/release-gates/<timestamp>/`，包含：

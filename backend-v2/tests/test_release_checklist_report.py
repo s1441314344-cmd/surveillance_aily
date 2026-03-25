@@ -103,3 +103,31 @@ def test_release_checklist_markdown_contains_sections():
     assert "## 1. 验收检查项" in markdown
     assert "| backend_pytest | passed |" in markdown
     assert "## 4. 发布步骤（建议）" in markdown
+
+
+def test_release_checklist_blocks_when_backfill_apply_is_required_but_dry_run():
+    checklist = build_release_checklist(
+        uat_summary_path="/tmp/uat-summary.json",
+        uat_summary={
+            "result": "passed",
+            "checks": {
+                "backend_pytest": {"status": "passed"},
+                "frontend_lint": {"status": "passed"},
+                "frontend_unit": {"status": "passed"},
+                "frontend_build": {"status": "passed"},
+                "e2e": {"status": "passed"},
+            },
+        },
+        release_drill_report_path="/tmp/release-drill-report.json",
+        release_drill_report={
+            "gate_status": "passed",
+            "preflight_result": "passed",
+            "backfill_dry_run": True,
+            "blocking_issues": [],
+            "risks": [],
+        },
+        require_release_drill_apply_backfill=True,
+    )
+
+    assert checklist.ready_to_release is False
+    assert any("dry-run" in item for item in checklist.blockers)

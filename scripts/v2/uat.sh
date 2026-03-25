@@ -15,6 +15,7 @@ require_cmd sed
 
 WITH_RELEASE_DRILL="false"
 RELEASE_DRILL_WITH_E2E="false"
+RELEASE_DRILL_APPLY_BACKFILL="false"
 OUTPUT_DIR="${V2_UAT_OUTPUT_DIR:-}"
 
 print_usage() {
@@ -25,6 +26,7 @@ Usage:
 Options:
   --with-release-drill      Run v2-release-drill after baseline checks
   --release-drill-with-e2e  If release drill is enabled, include E2E in preflight
+  --release-drill-apply-backfill  If release drill is enabled, run backfill in apply mode
   --output-dir <dir>        Override output directory (default: data/uat-logs/<timestamp>)
   --help                    Show this message
 EOF
@@ -38,6 +40,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --release-drill-with-e2e)
       RELEASE_DRILL_WITH_E2E="true"
+      shift
+      ;;
+    --release-drill-apply-backfill)
+      RELEASE_DRILL_APPLY_BACKFILL="true"
       shift
       ;;
     --output-dir)
@@ -126,6 +132,9 @@ if [[ "${WITH_RELEASE_DRILL}" == "true" ]]; then
   release_drill_args=()
   if [[ "${RELEASE_DRILL_WITH_E2E}" == "true" ]]; then
     release_drill_args+=(--with-e2e)
+  fi
+  if [[ "${RELEASE_DRILL_APPLY_BACKFILL}" == "true" ]]; then
+    release_drill_args+=(--apply-backfill)
   fi
   if ./scripts/v2/release-drill.sh "${release_drill_args[@]}" | tee "${release_drill_log}"; then
     release_drill_status="passed"

@@ -11,6 +11,7 @@ require_cmd head
 UAT_SUMMARY_PATH="${V2_RELEASE_CHECKLIST_UAT_SUMMARY_PATH:-}"
 RELEASE_DRILL_REPORT_PATH="${V2_RELEASE_CHECKLIST_DRILL_REPORT_PATH:-}"
 ALLOW_WITHOUT_RELEASE_DRILL="false"
+REQUIRE_DRILL_APPLY_BACKFILL="false"
 OUTPUT_DIR="${V2_RELEASE_CHECKLIST_OUTPUT_DIR:-}"
 
 print_usage() {
@@ -22,6 +23,7 @@ Options:
   --uat-summary <path>            Explicit UAT summary.json path
   --release-drill-report <path>   Explicit release drill report JSON path
   --allow-without-release-drill   Allow generating checklist without release drill report
+  --require-drill-apply-backfill  Require release drill to use non-dry-run backfill apply mode
   --output-dir <dir>              Output directory (default: data/release-checklists/<timestamp>)
   --help                          Show this message
 EOF
@@ -48,6 +50,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --allow-without-release-drill)
       ALLOW_WITHOUT_RELEASE_DRILL="true"
+      shift
+      ;;
+    --require-drill-apply-backfill)
+      REQUIRE_DRILL_APPLY_BACKFILL="true"
       shift
       ;;
     --output-dir)
@@ -101,6 +107,9 @@ if [[ -n "${RELEASE_DRILL_REPORT_PATH}" ]]; then
 fi
 if [[ "${ALLOW_WITHOUT_RELEASE_DRILL}" == "true" ]]; then
   cmd+=(--allow-without-release-drill)
+fi
+if [[ "${REQUIRE_DRILL_APPLY_BACKFILL}" == "true" ]]; then
+  cmd+=(--require-drill-apply-backfill)
 fi
 
 "${cmd[@]}"

@@ -35,6 +35,11 @@ def parse_args() -> argparse.Namespace:
         help="Allow generating checklist without release drill report.",
     )
     parser.add_argument(
+        "--require-drill-apply-backfill",
+        action="store_true",
+        help="Require release drill report to be generated from non-dry-run backfill apply mode.",
+    )
+    parser.add_argument(
         "--output",
         required=True,
         help="Output JSON path for release checklist.",
@@ -67,6 +72,7 @@ def main() -> int:
         release_drill_report_path=args.release_drill_report,
         release_drill_report=release_drill_report,
         allow_without_release_drill=args.allow_without_release_drill,
+        require_release_drill_apply_backfill=args.require_drill_apply_backfill,
     )
     output_path = save_release_checklist(checklist, args.output)
     print(json.dumps(checklist.to_dict(), ensure_ascii=False, indent=2))
