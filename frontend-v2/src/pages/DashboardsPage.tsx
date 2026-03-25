@@ -22,6 +22,7 @@ import {
   deleteDashboardDefinition,
   listDashboardDefinitions,
   updateDashboardDefinition,
+  validateDashboardDefinition,
 } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 
@@ -56,7 +57,7 @@ const DEFAULT_DEFINITION_TEXT = JSON.stringify(
 
 const ALLOWED_FILTER_KEYS = new Set(['strategy_id', 'model_provider', 'anomaly_type', 'time_range']);
 
-function validateDashboardDefinition(definition: unknown): string[] {
+function validateDashboardDefinitionLocally(definition: unknown): string[] {
   const errors: string[] = [];
   if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
     return ['看板定义必须是 JSON 对象'];
@@ -193,6 +194,35 @@ export function DashboardsPage() {
     },
   });
 
+  const validateMutation = useMutation({
+    mutationFn: ({
+      dashboardId,
+      definition,
+    }: {
+      dashboardId: string;
+      definition: Record<string, unknown>;
+    }) => validateDashboardDefinition(dashboardId, definition),
+    onSuccess: (result) => {
+      if (result.valid) {
+        message.success('看板定义服务端校验通过');
+        return;
+      }
+      modal.error({
+        title: '服务端校验失败',
+        content: (
+          <ul style={{ marginBottom: 0, paddingLeft: 18 }}>
+            {result.errors.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ),
+      });
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '看板定义服务端校验失败'));
+    },
+  });
+
   const resetForCreate = () => {
     setSelectedDashboardId(CREATE_DASHBOARD_ID);
     form.setFieldsValue({
@@ -220,7 +250,7 @@ export function DashboardsPage() {
       return;
     }
 
-    const definitionErrors = validateDashboardDefinition(definition);
+    const definitionErrors = validateDashboardDefinitionLocally(definition);
     if (definitionErrors.length > 0) {
       modal.error({
         title: '看板定义校验失败',
@@ -252,6 +282,41 @@ export function DashboardsPage() {
     }
 
     await createMutation.mutateAsync(payload);
+  };
+
+  const handleValidateDefinition = async () => {
+    if (!effectiveSelectedDashboardId) {
+      message.info('请先保存看板，再执行服务端校验');
+      return;
+    }
+
+    let definition: Record<string, unknown>;
+    try {
+      definition = JSON.parse(form.getFieldValue('definition_text') ?? '{}');
+    } catch {
+      message.error('看板定义 JSON 不是合法格式');
+      return;
+    }
+
+    const definitionErrors = validateDashboardDefinitionLocally(definition);
+    if (definitionErrors.length > 0) {
+      modal.error({
+        title: '看板定义校验失败',
+        content: (
+          <ul style={{ marginBottom: 0, paddingLeft: 18 }}>
+            {definitionErrors.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ),
+      });
+      return;
+    }
+
+    await validateMutation.mutateAsync({
+      dashboardId: effectiveSelectedDashboardId,
+      definition,
+    });
   };
 
   const handleDelete = () => {
@@ -390,6 +455,9 @@ export function DashboardsPage() {
               <Space>
                 <Button type="primary" htmlType="submit" loading={createMutation.isPending || updateMutation.isPending}>
                   {effectiveSelectedDashboardId ? '保存修改' : '创建看板'}
+                </Button>
+                <Button onClick={() => void handleValidateDefinition()} loading={validateMutation.isPending}>
+                  服务端校验
                 </Button>
                 <Button onClick={resetForCreate}>重置为新建</Button>
                 {effectiveSelectedDashboardId ? (

@@ -4,8 +4,15 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
-from app.schemas.dashboard_definition import DashboardDefinitionCreate, DashboardDefinitionRead, DashboardDefinitionUpdate
+from app.schemas.dashboard_definition import (
+    DashboardDefinitionCreate,
+    DashboardDefinitionRead,
+    DashboardDefinitionUpdate,
+    DashboardDefinitionValidateRequest,
+    DashboardDefinitionValidateResponse,
+)
 from app.services.dashboard_definition_service import (
+    collect_dashboard_definition_errors,
     create_dashboard_definition as create_dashboard_definition_record,
     delete_dashboard_definition as delete_dashboard_definition_record,
     get_dashboard_definition_or_404,
@@ -43,6 +50,18 @@ def get_dashboard(
     db: Session = Depends(get_db),
 ):
     return serialize_dashboard_definition(get_dashboard_definition_or_404(db, dashboard_id))
+
+
+@router.post("/{dashboard_id}/validate-definition", response_model=DashboardDefinitionValidateResponse)
+def validate_dashboard_definition(
+    dashboard_id: str,
+    payload: DashboardDefinitionValidateRequest,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN)),
+    db: Session = Depends(get_db),
+):
+    get_dashboard_definition_or_404(db, dashboard_id)
+    errors = collect_dashboard_definition_errors(payload.definition)
+    return DashboardDefinitionValidateResponse(dashboard_id=dashboard_id, valid=not errors, errors=errors)
 
 
 @router.patch("/{dashboard_id}", response_model=DashboardDefinitionRead)

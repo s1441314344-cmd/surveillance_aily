@@ -121,44 +121,42 @@ def _to_iso(value: datetime | None) -> str:
 
 
 def _validate_dashboard_definition(definition: dict) -> None:
+    errors = collect_dashboard_definition_errors(definition)
+    if errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=errors[0])
+
+
+def collect_dashboard_definition_errors(definition: dict) -> list[str]:
+    errors: list[str] = []
     if not isinstance(definition, dict):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dashboard definition must be a JSON object")
+        return ["Dashboard definition must be a JSON object"]
 
     widgets = definition.get("widgets")
     if widgets is not None:
         if not isinstance(widgets, list):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dashboard widgets must be an array")
-        for index, widget in enumerate(widgets):
-            if not isinstance(widget, dict):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Dashboard widget at index {index} must be an object",
-                )
-            widget_type = widget.get("type")
-            if not isinstance(widget_type, str) or not widget_type.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Dashboard widget at index {index} must include a non-empty type",
-                )
-            metric = widget.get("metric")
-            if not isinstance(metric, str) or not metric.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Dashboard widget at index {index} must include a non-empty metric",
-                )
+            errors.append("Dashboard widgets must be an array")
+        else:
+            for index, widget in enumerate(widgets):
+                if not isinstance(widget, dict):
+                    errors.append(f"Dashboard widget at index {index} must be an object")
+                    continue
+                widget_type = widget.get("type")
+                if not isinstance(widget_type, str) or not widget_type.strip():
+                    errors.append(f"Dashboard widget at index {index} must include a non-empty type")
+                metric = widget.get("metric")
+                if not isinstance(metric, str) or not metric.strip():
+                    errors.append(f"Dashboard widget at index {index} must include a non-empty metric")
 
     filters = definition.get("filters")
     if filters is not None:
         if not isinstance(filters, dict):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dashboard filters must be an object")
-        for key, value in filters.items():
-            if key not in ALLOWED_DASHBOARD_FILTER_KEYS:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Unsupported dashboard filter key: {key}",
-                )
-            if value is not None and not isinstance(value, str):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Dashboard filter {key} must be a string or null",
-                )
+            errors.append("Dashboard filters must be an object")
+        else:
+            for key, value in filters.items():
+                if key not in ALLOWED_DASHBOARD_FILTER_KEYS:
+                    errors.append(f"Unsupported dashboard filter key: {key}")
+                    continue
+                if value is not None and not isinstance(value, str):
+                    errors.append(f"Dashboard filter {key} must be a string or null")
+
+    return errors

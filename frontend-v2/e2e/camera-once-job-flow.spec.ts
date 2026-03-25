@@ -61,26 +61,28 @@ test('camera once job is queued and can be cancelled in job center', async ({ pa
 
   const createTaskCard = page.locator('.ant-card').filter({ hasText: '创建任务' }).first();
   const taskModeSelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '任务类型' }).locator('.ant-select');
+  const visibleSelectOptions = page.locator(
+    '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option',
+  );
   await taskModeSelect.click();
-  await page
-    .locator('.ant-select-dropdown .ant-select-item-option')
-    .filter({ hasText: '摄像头单次抽帧' })
-    .first()
-    .click();
+  await visibleSelectOptions.filter({ hasText: '摄像头单次抽帧' }).first().click();
+
+  const strategySelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '分析策略' }).locator('.ant-select');
+  await strategySelect.click();
+  await expect(visibleSelectOptions.first()).toBeVisible();
+  await visibleSelectOptions.first().click();
 
   const cameraSelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '选择摄像头' }).locator('.ant-select');
   await cameraSelect.click();
-  await page
-    .locator('.ant-select-dropdown .ant-select-item-option')
-    .filter({ hasText: cameraName })
-    .first()
-    .click();
+  await visibleSelectOptions.filter({ hasText: cameraName }).first().click();
+  await expect(page.getByRole('button', { name: '执行摄像头单次任务', exact: true })).toBeEnabled();
 
   const createJobResponsePromise = page.waitForResponse(
     (response) =>
       response.url().includes('/api/jobs/cameras/once') && response.request().method() === 'POST',
+    { timeout: 60000 },
   );
-  await page.getByRole('button', { name: '执行摄像头单次任务' }).click();
+  await page.getByRole('button', { name: '执行摄像头单次任务', exact: true }).click();
   const createJobResponse = await createJobResponsePromise;
   expect(createJobResponse.ok()).toBeTruthy();
   const createdJob = (await createJobResponse.json()) as { id: string };

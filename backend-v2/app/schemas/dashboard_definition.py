@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ALLOWED_DASHBOARD_STATUSES = {"active", "inactive"}
 
@@ -67,3 +67,26 @@ class DashboardDefinitionRead(DashboardDefinitionBase):
     id: str
     created_at: str
     updated_at: str
+
+
+class DashboardDefinitionValidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    definition: dict
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_definition_aliases(cls, value):
+        if not isinstance(value, dict):
+            return value
+        if "definition" in value:
+            return value
+        if "dashboard_definition" in value:
+            return {"definition": value["dashboard_definition"]}
+        return value
+
+
+class DashboardDefinitionValidateResponse(BaseModel):
+    dashboard_id: str
+    valid: bool
+    errors: list[str]

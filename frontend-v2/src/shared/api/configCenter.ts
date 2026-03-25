@@ -139,6 +139,12 @@ export type DashboardDefinitionPayload = {
   is_default: boolean;
 };
 
+export type DashboardDefinitionValidationResponse = {
+  dashboard_id: string;
+  valid: boolean;
+  errors: string[];
+};
+
 export async function listModelProviders() {
   const response = await apiClient.get<ModelProvider[]>('/api/model-providers');
   return response.data;
@@ -273,5 +279,13 @@ export async function updateDashboardDefinition(
 
 export async function deleteDashboardDefinition(dashboardId: string) {
   const response = await apiClient.delete<{ deleted: boolean }>(`/api/dashboards/${dashboardId}`);
+  return response.data;
+}
+
+export async function validateDashboardDefinition(dashboardId: string, definition: Record<string, unknown>) {
+  const response = await apiClient.post<DashboardDefinitionValidationResponse>(
+    `/api/dashboards/${dashboardId}/validate-definition`,
+    { definition },
+  );
   return response.data;
 }

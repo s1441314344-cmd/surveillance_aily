@@ -156,6 +156,113 @@ def test_dashboard_definition_status_filter_and_duplicate_name_guard(client):
     assert invalid_update_response.json()["detail"] == "Unsupported dashboard filter key: unsupported_key"
 
 
+def test_dashboard_definition_validate_endpoint_reports_valid_and_invalid_results(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_dashboard_response = client.post(
+        "/api/dashboards",
+        headers=headers,
+        json={
+            "name": "可校验看板",
+            "description": "用于校验接口测试",
+            "definition": {"widgets": [{"type": "kpi", "metric": "total_jobs"}]},
+            "status": "active",
+            "is_default": False,
+        },
+    )
+    assert create_dashboard_response.status_code == 200
+    dashboard = create_dashboard_response.json()
+
+    valid_response = client.post(
+        f"/api/dashboards/{dashboard['id']}/validate-definition",
+        headers=headers,
+        json={
+            "definition": {
+                "widgets": [
+                    {"type": "line", "metric": "jobs_trend"},
+                    {"type": "kpi", "metric": "success_rate"},
+                ],
+                "filters": {
+                    "strategy_id": "preset-helmet",
+                    "time_range": "7d",
+                },
+            }
+        },
+    )
+    assert valid_response.status_code == 200
+    valid_payload = valid_response.json()
+    assert valid_payload["dashboard_id"] == dashboard["id"]
+    assert valid_payload["valid"] is True
+    assert valid_payload["errors"] == []
+
+    invalid_response = client.post(
+        f"/api/dashboards/{dashboard['id']}/validate-definition",
+        headers=headers,
+        json={
+            "dashboard_definition": {
+                "widgets": "invalid",
+                "filters": {
+                    "unsupported_key": "x",
+                    "time_range": 7,
+                },
+            }
+        },
+    )
+    assert invalid_response.status_code == 200
+    invalid_payload = invalid_response.json()
+    assert invalid_payload["dashboard_id"] == dashboard["id"]
+    assert invalid_payload["valid"] is False
+    assert "Dashboard widgets must be an array" in invalid_payload["errors"]
+    assert "Unsupported dashboard filter key: unsupported_key" in invalid_payload["errors"]
+    assert "Dashboard filter time_range must be a string or null" in invalid_payload["errors"]
+
+
+def test_dashboard_definition_validate_requires_admin_role(client):
+    admin_login = login_as_admin(client)
+    admin_headers = auth_headers(admin_login["access_token"])
+
+    create_viewer_response = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "username": "dashboard_validate_viewer",
+            "password": "Viewer123!",
+            "display_name": "看板校验只读用户",
+            "roles": ["analysis_viewer"],
+        },
+    )
+    assert create_viewer_response.status_code == 200
+
+    create_dashboard_response = client.post(
+        "/api/dashboards",
+        headers=admin_headers,
+        json={
+            "name": "管理员校验看板",
+            "description": "用于权限校验",
+            "definition": {"widgets": [{"type": "kpi", "metric": "total_jobs"}]},
+            "status": "active",
+            "is_default": False,
+        },
+    )
+    assert create_dashboard_response.status_code == 200
+    dashboard = create_dashboard_response.json()
+
+    viewer_login = login_as_user(client, username="dashboard_validate_viewer", password="Viewer123!")
+    viewer_headers = auth_headers(viewer_login["access_token"])
+
+    validate_response = client.post(
+        f"/api/dashboards/{dashboard['id']}/validate-definition",
+        headers=viewer_headers,
+        json={
+            "definition": {
+                "widgets": [{"type": "kpi", "metric": "total_jobs"}],
+            }
+        },
+    )
+    assert validate_response.status_code == 403
+
+
 def test_analysis_viewer_can_read_dashboards_but_cannot_write(client):
     admin_login = login_as_admin(client)
     admin_headers = auth_headers(admin_login["access_token"])
