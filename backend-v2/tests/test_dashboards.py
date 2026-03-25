@@ -127,6 +127,34 @@ def test_dashboard_definition_status_filter_and_duplicate_name_guard(client):
     assert len(inactive_dashboards) == 1
     assert inactive_dashboards[0]["name"] == "夜班看板"
 
+    invalid_definition_response = client.post(
+        "/api/dashboards",
+        headers=headers,
+        json={
+            "name": "非法看板定义",
+            "description": "widgets 结构非法",
+            "definition": {"widgets": "not-an-array"},
+            "status": "active",
+            "is_default": False,
+        },
+    )
+    assert invalid_definition_response.status_code == 400
+    assert invalid_definition_response.json()["detail"] == "Dashboard widgets must be an array"
+
+    existing_dashboard_id = create_active_response.json()["id"]
+    invalid_update_response = client.patch(
+        f"/api/dashboards/{existing_dashboard_id}",
+        headers=headers,
+        json={
+            "definition": {
+                "widgets": [{"type": "kpi", "metric": "reviewed_rate"}],
+                "filters": {"unsupported_key": "x"},
+            }
+        },
+    )
+    assert invalid_update_response.status_code == 400
+    assert invalid_update_response.json()["detail"] == "Unsupported dashboard filter key: unsupported_key"
+
 
 def test_analysis_viewer_can_read_dashboards_but_cannot_write(client):
     admin_login = login_as_admin(client)

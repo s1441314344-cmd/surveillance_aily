@@ -8,6 +8,13 @@ from app.models.dashboard_definition import DashboardDefinition
 from app.schemas.dashboard_definition import DashboardDefinitionCreate, DashboardDefinitionRead, DashboardDefinitionUpdate
 from app.services.ids import generate_id
 
+ALLOWED_DASHBOARD_FILTER_KEYS = {
+    "strategy_id",
+    "model_provider",
+    "anomaly_type",
+    "time_range",
+}
+
 
 def serialize_dashboard_definition(dashboard: DashboardDefinition) -> DashboardDefinitionRead:
     return DashboardDefinitionRead(
@@ -40,6 +47,7 @@ def get_dashboard_definition_or_404(db: Session, dashboard_id: str) -> Dashboard
 
 def create_dashboard_definition(db: Session, payload: DashboardDefinitionCreate) -> DashboardDefinitionRead:
     _ensure_name_unique(db, payload.name)
+    _validate_dashboard_definition(payload.definition)
 
     if payload.is_default:
         _clear_default_dashboard(db)
@@ -69,6 +77,8 @@ def update_dashboard_definition(
 
     if "name" in updates and updates["name"] is not None and updates["name"] != dashboard.name:
         _ensure_name_unique(db, updates["name"], exclude_dashboard_id=dashboard.id)
+    if "definition" in updates and updates["definition"] is not None:
+        _validate_dashboard_definition(updates["definition"])
 
     if updates.get("is_default") is True:
         _clear_default_dashboard(db, exclude_dashboard_id=dashboard.id)
@@ -108,3 +118,47 @@ def _to_iso(value: datetime | None) -> str:
         return ""
     normalized = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
     return normalized.isoformat()
+
+
+def _validate_dashboard_definition(definition: dict) -> None:
+    if not isinstance(definition, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dashboard definition must be a JSON object")
+
+    widgets = definition.get("widgets")
+    if widgets is not None:
+        if not isinstance(widgets, list):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dashboard widgets must be an array")
+        for index, widget in enumerate(widgets):
+            if not isinstance(widget, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Dashboard widget at index {index} must be an object",
+                )
+            widget_type = widget.get("type")
+            if not isinstance(widget_type, str) or not widget_type.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Dashboard widget at index {index} must include a non-empty type",
+                )
+            metric = widget.get("metric")
+            if not isinstance(metric, str) or not metric.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Dashboard widget at index {index} must include a non-empty metric",
+                )
+
+    filters = definition.get("filters")
+    if filters is not None:
+        if not isinstance(filters, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dashboard filters must be an object")
+        for key, value in filters.items():
+            if key not in ALLOWED_DASHBOARD_FILTER_KEYS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported dashboard filter key: {key}",
+                )
+            if value is not None and not isinstance(value, str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Dashboard filter {key} must be a string or null",
+                )
