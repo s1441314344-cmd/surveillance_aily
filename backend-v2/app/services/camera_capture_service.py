@@ -63,6 +63,15 @@ class CameraCaptureDiagnostic:
     checked_at: datetime
 
 
+@dataclass
+class CameraRecordingPlan:
+    command: list[str]
+    output_path: str
+    mime_type: str
+    file_name: str
+    duration_seconds: int | None
+
+
 def camera_to_capture_config(camera: Camera) -> CameraCaptureConfig:
     return CameraCaptureConfig(
         id=camera.id,
@@ -89,25 +98,21 @@ def snapshot_to_capture_config(snapshot: dict) -> CameraCaptureConfig:
 
 def capture_camera_frame(camera: Camera | CameraCaptureConfig) -> CameraFrame:
     capture_config = camera if isinstance(camera, CameraCaptureConfig) else camera_to_capture_config(camera)
-    protocol = (capture_config.protocol or "").strip().lower()
-    if protocol != "rtsp":
-        raise CameraCaptureError(
-            f"Camera protocol {protocol or 'unknown'} is not supported in V1 capture chain; only RTSP is supported",
-        )
-
-    rtsp_url = (capture_config.rtsp_url or "").strip()
-    if not rtsp_url:
-        raise CameraCaptureError("RTSP URL is missing")
+    protocol, rtsp_url = _validate_rtsp_capture_config(capture_config)
 
     if rtsp_url.startswith("rtsp://mock/"):
+        timestamp = datetime.now(timezone.utc)
         return CameraFrame(
             content=MOCK_FRAME_PNG,
-            original_name=f"{_build_file_stem(capture_config.name)}-{capture_config.id[:8]}.png",
+            original_name=build_media_filename(
+                camera_name=capture_config.name,
+                camera_id=capture_config.id,
+                media_kind="photo",
+                extension="png",
+                timestamp=timestamp,
+            ),
             mime_type="image/png",
         )
-
-    if not rtsp_url.startswith("rtsp://"):
-        raise CameraCaptureError("RTSP URL must start with rtsp://")
 
     ffmpeg_path = shutil.which("ffmpeg")
     if ffmpeg_path is None:
@@ -155,8 +160,80 @@ def capture_camera_frame(camera: Camera | CameraCaptureConfig) -> CameraFrame:
 
     return CameraFrame(
         content=content,
-        original_name=f"{_build_file_stem(capture_config.name)}-{capture_config.id[:8]}.jpg",
+        original_name=build_media_filename(
+            camera_name=capture_config.name,
+            camera_id=capture_config.id,
+            media_kind="photo",
+            extension="jpg",
+            timestamp=datetime.now(timezone.utc),
+        ),
         mime_type="image/jpeg",
+    )
+
+
+def build_recording_plan(
+    camera: Camera | CameraCaptureConfig,
+    *,
+    output_path: str,
+    file_name: str | None = None,
+    duration_seconds: int | None = None,
+) -> CameraRecordingPlan:
+    capture_config = camera if isinstance(camera, CameraCaptureConfig) else camera_to_capture_config(camera)
+    _, rtsp_url = _validate_rtsp_capture_config(capture_config)
+
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path is None:
+        raise CameraCaptureError("ffmpeg is required for RTSP recording")
+
+    target_file_name = file_name or build_media_filename(
+        camera_name=capture_config.name,
+        camera_id=capture_config.id,
+        media_kind="video",
+        extension="mp4",
+        timestamp=datetime.now(timezone.utc),
+    )
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    command = [ffmpeg_path, "-y"]
+    if rtsp_url.startswith("rtsp://mock/"):
+        # Mock stream for local validation without a physical RTSP camera.
+        command.extend(
+            [
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc=size=1280x720:rate=15",
+            ]
+        )
+    else:
+        command.extend(["-rtsp_transport", "tcp", "-i", rtsp_url])
+
+    scale_filter = RESOLUTION_SCALE_MAP.get((capture_config.resolution or "").lower())
+    if scale_filter:
+        command.extend(["-vf", scale_filter])
+
+    if duration_seconds and duration_seconds > 0:
+        command.extend(["-t", str(duration_seconds)])
+
+    command.extend(
+        [
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            str(output_file),
+        ]
+    )
+
+    return CameraRecordingPlan(
+        command=command,
+        output_path=str(output_file),
+        mime_type="video/mp4",
+        file_name=target_file_name,
+        duration_seconds=duration_seconds,
     )
 
 
@@ -216,6 +293,38 @@ def diagnose_camera_capture(
             error_message=str(exc),
             checked_at=checked_at,
         )
+
+
+def build_media_filename(
+    *,
+    camera_name: str,
+    camera_id: str,
+    media_kind: str,
+    extension: str,
+    timestamp: datetime | None = None,
+) -> str:
+    normalized_extension = extension.lower().lstrip(".") or "bin"
+    normalized_kind = re.sub(r"[^a-zA-Z0-9_-]+", "-", media_kind.strip().lower()).strip("-") or "media"
+    suffix = camera_id[:8] if camera_id else "camera"
+    time_value = (timestamp or datetime.now(timezone.utc)).astimezone(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    stem = _build_file_stem(camera_name)
+    return f"{stem}-{suffix}-{normalized_kind}-{time_value}.{normalized_extension}"
+
+
+def _validate_rtsp_capture_config(capture_config: CameraCaptureConfig) -> tuple[str, str]:
+    protocol = (capture_config.protocol or "").strip().lower()
+    if protocol != "rtsp":
+        raise CameraCaptureError(
+            f"Camera protocol {protocol or 'unknown'} is not supported in V1 capture chain; only RTSP is supported",
+        )
+
+    rtsp_url = (capture_config.rtsp_url or "").strip()
+    if not rtsp_url:
+        raise CameraCaptureError("RTSP URL is missing")
+    if not rtsp_url.startswith("rtsp://"):
+        raise CameraCaptureError("RTSP URL must start with rtsp://")
+
+    return protocol, rtsp_url
 
 
 def _build_file_stem(name: str) -> str:

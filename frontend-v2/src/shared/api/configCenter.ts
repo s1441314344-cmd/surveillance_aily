@@ -120,6 +120,40 @@ export type CameraDiagnostic = {
   checked_at: string;
 };
 
+export type CameraMedia = {
+  id: string;
+  camera_id: string;
+  related_job_id: string | null;
+  file_asset_id: string | null;
+  media_type: 'photo' | 'video' | string;
+  source_kind: string;
+  status: string;
+  original_name: string;
+  storage_path: string;
+  mime_type: string;
+  duration_seconds: number | null;
+  stop_requested: boolean;
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type CameraPhotoCaptureResult = {
+  camera_id: string;
+  success: boolean;
+  media: CameraMedia | null;
+  error_message: string | null;
+};
+
+export type CameraRecordingResult = {
+  camera_id: string;
+  success: boolean;
+  media: CameraMedia;
+  message: string | null;
+};
+
 export type DashboardDefinition = {
   id: string;
   name: string;
@@ -251,6 +285,46 @@ export async function diagnoseCamera(cameraId: string, params?: { saveSnapshot?:
     params: {
       save_snapshot: params?.saveSnapshot ?? true,
     },
+  });
+  return response.data;
+}
+
+export async function captureCameraPhoto(cameraId: string, payload?: { sourceKind?: string }) {
+  const response = await apiClient.post<CameraPhotoCaptureResult>(`/api/cameras/${cameraId}/capture-photo`, {
+    source_kind: payload?.sourceKind || 'manual',
+  });
+  return response.data;
+}
+
+export async function startCameraRecording(
+  cameraId: string,
+  payload: { durationSeconds: number; sourceKind?: string },
+) {
+  const response = await apiClient.post<CameraRecordingResult>(`/api/cameras/${cameraId}/recordings/start`, {
+    duration_seconds: payload.durationSeconds,
+    source_kind: payload.sourceKind || 'manual',
+  });
+  return response.data;
+}
+
+export async function stopCameraRecording(cameraId: string, mediaId: string) {
+  const response = await apiClient.post<CameraRecordingResult>(`/api/cameras/${cameraId}/recordings/${mediaId}/stop`);
+  return response.data;
+}
+
+export async function listCameraMedia(cameraId: string, params?: { mediaType?: string; limit?: number }) {
+  const response = await apiClient.get<CameraMedia[]>(`/api/cameras/${cameraId}/media`, {
+    params: {
+      media_type: params?.mediaType || undefined,
+      limit: params?.limit ?? 50,
+    },
+  });
+  return response.data;
+}
+
+export async function fetchCameraMediaFile(cameraId: string, mediaId: string) {
+  const response = await apiClient.get<Blob>(`/api/cameras/${cameraId}/media/${mediaId}/file`, {
+    responseType: 'blob',
   });
   return response.data;
 }

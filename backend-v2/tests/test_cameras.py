@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from app.services.camera_capture_service import CameraRecordingPlan
 from app.services.scheduler_service import run_camera_status_sweep_once
 from .test_auth_and_users import auth_headers, login_as_admin, login_as_user
 
@@ -361,3 +364,141 @@ def test_check_all_cameras_status_requires_system_admin_role(client):
 
     response = client.post("/api/cameras/check-all", headers=operator_headers)
     assert response.status_code == 403
+
+
+def test_camera_manual_photo_capture_and_media_listing(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "拍照测试摄像头",
+            "location": "拍照测试位",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/photo-capture",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/photo-capture",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    capture_response = client.post(
+        f"/api/cameras/{camera['id']}/capture-photo",
+        headers=headers,
+        json={"source_kind": "manual"},
+    )
+    assert capture_response.status_code == 200
+    capture_result = capture_response.json()
+    assert capture_result["success"] is True
+    assert capture_result["media"] is not None
+    assert capture_result["media"]["media_type"] == "photo"
+    assert capture_result["media"]["status"] == "completed"
+    assert "photo" in capture_result["media"]["original_name"]
+
+    list_media_response = client.get(f"/api/cameras/{camera['id']}/media", headers=headers)
+    assert list_media_response.status_code == 200
+    media_items = list_media_response.json()
+    assert len(media_items) == 1
+    media = media_items[0]
+    assert media["camera_id"] == camera["id"]
+    assert media["media_type"] == "photo"
+    assert "/camera-media/" in media["storage_path"]
+
+    media_file_response = client.get(f"/api/cameras/{camera['id']}/media/{media['id']}/file", headers=headers)
+    assert media_file_response.status_code == 200
+    assert media_file_response.content
+
+
+def test_camera_video_recording_start_and_stop(client, monkeypatch, tmp_path):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "录制测试摄像头",
+            "location": "录制测试位",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/video-capture",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": str(tmp_path / "video-capture"),
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    output_path = tmp_path / "clip.mp4"
+
+    def fake_build_recording_plan(*args, **kwargs):
+        return CameraRecordingPlan(
+            command=["fake-ffmpeg", str(output_path)],
+            output_path=str(output_path),
+            mime_type="video/mp4",
+            file_name="clip.mp4",
+            duration_seconds=60,
+        )
+
+    class FakeRecordingProcess:
+        def __init__(self, *args, **kwargs):
+            self.returncode = None
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            self.returncode = 0
+            Path(output_path).write_bytes(b"mock-video")
+
+        def wait(self, timeout=None):
+            if self.returncode is None:
+                self.terminate()
+            return self.returncode
+
+        def kill(self):
+            self.terminate()
+
+        def communicate(self):
+            if self.returncode is None:
+                self.returncode = 0
+            return b"", b""
+
+    monkeypatch.setattr("app.services.camera_media_service.build_recording_plan", fake_build_recording_plan)
+    monkeypatch.setattr("app.services.camera_media_service.subprocess.Popen", FakeRecordingProcess)
+    monkeypatch.setattr("app.services.camera_media_service._monitor_recording_completion", lambda *_args: None)
+
+    start_response = client.post(
+        f"/api/cameras/{camera['id']}/recordings/start",
+        headers=headers,
+        json={"duration_seconds": 60, "source_kind": "manual"},
+    )
+    assert start_response.status_code == 200
+    start_result = start_response.json()
+    assert start_result["success"] is True
+    assert start_result["media"]["media_type"] == "video"
+    assert start_result["media"]["status"] == "recording"
+    media_id = start_result["media"]["id"]
+
+    stop_response = client.post(
+        f"/api/cameras/{camera['id']}/recordings/{media_id}/stop",
+        headers=headers,
+    )
+    assert stop_response.status_code == 200
+    stop_result = stop_response.json()
+    assert stop_result["success"] is True
+    assert stop_result["media"]["stop_requested"] is True

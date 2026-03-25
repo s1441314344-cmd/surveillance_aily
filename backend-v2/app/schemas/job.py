@@ -37,6 +37,13 @@ class JobCameraOnceCreate(BaseModel):
     model_name: str | None = None
 
 
+class JobCameraSnapshotUploadCreate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    camera_id: str
+    strategy_id: str
+
+
 class JobScheduleCreate(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 

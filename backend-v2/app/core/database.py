@@ -44,6 +44,9 @@ def ensure_runtime_schema_columns() -> None:
             "last_run_at": "TIMESTAMP",
             "last_error": "TEXT",
         },
+        "camera_media": {
+            "related_job_id": "VARCHAR(36)",
+        },
     }
 
     inspector = inspect(engine)

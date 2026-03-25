@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
-from app.schemas.job import JobCameraOnceCreate, JobRead
+from app.schemas.job import JobCameraOnceCreate, JobCameraSnapshotUploadCreate, JobRead
 from app.services.job_service import cancel_job as cancel_job_record
 from app.services.job_service import create_camera_once_job as create_camera_once_job_record
+from app.services.job_service import create_camera_snapshot_upload_job as create_camera_snapshot_upload_job_record
 from app.services.job_service import create_upload_job as create_upload_job_record
 from app.services.job_service import get_job_or_404, list_jobs as list_job_records, serialize_job
 from app.services.job_service import run_job_inline as run_job_inline_record
@@ -42,6 +43,20 @@ def create_camera_once_job(
         current_user=current_user,
         model_provider=payload.model_provider,
         model_name=payload.model_name,
+    )
+
+
+@router.post("/cameras/snapshot-upload", response_model=JobRead)
+def create_camera_snapshot_upload_job(
+    payload: JobCameraSnapshotUploadCreate,
+    current_user: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    return create_camera_snapshot_upload_job_record(
+        db,
+        camera_id=payload.camera_id,
+        strategy_id=payload.strategy_id,
+        current_user=current_user,
     )
 
 

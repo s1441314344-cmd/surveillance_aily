@@ -83,3 +83,46 @@ class CameraDiagnosticRead(BaseModel):
     snapshot_path: str | None = None
     error_message: str | None = None
     checked_at: str
+
+
+class CameraPhotoCaptureRequest(BaseModel):
+    source_kind: str = "manual"
+
+
+class CameraRecordingStartRequest(BaseModel):
+    duration_seconds: int = 30
+    source_kind: str = "manual"
+
+
+class CameraMediaRead(BaseModel):
+    id: str
+    camera_id: str
+    related_job_id: str | None = None
+    file_asset_id: str | None = None
+    media_type: str
+    source_kind: str
+    status: str
+    original_name: str
+    storage_path: str
+    mime_type: str
+    duration_seconds: int | None = None
+    stop_requested: bool = False
+    started_at: str | None = None
+    finished_at: str | None = None
+    error_message: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class CameraPhotoCaptureRead(BaseModel):
+    camera_id: str
+    success: bool
+    media: CameraMediaRead | None = None
+    error_message: str | None = None
+
+
+class CameraRecordingStatusRead(BaseModel):
+    camera_id: str
+    success: bool
+    media: CameraMediaRead
+    message: str | None = None

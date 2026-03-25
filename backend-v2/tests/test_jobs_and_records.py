@@ -241,6 +241,13 @@ def test_camera_once_job_creates_camera_record(client):
     assert image_response.status_code == 200
     assert image_response.content
 
+    media_response = client.get(f"/api/cameras/{camera['id']}/media", headers=headers)
+    assert media_response.status_code == 200
+    media_items = media_response.json()
+    assert len(media_items) >= 1
+    assert any(item["media_type"] == "photo" for item in media_items)
+    assert any(item["related_job_id"] == job["id"] for item in media_items)
+
 
 def test_camera_once_job_onvif_protocol_fails_with_clear_message(client):
     login_data = login_as_admin(client)
@@ -295,6 +302,64 @@ def test_camera_once_job_onvif_protocol_fails_with_clear_message(client):
     assert len(records) == 1
     assert records[0]["result_status"] == "failed"
     assert "only RTSP is supported" in records[0]["raw_model_response"]
+
+
+def test_camera_snapshot_upload_job_uses_upload_pipeline(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "快照上传摄像头",
+            "location": "快照测试位",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/snapshot-upload",
+            "frame_frequency_seconds": 15,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/snapshot-upload",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_job_response = client.post(
+        "/api/jobs/cameras/snapshot-upload",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+        },
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+    assert job["job_type"] == "upload_single"
+    assert job["camera_id"] == camera["id"]
+    assert job["status"] == "queued"
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "completed"
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    record = records[0]
+    assert record["source_type"] == "upload"
+    assert record["camera_id"] == camera["id"]
+    assert record["normalized_json"] is not None
+
+    media_response = client.get(f"/api/cameras/{camera['id']}/media", headers=headers)
+    assert media_response.status_code == 200
+    media_items = media_response.json()
+    assert len(media_items) >= 1
+    assert any(item["related_job_id"] == job["id"] for item in media_items)
 
 
 def test_cancelled_queued_job_will_not_be_processed(client):

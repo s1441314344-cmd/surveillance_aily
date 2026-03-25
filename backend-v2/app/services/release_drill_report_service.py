@@ -6,6 +6,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REQUIRED_PREFLIGHT_CHECKS = ("smoke", "perf", "soak")
+EXPECTED_BACKFILL_WARNING_PATTERNS = (
+    "legacy work_orders",
+)
 
 
 @dataclass
@@ -70,8 +73,9 @@ def build_release_drill_report(
         blocking_issues.append(
             f"Backfill detected {missing_file_count} missing files; reconcile source storage before cutover."
         )
-    if warning_count > 0:
-        risks.append(f"Backfill produced {warning_count} warning(s); manual review required.")
+    unexpected_warnings = [item for item in warnings if not _is_expected_backfill_warning(item)]
+    if unexpected_warnings:
+        risks.append(f"Backfill produced {len(unexpected_warnings)} unexpected warning(s); manual review required.")
 
     backfill_dry_run = bool(backfill_report.get("dry_run", True))
     if backfill_dry_run:
@@ -109,6 +113,11 @@ def build_release_drill_report(
         risks=risks,
         gate_status=gate_status,
     )
+
+
+def _is_expected_backfill_warning(message: str) -> bool:
+    normalized = message.lower()
+    return any(pattern in normalized for pattern in EXPECTED_BACKFILL_WARNING_PATTERNS)
 
 
 def save_release_drill_report(report: ReleaseDrillReport, output_path: str | Path) -> Path:

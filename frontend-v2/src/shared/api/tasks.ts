@@ -95,6 +95,17 @@ export async function createCameraOnceJob(payload: {
   return response.data;
 }
 
+export async function createCameraSnapshotUploadJob(payload: {
+  cameraId: string;
+  strategyId: string;
+}) {
+  const response = await apiClient.post<Job>('/api/jobs/cameras/snapshot-upload', {
+    camera_id: payload.cameraId,
+    strategy_id: payload.strategyId,
+  });
+  return response.data;
+}
+
 export async function listJobSchedules(params?: {
   status?: string;
   cameraId?: string;
