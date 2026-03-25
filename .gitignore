@@ -108,5 +108,6 @@ data/release-checklists/
 data/release-gates/
 data/verify-logs/
 data/manual_captures/
+data/terminal_captures/
 data/screenshot_*
 data/screenshot_probe_*
