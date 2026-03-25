@@ -23,6 +23,7 @@ import {
   listDashboardDefinitions,
   updateDashboardDefinition,
   validateDashboardDefinition,
+  validateDashboardDefinitionDraft,
 } from '@/shared/api/configCenter';
 import { getApiErrorMessage } from '@/shared/api/errors';
 
@@ -199,9 +200,12 @@ export function DashboardsPage() {
       dashboardId,
       definition,
     }: {
-      dashboardId: string;
+      dashboardId?: string;
       definition: Record<string, unknown>;
-    }) => validateDashboardDefinition(dashboardId, definition),
+    }) =>
+      dashboardId
+        ? validateDashboardDefinition(dashboardId, definition)
+        : validateDashboardDefinitionDraft(definition),
     onSuccess: (result) => {
       if (result.valid) {
         message.success('看板定义服务端校验通过');
@@ -285,11 +289,6 @@ export function DashboardsPage() {
   };
 
   const handleValidateDefinition = async () => {
-    if (!effectiveSelectedDashboardId) {
-      message.info('请先保存看板，再执行服务端校验');
-      return;
-    }
-
     let definition: Record<string, unknown>;
     try {
       definition = JSON.parse(form.getFieldValue('definition_text') ?? '{}');
@@ -314,7 +313,7 @@ export function DashboardsPage() {
     }
 
     await validateMutation.mutateAsync({
-      dashboardId: effectiveSelectedDashboardId,
+      dashboardId: effectiveSelectedDashboardId ?? undefined,
       definition,
     });
   };

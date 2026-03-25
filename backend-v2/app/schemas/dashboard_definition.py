@@ -87,6 +87,6 @@ class DashboardDefinitionValidateRequest(BaseModel):
 
 
 class DashboardDefinitionValidateResponse(BaseModel):
-    dashboard_id: str
+    dashboard_id: str | None = None
     valid: bool
     errors: list[str]

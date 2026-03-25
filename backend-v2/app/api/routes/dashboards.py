@@ -43,6 +43,15 @@ def create_dashboard(
     return create_dashboard_definition_record(db, payload)
 
 
+@router.post("/validate-definition", response_model=DashboardDefinitionValidateResponse)
+def validate_dashboard_definition_draft(
+    payload: DashboardDefinitionValidateRequest,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN)),
+):
+    errors = collect_dashboard_definition_errors(payload.definition)
+    return DashboardDefinitionValidateResponse(valid=not errors, errors=errors)
+
+
 @router.get("/{dashboard_id}", response_model=DashboardDefinitionRead)
 def get_dashboard(
     dashboard_id: str,

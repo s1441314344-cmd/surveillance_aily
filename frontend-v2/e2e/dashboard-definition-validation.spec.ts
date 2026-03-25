@@ -54,3 +54,30 @@ test('saved dashboard definition can pass server-side validation', async ({ page
   await page.getByRole('button', { name: '服务端校验', exact: true }).click();
   await expect(page.locator('.ant-message-notice').filter({ hasText: '看板定义服务端校验通过' })).toBeVisible();
 });
+
+test('draft dashboard definition can pass server-side validation before create', async ({ page }) => {
+  await loginByUi(page, 'admin', 'admin123456');
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+
+  await page.getByRole('menuitem', { name: '看板配置' }).click();
+  await expect(page).toHaveURL(/\/dashboards$/);
+  await expect(page.getByRole('heading', { name: '看板配置' })).toBeVisible();
+
+  const dashboardName = `E2E-草稿校验看板-${Date.now()}`;
+  await page.getByRole('button', { name: '重置为新建', exact: true }).click();
+  await page.getByLabel('看板名称').fill(dashboardName);
+  await page.getByLabel('看板定义 JSON').fill(
+    JSON.stringify(
+      {
+        widgets: [{ type: 'kpi', metric: 'success_rate' }],
+        filters: { model_provider: 'zhipu' },
+      },
+      null,
+      2,
+    ),
+  );
+
+  await page.getByRole('button', { name: '服务端校验', exact: true }).click();
+  await expect(page.locator('.ant-message-notice').filter({ hasText: '看板定义服务端校验通过' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '创建看板', exact: true })).toBeVisible();
+});

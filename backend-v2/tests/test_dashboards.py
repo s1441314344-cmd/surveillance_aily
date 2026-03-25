@@ -218,6 +218,44 @@ def test_dashboard_definition_validate_endpoint_reports_valid_and_invalid_result
     assert "Dashboard filter time_range must be a string or null" in invalid_payload["errors"]
 
 
+def test_dashboard_definition_draft_validate_endpoint_reports_results(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    valid_response = client.post(
+        "/api/dashboards/validate-definition",
+        headers=headers,
+        json={
+            "definition": {
+                "widgets": [{"type": "kpi", "metric": "success_rate"}],
+                "filters": {"time_range": "7d"},
+            }
+        },
+    )
+    assert valid_response.status_code == 200
+    valid_payload = valid_response.json()
+    assert valid_payload["dashboard_id"] is None
+    assert valid_payload["valid"] is True
+    assert valid_payload["errors"] == []
+
+    invalid_response = client.post(
+        "/api/dashboards/validate-definition",
+        headers=headers,
+        json={
+            "dashboard_definition": {
+                "widgets": "bad",
+                "filters": {"unsupported_key": "x"},
+            }
+        },
+    )
+    assert invalid_response.status_code == 200
+    invalid_payload = invalid_response.json()
+    assert invalid_payload["dashboard_id"] is None
+    assert invalid_payload["valid"] is False
+    assert "Dashboard widgets must be an array" in invalid_payload["errors"]
+    assert "Unsupported dashboard filter key: unsupported_key" in invalid_payload["errors"]
+
+
 def test_dashboard_definition_validate_requires_admin_role(client):
     admin_login = login_as_admin(client)
     admin_headers = auth_headers(admin_login["access_token"])
@@ -261,6 +299,17 @@ def test_dashboard_definition_validate_requires_admin_role(client):
         },
     )
     assert validate_response.status_code == 403
+
+    validate_draft_response = client.post(
+        "/api/dashboards/validate-definition",
+        headers=viewer_headers,
+        json={
+            "definition": {
+                "widgets": [{"type": "kpi", "metric": "total_jobs"}],
+            }
+        },
+    )
+    assert validate_draft_response.status_code == 403
 
 
 def test_analysis_viewer_can_read_dashboards_but_cannot_write(client):

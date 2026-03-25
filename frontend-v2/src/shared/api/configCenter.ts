@@ -140,7 +140,7 @@ export type DashboardDefinitionPayload = {
 };
 
 export type DashboardDefinitionValidationResponse = {
-  dashboard_id: string;
+  dashboard_id: string | null;
   valid: boolean;
   errors: string[];
 };
@@ -287,5 +287,12 @@ export async function validateDashboardDefinition(dashboardId: string, definitio
     `/api/dashboards/${dashboardId}/validate-definition`,
     { definition },
   );
+  return response.data;
+}
+
+export async function validateDashboardDefinitionDraft(definition: Record<string, unknown>) {
+  const response = await apiClient.post<DashboardDefinitionValidationResponse>('/api/dashboards/validate-definition', {
+    definition,
+  });
   return response.data;
 }
