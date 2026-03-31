@@ -1,420 +1,91 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  App,
   Button,
-  Card,
-  Col,
-  Empty,
-  Form,
-  Input,
-  Row,
-  Select,
   Space,
-  Spin,
-  Tag,
-  Typography,
 } from 'antd';
 import {
-  createStrategy,
-  listModelProviders,
-  listStrategies,
-  Strategy,
-  updateStrategy,
-  updateStrategyStatus,
-  validateStrategySchema,
-} from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
-
-const { Paragraph, Text, Title } = Typography;
-const { TextArea } = Input;
-const CREATE_STRATEGY_ID = '__create__';
-
-type StrategyFormValues = {
-  name: string;
-  scene_description: string;
-  prompt_template: string;
-  model_provider: string;
-  model_name: string;
-  response_schema_text: string;
-  status: string;
-};
-
-const DEFAULT_SCHEMA = JSON.stringify(
-  {
-    type: 'object',
-    properties: {
-      summary: { type: 'string' },
-      has_issue: { type: 'boolean' },
-    },
-    required: ['summary', 'has_issue'],
-  },
-  null,
-  2,
-);
+  ACTIVE_STATUS_LABELS,
+  PageHeader,
+  SectionCard,
+  StatusBadge,
+  UNKNOWN_LABELS,
+} from '@/shared/ui';
+import { StrategyEditorForm } from '@/pages/strategies/StrategyEditorForm';
+import { StrategySelectionRail } from '@/pages/strategies/StrategySelectionRail';
+import { useStrategiesPageController } from '@/pages/strategies/useStrategiesPageController';
 
 export function StrategiesPage() {
-  const { message, modal } = App.useApp();
-  const queryClient = useQueryClient();
-  const [form] = Form.useForm<StrategyFormValues>();
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null);
-
-  const providerQuery = useQuery({
-    queryKey: ['model-providers'],
-    queryFn: listModelProviders,
-  });
-
-  const strategyQuery = useQuery({
-    queryKey: ['strategies', statusFilter],
-    queryFn: () =>
-      listStrategies({
-        status: statusFilter === 'all' ? undefined : statusFilter,
-      }),
-  });
-
-  const strategies = useMemo(() => strategyQuery.data ?? [], [strategyQuery.data]);
-  const effectiveSelectedStrategyId = useMemo(() => {
-    if (selectedStrategyId === CREATE_STRATEGY_ID) {
-      return null;
-    }
-
-    const exists = selectedStrategyId && strategies.some((item) => item.id === selectedStrategyId);
-    return exists ? selectedStrategyId : strategies[0]?.id ?? null;
-  }, [selectedStrategyId, strategies]);
-  const activeStrategy = useMemo(
-    () => strategies.find((item) => item.id === effectiveSelectedStrategyId) ?? null,
-    [effectiveSelectedStrategyId, strategies],
-  );
-
-  useEffect(() => {
-    if (!activeStrategy) {
-      return;
-    }
-
-    form.setFieldsValue({
-      name: activeStrategy.name,
-      scene_description: activeStrategy.scene_description,
-      prompt_template: activeStrategy.prompt_template,
-      model_provider: activeStrategy.model_provider,
-      model_name: activeStrategy.model_name,
-      response_schema_text: JSON.stringify(activeStrategy.response_schema, null, 2),
-      status: activeStrategy.status,
-    });
-  }, [activeStrategy, form]);
-
-  const invalidateStrategyQueries = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['strategies'] }),
-      queryClient.invalidateQueries({ queryKey: ['strategies', statusFilter] }),
-    ]);
-
-  const createMutation = useMutation({
-    mutationFn: createStrategy,
-    onSuccess: async (strategy) => {
-      await invalidateStrategyQueries();
-      setSelectedStrategyId(strategy.id);
-      message.success('策略创建成功');
-    },
-    onError: (error) => {
-      message.error(getApiErrorMessage(error, '策略创建失败'));
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ strategyId, payload }: { strategyId: string; payload: Parameters<typeof updateStrategy>[1] }) =>
-      updateStrategy(strategyId, payload),
-    onSuccess: async () => {
-      await invalidateStrategyQueries();
-      message.success('策略已更新');
-    },
-    onError: (error) => {
-      message.error(getApiErrorMessage(error, '策略更新失败'));
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ strategyId, status }: { strategyId: string; status: string }) =>
-      updateStrategyStatus(strategyId, status),
-    onSuccess: async () => {
-      await invalidateStrategyQueries();
-      message.success('策略状态已更新');
-    },
-    onError: (error) => {
-      message.error(getApiErrorMessage(error, '策略状态更新失败'));
-    },
-  });
-
-  const validateMutation = useMutation({
-    mutationFn: ({ strategyId, schema }: { strategyId: string; schema: Record<string, unknown> }) =>
-      validateStrategySchema(strategyId, schema),
-    onSuccess: (result) => {
-      if (result.valid) {
-        message.success('Schema 校验通过');
-      } else {
-        modal.error({
-          title: 'Schema 校验失败',
-          content: (
-            <ul style={{ marginBottom: 0, paddingLeft: 18 }}>
-              {result.errors.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          ),
-        });
-      }
-    },
-    onError: (error) => {
-      message.error(getApiErrorMessage(error, 'Schema 校验失败'));
-    },
-  });
-
-  const resetForCreate = () => {
-    setSelectedStrategyId(CREATE_STRATEGY_ID);
-    form.setFieldsValue({
-      name: '',
-      scene_description: '',
-      prompt_template: '',
-      model_provider: providerQuery.data?.[0]?.provider ?? 'zhipu',
-      model_name: providerQuery.data?.[0]?.default_model ?? 'glm-4v-plus',
-      response_schema_text: DEFAULT_SCHEMA,
-      status: 'active',
-    });
-  };
-
-  useEffect(() => {
-    if (!activeStrategy && providerQuery.data?.length) {
-      resetForCreate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providerQuery.data?.length, activeStrategy]);
-
-  const handleSubmit = async (values: StrategyFormValues) => {
-    let responseSchema: Record<string, unknown>;
-
-    try {
-      responseSchema = JSON.parse(values.response_schema_text);
-    } catch {
-      message.error('JSON Schema 不是合法 JSON');
-      return;
-    }
-
-    const payload = {
-      name: values.name,
-      scene_description: values.scene_description,
-      prompt_template: values.prompt_template,
-      model_provider: values.model_provider,
-      model_name: values.model_name,
-      response_schema: responseSchema,
-      status: values.status,
-    };
-
-    if (effectiveSelectedStrategyId) {
-      await updateMutation.mutateAsync({ strategyId: effectiveSelectedStrategyId, payload });
-      return;
-    }
-
-    await createMutation.mutateAsync(payload);
-  };
-
-  const handleValidate = async () => {
-    if (!effectiveSelectedStrategyId) {
-      message.info('请先保存策略，再执行服务端 Schema 校验');
-      return;
-    }
-
-    try {
-      const raw = form.getFieldValue('response_schema_text') ?? '{}';
-      const schema = JSON.parse(raw);
-      await validateMutation.mutateAsync({ strategyId: effectiveSelectedStrategyId, schema });
-    } catch {
-      message.error('JSON Schema 不是合法 JSON');
-    }
-  };
+  const {
+    form,
+    statusFilter,
+    setStatusFilter,
+    setSelectedStrategyId,
+    queries,
+    mutations,
+    actions,
+    providerOptions,
+    handleResetListFilter,
+    handleToggleStrategyStatus,
+  } = useStrategiesPageController();
 
   return (
-    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-      <div>
-        <Title level={3} style={{ marginBottom: 0 }}>
-          策略中心
-        </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          统一管理场景描述、提示词模板、目标模型与 JSON Schema，后续任务提报会直接复用这里的策略定义。
-        </Paragraph>
-      </div>
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="策略配置"
+        title="策略中心"
+        description="统一管理场景描述、提示词模板、目标模型与输出格式，收敛为可维护的策略版本。"
+        extra={
+          <Button type="primary" onClick={actions.resetForCreate}>
+            新建策略
+          </Button>
+        }
+      />
 
-      <Row gutter={16} align="stretch">
-        <Col xs={24} lg={8}>
-          <Card
-            title="策略列表"
-            extra={
-              <Space>
-                <Select
-                  size="small"
-                  value={statusFilter}
-                  onChange={setStatusFilter}
-                  options={[
-                    { label: '全部状态', value: 'all' },
-                    { label: '启用', value: 'active' },
-                    { label: '停用', value: 'inactive' },
-                  ]}
-                  style={{ width: 110 }}
-                />
-                <Button size="small" type="primary" onClick={resetForCreate}>
-                  新建
-                </Button>
-              </Space>
-            }
-          >
-            {strategyQuery.isLoading ? (
-              <Spin />
-            ) : strategies.length ? (
-              <Space orientation="vertical" size={8} style={{ width: '100%' }}>
-                {strategies.map((item: Strategy) => (
-                  <div
-                    key={item.id}
-                    role="button"
-                    tabIndex={0}
-                    style={{
-                      cursor: 'pointer',
-                      padding: 12,
-                      borderRadius: 12,
-                      border: '1px solid #f0f0f0',
-                      background: item.id === effectiveSelectedStrategyId ? '#f0f7ff' : '#fff',
-                    }}
-                    onClick={() => setSelectedStrategyId(item.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        setSelectedStrategyId(item.id);
-                      }
-                    }}
-                  >
-                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
-                      <Space>
-                        <Text strong>{item.name}</Text>
-                        {item.is_preset ? <Tag color="purple">预设</Tag> : null}
-                        <Tag color={item.status === 'active' ? 'green' : 'default'}>{item.status}</Tag>
-                      </Space>
-                      <Text type="secondary">{item.model_provider} / {item.model_name}</Text>
-                      <Text type="secondary">版本 v{item.version}</Text>
-                    </Space>
-                  </div>
-                ))}
-              </Space>
-            ) : (
-              <Empty description="当前筛选条件下暂无策略" />
-            )}
-          </Card>
-        </Col>
+      <div className="page-grid page-grid--sidebar">
+        <StrategySelectionRail
+          loading={queries.strategyQuery.isLoading}
+          error={queries.strategyError}
+          strategies={queries.strategies}
+          selectedStrategyId={queries.effectiveSelectedStrategyId}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          onResetListFilter={handleResetListFilter}
+          onSelectStrategy={setSelectedStrategyId}
+        />
 
-        <Col xs={24} lg={16}>
-          <Card
-            title={effectiveSelectedStrategyId ? '编辑策略' : '新建策略'}
-            extra={
-              activeStrategy ? (
-                <Space>
-                  <Tag color={activeStrategy.status === 'active' ? 'green' : 'default'}>
-                    {activeStrategy.status}
-                  </Tag>
-                  <Button
-                    size="small"
-                    onClick={() =>
-                      updateStatusMutation.mutate({
-                        strategyId: activeStrategy.id,
-                        status: activeStrategy.status === 'active' ? 'inactive' : 'active',
-                      })
-                    }
-                    loading={updateStatusMutation.isPending}
-                  >
-                    {activeStrategy.status === 'active' ? '停用' : '启用'}
-                  </Button>
-                </Space>
-              ) : null
-            }
-          >
-            <Form layout="vertical" form={form} onFinish={handleSubmit}>
-              <Row gutter={16}>
-                <Col xs={24} md={12}>
-                  <Form.Item label="策略名称" name="name" rules={[{ required: true, message: '请输入策略名称' }]}>
-                    <Input placeholder="例如 安全帽识别" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}>
-                    <Select
-                      options={[
-                        { label: '启用', value: 'active' },
-                        { label: '停用', value: 'inactive' },
-                      ]}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Form.Item
-                label="场景描述"
-                name="scene_description"
-                rules={[{ required: true, message: '请输入场景描述' }]}
-              >
-                <TextArea rows={3} placeholder="说明该策略适用的业务场景与识别目标" />
-              </Form.Item>
-
-              <Form.Item
-                label="提示词模板"
-                name="prompt_template"
-                rules={[{ required: true, message: '请输入提示词模板' }]}
-              >
-                <TextArea rows={5} placeholder="请描述需要大模型返回的结构化内容和分析重点" />
-              </Form.Item>
-
-              <Row gutter={16}>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    label="模型提供方"
-                    name="model_provider"
-                    rules={[{ required: true, message: '请选择模型提供方' }]}
-                  >
-                    <Select
-                      options={(providerQuery.data ?? []).map((item) => ({
-                        label: `${item.display_name} (${item.provider})`,
-                        value: item.provider,
-                      }))}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item label="模型名称" name="model_name" rules={[{ required: true, message: '请输入模型名称' }]}>
-                    <Input placeholder="例如 gpt-5-mini / glm-4v-plus" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Form.Item
-                label="JSON Schema"
-                name="response_schema_text"
-                rules={[{ required: true, message: '请输入 JSON Schema' }]}
-              >
-                <TextArea rows={12} spellCheck={false} placeholder="请输入合法 JSON Schema" />
-              </Form.Item>
-
+        <SectionCard
+          title={queries.effectiveSelectedStrategyId ? '编辑策略' : '新建策略'}
+          subtitle={queries.activeStrategy ? `${queries.activeStrategy.name} · 当前版本 v${queries.activeStrategy.version}` : '填写基础信息、提示词与结果格式'}
+          actions={
+            queries.activeStrategy ? (
               <Space wrap>
+                <StatusBadge
+                  namespace="generic"
+                  value={queries.activeStrategy.status}
+                  label={ACTIVE_STATUS_LABELS[queries.activeStrategy.status] ?? UNKNOWN_LABELS.generic}
+                />
                 <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={createMutation.isPending || updateMutation.isPending}
+                  size="small"
+                  onClick={handleToggleStrategyStatus}
+                  loading={mutations.updateStatusMutation.isPending}
                 >
-                  {effectiveSelectedStrategyId ? '保存修改' : '创建策略'}
+                  {queries.activeStrategy.status === 'active' ? '停用策略' : '启用策略'}
                 </Button>
-                <Button onClick={handleValidate} loading={validateMutation.isPending}>
-                  校验 Schema
-                </Button>
-                <Button onClick={resetForCreate}>清空重建</Button>
               </Space>
-            </Form>
-          </Card>
-        </Col>
-      </Row>
-    </Space>
+            ) : null
+          }
+        >
+          <StrategyEditorForm
+            form={form}
+            providerOptions={providerOptions}
+            selectedStrategyId={queries.effectiveSelectedStrategyId}
+            submitLoading={actions.submitLoading}
+            validateLoading={actions.validateLoading}
+            onSubmit={actions.handleSubmit}
+            onValidate={() => void actions.handleValidate()}
+            onReset={actions.resetForCreate}
+          />
+        </SectionCard>
+      </div>
+    </div>
   );
 }

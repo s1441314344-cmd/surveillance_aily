@@ -45,6 +45,7 @@ python -m app.schedulers.runner
 - `SCHEDULER_POLL_INTERVAL_SECONDS`：定时任务扫描周期（秒）
 - `SCHEDULER_CAMERA_STATUS_SWEEP_ENABLED`：是否启用摄像头状态后台巡检
 - `SCHEDULER_CAMERA_STATUS_SWEEP_INTERVAL_SECONDS`：摄像头状态巡检周期（秒）
+- `ZHIPU_API_KEY` / `OPENAI_API_KEY` / `ARK_API_KEY`：可选，首次启动时自动写入对应 provider（加密存储）
 
 ## 推荐联调方式
 
@@ -78,7 +79,7 @@ make v2-release-gate
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
 
-默认 `CORS_ORIGINS` 已覆盖 `localhost/127.0.0.1` 的 `5174-5178` 端口，兼容 Vite 开发端口回退。
+默认 `CORS_ORIGINS` 已覆盖 `localhost/127.0.0.1` 的 `5173-5180` 端口，兼容 Vite 开发端口回退。
 
 `make v2-smoke` 会对运行中的栈执行一次“上传异步链路 + 失败任务重试链路 + 定时调度链路”的冒烟验收。
 
@@ -97,6 +98,37 @@ make v2-release-gate
 `make v2-backfill` 会对旧版 `SQLite` 数据执行一次 dry-run 回填评估，输出将要迁移的 cameras / strategies / schedules / jobs / task_records / file_assets 数量，以及缺失文件和未纳入核心迁移的 legacy 提示。
 
 `PROVIDER_MOCK_FALLBACK_ENABLED=true` 时，如果模型提供方未配置可用密钥，adapter 会回退到本地 mock 输出，方便开发和测试；生产环境建议关闭该开关，并在“模型提供方管理”中配置真实 API Key。
+
+### 火山方舟（Ark）接入提示
+
+- 推荐提供方主键使用 `ark`，接口也兼容别名 `doubao / volcengine / huoshan`（会自动归一到 `ark`）。
+- `base_url` 建议保持：`https://ark.cn-beijing.volces.com/api/v3/chat/completions`。
+- `model` 建议使用方舟控制台分配的 endpoint id（通常 `ep-` 开头）。
+- 如果调试请求附带图片而模型不支持视觉输入，服务端会返回带排查建议的 400 详情（包括方舟原始错误 message）。
+
+## 策略输出格式配置
+
+`/api/strategies` 新增 `result_format`，可选值：
+
+- `json_schema`：强约束结构化输出（默认），会严格校验 `response_schema`
+- `json_object`：要求 JSON 对象但不强制匹配固定 schema
+- `auto`：优先 JSON，对象解析失败时回退为文本结论
+- `text`：纯文本结论（会在 `normalized_json.raw_text` 中保留）
+
+示例（文本模式）：
+
+```json
+{
+  "name": "现场巡检文本结论",
+  "scene_description": "快速输出巡检结论",
+  "prompt_template": "请给出一行巡检结论与建议",
+  "model_provider": "ark",
+  "model_name": "your-endpoint-id",
+  "result_format": "text",
+  "response_schema": {},
+  "status": "active"
+}
+```
 
 `make v2-eval` 会读取样本集清单，按 provider/model 执行多轮评估，输出准确率、结构化成功率、稳定性、平均时延和成本估算。
 
@@ -399,7 +431,7 @@ make v2-release-gate-final
 - SQLAlchemy 数据模型与迁移
 - Celery/Redis 骨架
 - APScheduler 独立调度进程
-- OpenAI / 智谱真实 provider adapter（缺少可用密钥时可按配置回退 mock）
+- OpenAI / 智谱 / 火山方舟（Ark）provider adapter（缺少可用密钥时可按配置回退 mock）
 - 健康检查与核心业务路由
 
 ## 当前 API 骨架范围

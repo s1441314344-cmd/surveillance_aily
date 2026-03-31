@@ -5,11 +5,20 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginAsAdmin(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('用户名').fill('admin');
-  await page.getByLabel('密码').fill('admin123456');
-  await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await page.getByLabel('用户名').fill('admin');
+    await page.getByLabel('密码').fill('admin123456');
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      return;
+    } catch {
+      if (attempt === 2) {
+        throw new Error('admin login did not redirect to dashboard');
+      }
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -75,7 +84,7 @@ test('bulk camera status check updates status summary and cards', async ({ page,
 
   await loginAsAdmin(page);
   await page.getByRole('menuitem', { name: '摄像头中心' }).click();
-  await expect(page).toHaveURL(/\/cameras$/);
+  await expect(page).toHaveURL(/\/cameras(?:\/devices)?(?:\?.*)?$/);
   await expect(page.getByRole('heading', { name: '摄像头中心' })).toBeVisible();
   await expect(page.locator('.ant-card').filter({ hasText: normalCameraName }).first()).toBeVisible();
   await expect(page.locator('.ant-card').filter({ hasText: abnormalCameraName }).first()).toBeVisible();
@@ -110,5 +119,6 @@ test('bulk camera status check updates status summary and cards', async ({ page,
   await expect(page.locator('.ant-card').filter({ hasText: abnormalCameraName }).first()).toBeVisible();
   await expect(page.locator('.ant-card').filter({ hasText: normalCameraName }).first()).toHaveCount(0);
 
-  await expect(page.getByText(/在线\s+\d+\s+\/\s+告警\s+\d+/)).toBeVisible();
+  await expect(page.getByText(/在线\s+\d+/)).toBeVisible();
+  await expect(page.getByText(/告警\s+\d+/)).toBeVisible();
 });

@@ -13,10 +13,13 @@ class AnalysisStrategy(Base, TimestampMixin):
     prompt_template: Mapped[str] = mapped_column(Text, nullable=False)
     model_provider: Mapped[str] = mapped_column(String(50), nullable=False)
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    result_format: Mapped[str] = mapped_column(String(30), default="json_schema", nullable=False)
     response_schema: Mapped[dict] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     is_preset: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_signal_strategy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    signal_mapping: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class StrategyVersion(Base, TimestampMixin):

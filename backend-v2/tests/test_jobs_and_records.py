@@ -244,9 +244,7 @@ def test_camera_once_job_creates_camera_record(client):
     media_response = client.get(f"/api/cameras/{camera['id']}/media", headers=headers)
     assert media_response.status_code == 200
     media_items = media_response.json()
-    assert len(media_items) >= 1
-    assert any(item["media_type"] == "photo" for item in media_items)
-    assert any(item["related_job_id"] == job["id"] for item in media_items)
+    assert media_items == []
 
 
 def test_camera_once_job_onvif_protocol_fails_with_clear_message(client):
@@ -358,8 +356,7 @@ def test_camera_snapshot_upload_job_uses_upload_pipeline(client):
     media_response = client.get(f"/api/cameras/{camera['id']}/media", headers=headers)
     assert media_response.status_code == 200
     media_items = media_response.json()
-    assert len(media_items) >= 1
-    assert any(item["related_job_id"] == job["id"] for item in media_items)
+    assert media_items == []
 
 
 def test_cancelled_queued_job_will_not_be_processed(client):

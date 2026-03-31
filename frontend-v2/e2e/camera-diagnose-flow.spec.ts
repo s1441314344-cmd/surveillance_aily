@@ -5,11 +5,20 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginAsAdmin(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('用户名').fill('admin');
-  await page.getByLabel('密码').fill('admin123456');
-  await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await page.getByLabel('用户名').fill('admin');
+    await page.getByLabel('密码').fill('admin123456');
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      return;
+    } catch {
+      if (attempt === 2) {
+        throw new Error('admin login did not redirect to dashboard');
+      }
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -56,12 +65,11 @@ test('camera diagnose action shows diagnostic modal', async ({ page, request }) 
 
   await loginAsAdmin(page);
   await page.getByRole('menuitem', { name: '摄像头中心' }).click();
-  await expect(page).toHaveURL(/\/cameras$/);
+  await expect(page).toHaveURL(/\/cameras(?:\/devices)?(?:\?.*)?$/);
   await expect(page.getByRole('heading', { name: '摄像头中心' })).toBeVisible();
-
-  const cameraCard = page.getByTestId(`camera-card-${camera.id}`);
-  await expect(cameraCard).toBeVisible();
-  await cameraCard.click();
+  await page.goto(`/cameras/diagnostics?cameraId=${camera.id}`);
+  await expect(page).toHaveURL(/\/cameras\/diagnostics(?:\?.*)?$/);
+  await expect(page.locator('.ant-card').filter({ hasText: '状态概览' }).first()).toBeVisible();
 
   const diagnoseResponsePromise = page.waitForResponse(
     (response) =>

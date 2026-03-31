@@ -7,6 +7,16 @@ from app.core.database import get_db
 from app.schemas.auth import CurrentUser
 from app.schemas.camera import (
     CameraCreate,
+    CameraSignalMonitorConfigRead,
+    CameraSignalMonitorConfigUpdate,
+    CameraSignalMonitorStartRequest,
+    CameraSignalMonitorStatusRead,
+    CameraTriggerRuleCreate,
+    CameraTriggerRuleDebugRead,
+    CameraTriggerRuleDebugLiveRequest,
+    CameraTriggerRuleDebugRequest,
+    CameraTriggerRuleRead,
+    CameraTriggerRuleUpdate,
     CameraMediaRead,
     CameraPhotoCaptureRead,
     CameraPhotoCaptureRequest,
@@ -18,6 +28,17 @@ from app.schemas.camera import (
     CameraStatusRead,
     CameraStatusSweepRead,
     CameraUpdate,
+)
+from app.services.camera_signal_monitor_service import (
+    get_monitor_config_or_create,
+    serialize_monitor_config,
+    serialize_monitor_status,
+    start_manual_monitor,
+    stop_monitor,
+    upsert_monitor_config,
+)
+from app.services.camera_signal_pipeline_service import (
+    debug_camera_trigger_rules_live as debug_camera_trigger_rules_live_record,
 )
 from app.services.camera_service import (
     check_camera_status as check_camera_status_record,
@@ -34,12 +55,21 @@ from app.services.camera_service import (
 )
 from app.services.camera_media_service import (
     capture_photo as capture_camera_photo_record,
+    delete_camera_media as delete_camera_media_record,
     get_camera_media_file_path_or_404,
     get_camera_media_or_404,
     list_camera_media as list_camera_media_records,
     serialize_camera_media,
     start_video_recording as start_video_recording_record,
     stop_video_recording as stop_video_recording_record,
+)
+from app.services.camera_trigger_rule_service import (
+    create_camera_trigger_rule as create_camera_trigger_rule_record,
+    debug_camera_trigger_rules as debug_camera_trigger_rules_record,
+    delete_camera_trigger_rule as delete_camera_trigger_rule_record,
+    get_camera_trigger_rule_or_404,
+    list_camera_trigger_rules as list_camera_trigger_rule_records,
+    update_camera_trigger_rule as update_camera_trigger_rule_record,
 )
 from app.services.rbac import ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR
 from app.services.scheduler_service import run_camera_status_sweep_once_with_db
@@ -100,6 +130,151 @@ def list_camera_media(
     return list_camera_media_records(db, camera_id=camera.id, media_type=media_type, limit=limit)
 
 
+@router.get("/{camera_id}/trigger-rules", response_model=list[CameraTriggerRuleRead])
+def list_camera_trigger_rules(
+    camera_id: str,
+    _: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return list_camera_trigger_rule_records(db, camera_id=camera.id)
+
+
+@router.post("/{camera_id}/trigger-rules", response_model=CameraTriggerRuleRead)
+def create_camera_trigger_rule(
+    camera_id: str,
+    payload: CameraTriggerRuleCreate,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return create_camera_trigger_rule_record(db, camera=camera, payload=payload)
+
+
+@router.patch("/{camera_id}/trigger-rules/{rule_id}", response_model=CameraTriggerRuleRead)
+def update_camera_trigger_rule(
+    camera_id: str,
+    rule_id: str,
+    payload: CameraTriggerRuleUpdate,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    rule = get_camera_trigger_rule_or_404(db, camera_id=camera.id, rule_id=rule_id)
+    return update_camera_trigger_rule_record(db, rule=rule, payload=payload)
+
+
+@router.delete("/{camera_id}/trigger-rules/{rule_id}")
+def delete_camera_trigger_rule(
+    camera_id: str,
+    rule_id: str,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    rule = get_camera_trigger_rule_or_404(db, camera_id=camera.id, rule_id=rule_id)
+    return delete_camera_trigger_rule_record(db, rule=rule)
+
+
+@router.post("/{camera_id}/trigger-rules/debug", response_model=CameraTriggerRuleDebugRead)
+def debug_camera_trigger_rules(
+    camera_id: str,
+    payload: CameraTriggerRuleDebugRequest,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return debug_camera_trigger_rules_record(db, camera=camera, payload=payload)
+
+
+@router.post("/{camera_id}/trigger-rules/debug-live", response_model=CameraTriggerRuleDebugRead)
+def debug_camera_trigger_rules_live(
+    camera_id: str,
+    payload: CameraTriggerRuleDebugLiveRequest,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return debug_camera_trigger_rules_live_record(db, camera=camera, payload=payload)
+
+
+@router.post("/{camera_id}/debug-live", response_model=CameraTriggerRuleDebugRead)
+def debug_camera_trigger_rules_live_alias(
+    camera_id: str,
+    payload: CameraTriggerRuleDebugLiveRequest,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return debug_camera_trigger_rules_live_record(db, camera=camera, payload=payload)
+
+
+@router.get("/{camera_id}/signal-monitor-config", response_model=CameraSignalMonitorConfigRead)
+def get_signal_monitor_config(
+    camera_id: str,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    config = get_monitor_config_or_create(db, camera=camera)
+    return serialize_monitor_config(config)
+
+
+@router.put("/{camera_id}/signal-monitor-config", response_model=CameraSignalMonitorConfigRead)
+def put_signal_monitor_config(
+    camera_id: str,
+    payload: CameraSignalMonitorConfigUpdate,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return upsert_monitor_config(db, camera=camera, payload=payload)
+
+
+@router.patch("/{camera_id}/signal-monitor-config", response_model=CameraSignalMonitorConfigRead)
+def patch_signal_monitor_config(
+    camera_id: str,
+    payload: CameraSignalMonitorConfigUpdate,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return upsert_monitor_config(db, camera=camera, payload=payload)
+
+
+@router.post("/{camera_id}/signal-monitor/start", response_model=CameraSignalMonitorStatusRead)
+def start_signal_monitor(
+    camera_id: str,
+    payload: CameraSignalMonitorStartRequest | None = None,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    duration_seconds = payload.duration_seconds if payload is not None else 600
+    return start_manual_monitor(db, camera=camera, duration_seconds=duration_seconds)
+
+
+@router.post("/{camera_id}/signal-monitor/stop", response_model=CameraSignalMonitorStatusRead)
+def stop_signal_monitor(
+    camera_id: str,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    return stop_monitor(db, camera=camera)
+
+
+@router.get("/{camera_id}/signal-monitor/status", response_model=CameraSignalMonitorStatusRead)
+def get_signal_monitor_status(
+    camera_id: str,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    config = get_monitor_config_or_create(db, camera=camera)
+    return serialize_monitor_status(config)
+
+
 @router.get("/{camera_id}/media/{media_id}", response_model=CameraMediaRead)
 def get_camera_media(
     camera_id: str,
@@ -123,6 +298,18 @@ def get_camera_media_file(
     media = get_camera_media_or_404(db, camera_id=camera.id, media_id=media_id)
     file_path = get_camera_media_file_path_or_404(media)
     return FileResponse(file_path, filename=media.original_name, media_type=media.mime_type)
+
+
+@router.delete("/{camera_id}/media/{media_id}")
+def delete_camera_media(
+    camera_id: str,
+    media_id: str,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    camera = get_camera_or_404(db, camera_id)
+    media = get_camera_media_or_404(db, camera_id=camera.id, media_id=media_id)
+    return delete_camera_media_record(db, media=media)
 
 
 @router.patch("/{camera_id}", response_model=CameraRead)

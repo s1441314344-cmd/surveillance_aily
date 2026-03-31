@@ -5,8 +5,9 @@ import { login } from '@/shared/api/auth';
 import { getApiErrorMessage } from '@/shared/api/errors';
 import { toStoreSessionPayload } from '@/shared/auth/session';
 import { useAuthStore } from '@/shared/state/authStore';
+import { PageHeader } from '@/shared/ui';
 
-const { Paragraph, Title } = Typography;
+const { Paragraph } = Typography;
 
 export function LoginPage() {
   const { message } = App.useApp();
@@ -34,13 +35,12 @@ export function LoginPage() {
   return (
     <div className="login-shell">
       <Card className="login-card">
-        <Space orientation="vertical" size={16}>
-          <Title level={2} style={{ marginBottom: 0 }}>
-            智能巡检系统 V2
-          </Title>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            已接入 V2 后端认证。默认开发账号为 `admin / admin123456`，可直接进入配置中心联调。
-          </Paragraph>
+        <Space direction="vertical" size={20} className="login-card__stack">
+          <PageHeader
+            eyebrow="统一入口"
+            title="智能巡检系统 V2"
+            description="统一管理巡检任务、摄像头、模型配置与告警分析。默认开发账号可直接进入配置中心联调。"
+          />
           <Alert
             type="info"
             showIcon
@@ -58,14 +58,14 @@ export function LoginPage() {
               name="username"
               rules={[{ required: true, message: '请输入用户名' }]}
             >
-              <Input size="large" placeholder="请输入用户名" />
+              <Input size="large" placeholder="请输入用户名" autoComplete="username" />
             </Form.Item>
             <Form.Item
               label="密码"
               name="password"
               rules={[{ required: true, message: '请输入密码' }]}
             >
-              <Input.Password size="large" placeholder="请输入密码" />
+              <Input.Password size="large" placeholder="请输入密码" autoComplete="current-password" />
             </Form.Item>
             <Button
               type="primary"
@@ -77,6 +77,9 @@ export function LoginPage() {
               登录系统
             </Button>
           </Form>
+          <Paragraph type="secondary" className="login-card__hint">
+            登录后可继续访问任务中心、摄像头中心、模型与系统设置等页面。
+          </Paragraph>
         </Space>
       </Card>
     </div>

@@ -5,7 +5,12 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_database
 from app.services.bootstrap import seed_defaults
-from app.services.scheduler_service import run_camera_status_sweep_once, run_due_job_schedules_once
+from app.services.scheduler_service import (
+    run_camera_status_sweep_once,
+    run_due_alert_webhook_deliveries_once,
+    run_due_job_schedules_once,
+    run_due_signal_monitors_once,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -23,6 +28,24 @@ def main() -> None:
         trigger="interval",
         seconds=settings.scheduler_poll_interval_seconds,
         id="surveillance-v2-job-schedules",
+        max_instances=1,
+        coalesce=True,
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _run_due_signal_monitors,
+        trigger="interval",
+        seconds=settings.scheduler_poll_interval_seconds,
+        id="surveillance-v2-signal-monitors",
+        max_instances=1,
+        coalesce=True,
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _run_due_alert_webhooks,
+        trigger="interval",
+        seconds=max(int(settings.scheduler_poll_interval_seconds), 10),
+        id="surveillance-v2-alert-webhooks",
         max_instances=1,
         coalesce=True,
         replace_existing=True,
@@ -48,6 +71,8 @@ def main() -> None:
         logger.info("camera status sweep disabled")
 
     _run_due_schedules()
+    _run_due_signal_monitors()
+    _run_due_alert_webhooks()
     if settings.scheduler_camera_status_sweep_enabled:
         _run_camera_status_sweep()
     scheduler.start()
@@ -69,6 +94,18 @@ def _run_camera_status_sweep() -> None:
         summary["failed_count"],
         summary["total_count"],
     )
+
+
+def _run_due_signal_monitors() -> None:
+    processed = run_due_signal_monitors_once()
+    if processed:
+        logger.info("processed signal monitor cycle for %s camera(s): %s", len(processed), ", ".join(processed))
+
+
+def _run_due_alert_webhooks() -> None:
+    delivered = run_due_alert_webhook_deliveries_once()
+    if delivered:
+        logger.info("processed alert webhook deliveries: %s", ", ".join(delivered))
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ async function loginByUi(page: Page, username: string, password: string) {
       return;
     } catch {
       if (attempt === 2) {
-        break;
+        throw new Error(`login failed for user ${username}`);
       }
     }
   }

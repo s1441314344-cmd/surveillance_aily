@@ -7,6 +7,7 @@ class ProviderRequest:
     model: str
     prompt: str
     image_paths: list[str]
+    response_format: str = "json_schema"
     response_schema: dict | None = None
 
 

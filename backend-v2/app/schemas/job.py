@@ -49,6 +49,7 @@ class JobScheduleCreate(BaseModel):
 
     camera_id: str
     strategy_id: str
+    precheck_strategy_id: str | None = None
     schedule_type: str
     schedule_value: str
 
@@ -58,6 +59,7 @@ class JobScheduleUpdate(BaseModel):
 
     camera_id: str | None = None
     strategy_id: str | None = None
+    precheck_strategy_id: str | None = None
     schedule_type: str | None = None
     schedule_value: str | None = None
     status: str | None = None
@@ -73,6 +75,7 @@ class JobScheduleRead(BaseModel):
     id: str
     camera_id: str
     strategy_id: str
+    precheck_strategy_id: str | None = None
     schedule_type: str
     schedule_value: str
     status: str

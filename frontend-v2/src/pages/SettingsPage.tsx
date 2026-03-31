@@ -1,204 +1,127 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Card, Col, Empty, Form, Input, Row, Select, Space, Spin, Tag, Typography } from 'antd';
-import { listModelProviders, updateModelProvider } from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import {
+  Button,
+  Space,
+  Typography,
+} from 'antd';
+import {
+  ACTIVE_STATUS_LABELS,
+  DataStateBlock,
+  PageHeader,
+  SectionCard,
+  StatusBadge,
+  UNKNOWN_LABELS,
+} from '@/shared/ui';
+import { ProviderDebugForm } from '@/pages/settings/ProviderDebugForm';
+import { ProviderConfigForm } from '@/pages/settings/ProviderConfigForm';
+import { ProviderSelectionRail } from '@/pages/settings/ProviderSelectionRail';
+import { ProviderDebugResultPanel } from '@/pages/settings/ProviderDebugResultPanel';
+import { useSettingsPageController } from '@/pages/settings/useSettingsPageController';
 
-const { Paragraph, Text, Title } = Typography;
-
-type ProviderFormValues = {
-  display_name: string;
-  base_url: string;
-  api_key?: string;
-  default_model: string;
-  timeout_seconds: number;
-  status: string;
-};
+const { Paragraph } = Typography;
 
 export function SettingsPage() {
-  const { message } = App.useApp();
-  const queryClient = useQueryClient();
-  const [form] = Form.useForm<ProviderFormValues>();
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-
-  const providerQuery = useQuery({
-    queryKey: ['model-providers'],
-    queryFn: listModelProviders,
-  });
-
-  const providers = useMemo(() => providerQuery.data ?? [], [providerQuery.data]);
-  const effectiveSelectedProvider = useMemo(() => {
-    if (!providers.length) {
-      return null;
-    }
-
-    const exists = providers.some((item) => item.provider === selectedProvider);
-    return exists ? selectedProvider : providers[0]?.provider ?? null;
-  }, [providers, selectedProvider]);
-  const activeProvider = useMemo(
-    () => providers.find((item) => item.provider === effectiveSelectedProvider) ?? null,
-    [effectiveSelectedProvider, providers],
-  );
-
-  useEffect(() => {
-    if (!activeProvider) {
-      return;
-    }
-
-    form.setFieldsValue({
-      display_name: activeProvider.display_name,
-      base_url: activeProvider.base_url,
-      api_key: '',
-      default_model: activeProvider.default_model,
-      timeout_seconds: activeProvider.timeout_seconds,
-      status: activeProvider.status,
-    });
-  }, [activeProvider, form]);
-
-  const saveMutation = useMutation({
-    mutationFn: ({ provider, payload }: { provider: string; payload: ProviderFormValues }) =>
-      updateModelProvider(provider, {
-        display_name: payload.display_name,
-        base_url: payload.base_url,
-        api_key: payload.api_key?.trim() || undefined,
-        default_model: payload.default_model,
-        timeout_seconds: Number(payload.timeout_seconds),
-        status: payload.status,
-      }),
-    onSuccess: (_, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['model-providers'] });
-      message.success(`${variables.provider.toUpperCase()} 配置已保存`);
-    },
-    onError: (error) => {
-      message.error(getApiErrorMessage(error, '模型提供方保存失败'));
-    },
-  });
-
-  const handleSubmit = async (values: ProviderFormValues) => {
-    if (!effectiveSelectedProvider) {
-      message.warning('请先选择一个模型提供方');
-      return;
-    }
-
-    await saveMutation.mutateAsync({ provider: effectiveSelectedProvider, payload: values });
-  };
+  const {
+    form,
+    debugForm,
+    lastDebugResult,
+    queries,
+    actions,
+    workspace,
+    handleSelectProvider,
+  } = useSettingsPageController();
+  const activeProvider = queries.activeProvider;
+  const isProviderBusy = actions.saveLoading || actions.debugLoading;
+  const providerSubtitle = activeProvider
+    ? `${activeProvider.display_name} · ${activeProvider.provider}`
+    : '请选择左侧提供方';
 
   return (
-    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-      <div>
-        <Title level={3} style={{ marginBottom: 0 }}>
-          模型与系统设置
-        </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          管理 OpenAI / 智谱 等模型提供方，统一维护模型入口、默认模型、超时和密钥状态。
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="模型与系统"
+        title="模型与系统设置"
+        description="统一管理 OpenAI、Google Gemini、智谱、豆包/火山方舟等模型提供方，并在保存后直接执行联通性调试。"
+        extra={
+          activeProvider ? (
+            <Space wrap>
+              <StatusBadge
+                namespace="generic"
+                value={activeProvider.status}
+                label={ACTIVE_STATUS_LABELS[activeProvider.status] ?? UNKNOWN_LABELS.generic}
+              />
+              <Button onClick={() => void form.submit()} loading={actions.saveLoading}>
+                保存配置
+              </Button>
+              <Button type="primary" onClick={() => void actions.handleSaveAndDebug()} loading={isProviderBusy}>
+                保存并调试
+              </Button>
+            </Space>
+          ) : null
+        }
+      />
+
+      <SectionCard
+        title="接入说明"
+        subtitle="本页只维护服务端 API 配置，不依赖 ChatGPT Plus 等网页登录态。"
+      >
+        <Paragraph className="page-paragraph-bottomless">
+          `OpenAI` 维护标准 API 地址与模型，`豆包/火山方舟` 继续走 `ark` 提供方，`Google` 对应 Gemini API。
+          调试结果会保留本次请求日志、输入摘要、原始输出和结构化结果，方便判断链路是否真正打通。
         </Paragraph>
+      </SectionCard>
+
+      <div className="page-grid page-grid--sidebar">
+        <ProviderSelectionRail
+          providers={workspace.filteredProviders}
+          selectedProvider={workspace.effectiveSelectedProviderInFilter}
+          loading={queries.providerQuery.isLoading}
+          error={queries.providerError}
+          statusFilter={workspace.statusFilter}
+          onStatusFilterChange={workspace.setStatusFilter}
+          onResetFilter={workspace.handleResetListFilter}
+          onSelectProvider={handleSelectProvider}
+        />
+
+        <div className="page-stack">
+          <SectionCard
+            title="提供方配置"
+            subtitle={providerSubtitle}
+          >
+            <DataStateBlock
+              empty={!activeProvider}
+              emptyDescription="请选择一个模型提供方后开始配置"
+            >
+              {activeProvider ? (
+                <ProviderConfigForm
+                  form={form}
+                  provider={activeProvider}
+                  onSubmit={(values) => void actions.handleSubmit(values)}
+                />
+              ) : null}
+            </DataStateBlock>
+          </SectionCard>
+
+          <SectionCard title="联通调试" subtitle="保存当前配置后，使用同一提供方立即验证请求、返回与结构化输出">
+            <DataStateBlock
+              empty={!activeProvider}
+              emptyDescription="请选择一个模型提供方后开始调试"
+            >
+              {activeProvider ? (
+                <div className="page-stack">
+                  <ProviderDebugForm
+                    form={debugForm}
+                    provider={activeProvider}
+                    loading={isProviderBusy}
+                    onSubmit={() => void actions.handleSaveAndDebug()}
+                  />
+
+                  <ProviderDebugResultPanel result={lastDebugResult} />
+                </div>
+              ) : null}
+            </DataStateBlock>
+          </SectionCard>
+        </div>
       </div>
-
-      <Row gutter={16} align="stretch">
-        <Col xs={24} lg={8}>
-          <Card title="提供方列表" style={{ height: '100%' }}>
-            {providerQuery.isLoading ? (
-              <Spin />
-            ) : providers.length ? (
-              <Space orientation="vertical" size={8} style={{ width: '100%' }}>
-                {providers.map((item) => (
-                  <div
-                    key={item.provider}
-                    role="button"
-                    tabIndex={0}
-                    style={{
-                      cursor: 'pointer',
-                      padding: 12,
-                      borderRadius: 12,
-                      border: '1px solid #f0f0f0',
-                      background: item.provider === effectiveSelectedProvider ? '#f0f7ff' : '#fff',
-                    }}
-                    onClick={() => setSelectedProvider(item.provider)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        setSelectedProvider(item.provider);
-                      }
-                    }}
-                  >
-                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
-                      <Space>
-                        <Text strong>{item.display_name}</Text>
-                        <Tag color={item.status === 'active' ? 'green' : 'default'}>{item.status}</Tag>
-                      </Space>
-                      <Text type="secondary">{item.default_model}</Text>
-                      <Text type="secondary">{item.api_key_masked || '尚未配置 API Key'}</Text>
-                    </Space>
-                  </div>
-                ))}
-              </Space>
-            ) : (
-              <Empty description="暂无模型提供方" />
-            )}
-          </Card>
-        </Col>
-
-        <Col xs={24} lg={16}>
-          <Card title="提供方配置">
-            {activeProvider ? (
-              <Form layout="vertical" form={form} onFinish={handleSubmit}>
-                <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="展示名称" name="display_name" rules={[{ required: true, message: '请输入展示名称' }]}>
-                      <Input placeholder="例如 OpenAI" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}>
-                      <Select
-                        options={[
-                          { label: '启用', value: 'active' },
-                          { label: '停用', value: 'inactive' },
-                        ]}
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
-
-                <Form.Item label="Base URL" name="base_url" rules={[{ required: true, message: '请输入接口地址' }]}>
-                  <Input placeholder="https://api.openai.com/v1/responses" />
-                </Form.Item>
-
-                <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="默认模型" name="default_model" rules={[{ required: true, message: '请输入默认模型' }]}>
-                      <Input placeholder="例如 gpt-5-mini" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="超时时间(秒)" name="timeout_seconds" rules={[{ required: true, message: '请输入超时时间' }]}>
-                      <Input type="number" min={1} />
-                    </Form.Item>
-                  </Col>
-                </Row>
-
-                <Form.Item
-                  label={`API Key ${activeProvider.has_api_key ? `(当前：${activeProvider.api_key_masked})` : ''}`}
-                  name="api_key"
-                >
-                  <Input.Password placeholder="留空则保持当前密钥不变" />
-                </Form.Item>
-
-                <Space>
-                  <Button type="primary" htmlType="submit" loading={saveMutation.isPending}>
-                    保存配置
-                  </Button>
-                  <Tag color={activeProvider.has_api_key ? 'green' : 'orange'}>
-                    {activeProvider.has_api_key ? '已配置密钥' : '未配置密钥'}
-                  </Tag>
-                </Space>
-              </Form>
-            ) : (
-              <Empty description="请选择一个模型提供方" />
-            )}
-          </Card>
-        </Col>
-      </Row>
-    </Space>
+    </div>
   );
 }

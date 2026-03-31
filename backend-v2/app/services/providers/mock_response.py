@@ -6,6 +6,22 @@ from app.services.providers.base import ProviderRequest, ProviderResponse
 
 def build_mock_provider_response(provider: str, request: ProviderRequest) -> ProviderResponse:
     image_name = Path(request.image_paths[0]).name if request.image_paths else "image"
+    response_format = (request.response_format or "json_schema").strip().lower()
+
+    if response_format == "text":
+        raw_text = f"Mock analysis for {image_name} by {provider}/{request.model}"
+        return ProviderResponse(
+            success=True,
+            raw_response=raw_text,
+            normalized_json={"raw_text": raw_text},
+            error_message=None,
+            usage={
+                "input_tokens": _estimate_tokens(request.prompt),
+                "output_tokens": _estimate_tokens(raw_text),
+                "total_tokens": _estimate_tokens(request.prompt) + _estimate_tokens(raw_text),
+            },
+        )
+
     normalized_json = _generate_value(
         request.response_schema or {"type": "object"},
         field_name="root",

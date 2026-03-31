@@ -5,19 +5,18 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginAsAdmin(page: Page) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto('/login');
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码').fill('admin123456');
     await page.getByRole('button', { name: '登录系统' }).click();
     try {
-      await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
       return;
-    } catch (error) {
-      if (attempt === 1) {
-        throw error;
+    } catch {
+      if (attempt === 2) {
+        throw new Error('admin login did not redirect to dashboard');
       }
-      await page.waitForTimeout(500);
     }
   }
 }
@@ -89,7 +88,7 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
   await expect(page.getByRole('heading', { name: '任务中心' })).toBeVisible();
 
   const scheduleCard = page.locator('.ant-card').filter({ hasText: '定时任务计划' }).first();
-  const scheduleCameraFilter = scheduleCard.locator('.ant-card-extra .ant-select').nth(1);
+  const scheduleCameraFilter = page.getByTestId('schedule-filter-camera');
   const visibleSelectOptions = page.locator(
     '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option',
   );
@@ -124,6 +123,11 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
   const runNowResponse = await runNowResponsePromise;
   expect(runNowResponse.ok()).toBeTruthy();
   const runNowJob = (await runNowResponse.json()) as { id: string };
+
+  const drawerCloseButton = page.locator('.ant-drawer-close').first();
+  if (await drawerCloseButton.isVisible().catch(() => false)) {
+    await drawerCloseButton.click();
+  }
 
   await scheduleRow.getByRole('button', { name: '查看任务' }).click();
 

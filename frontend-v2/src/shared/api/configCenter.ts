@@ -20,6 +20,36 @@ export type ModelProviderUpdatePayload = {
   status: string;
 };
 
+export type ModelProviderDebugPayload = {
+  model?: string;
+  prompt: string;
+  response_format: 'text' | 'json_object' | 'json_schema' | 'auto';
+  response_schema?: Record<string, unknown>;
+  include_sample_image: boolean;
+};
+
+export type ModelProviderDebugResult = {
+  provider: string;
+  display_name: string;
+  base_url: string;
+  model: string;
+  response_format: string;
+  include_sample_image: boolean;
+  success: boolean;
+  has_api_key: boolean;
+  status: string;
+  timeout_seconds: number;
+  request_payload: Record<string, unknown>;
+  logs: Array<{
+    level: string;
+    message: string;
+  }>;
+  raw_response: string;
+  normalized_json: Record<string, unknown> | null;
+  error_message: string | null;
+  usage: Record<string, unknown> | null;
+};
+
 export type Strategy = {
   id: string;
   name: string;
@@ -27,6 +57,7 @@ export type Strategy = {
   prompt_template: string;
   model_provider: string;
   model_name: string;
+  result_format: 'json_schema' | 'json_object' | 'auto' | 'text';
   response_schema: Record<string, unknown>;
   status: string;
   version: number;
@@ -39,6 +70,7 @@ export type StrategyPayload = {
   prompt_template: string;
   model_provider: string;
   model_name: string;
+  result_format: 'json_schema' | 'json_object' | 'auto' | 'text';
   response_schema: Record<string, unknown>;
   status: string;
 };
@@ -154,6 +186,239 @@ export type CameraRecordingResult = {
   message: string | null;
 };
 
+export type CameraTriggerRule = {
+  id: string;
+  camera_id: string;
+  name: string;
+  event_type: 'person' | 'fire' | 'leak' | 'custom' | string;
+  event_key: string | null;
+  enabled: boolean;
+  min_confidence: number;
+  min_consecutive_frames: number;
+  cooldown_seconds: number;
+  description: string | null;
+  last_triggered_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type CameraTriggerRulePayload = {
+  name: string;
+  event_type: 'person' | 'fire' | 'leak' | 'custom' | string;
+  event_key?: string | null;
+  enabled: boolean;
+  min_confidence: number;
+  min_consecutive_frames: number;
+  cooldown_seconds: number;
+  description?: string | null;
+};
+
+export type CameraTriggerRuleDebugPayload = {
+  signals: Record<string, number>;
+  consecutive_hits?: Record<string, number>;
+  dry_run?: boolean;
+  capture_on_match?: boolean;
+  source_kind?: string;
+  rule_ids?: string[];
+};
+
+export type CameraTriggerRuleDebugItem = {
+  rule_id: string;
+  rule_name: string;
+  event_type: string;
+  event_key: string;
+  enabled: boolean;
+  matched: boolean;
+  confidence: number;
+  threshold: number;
+  consecutive_hits: number;
+  required_consecutive_hits: number;
+  cooldown_ok: boolean;
+  cooldown_remaining_seconds: number;
+  reason: string;
+  media: CameraMedia | null;
+  error_message: string | null;
+};
+
+export type CameraTriggerRuleDebugResult = {
+  camera_id: string;
+  dry_run: boolean;
+  capture_on_match: boolean;
+  matched_count: number;
+  evaluated_at: string;
+  results: CameraTriggerRuleDebugItem[];
+};
+
+export type SignalMonitorConfig = {
+  camera_id: string;
+  runtime_mode: 'daemon' | 'manual' | 'schedule';
+  enabled: boolean;
+  signal_strategy_id: string | null;
+  monitor_interval_seconds: number;
+  schedule_type: 'interval_minutes' | 'daily_time' | null;
+  schedule_value: string | null;
+  manual_until: string | null;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  last_error: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type SignalMonitorConfigPayload = {
+  runtime_mode?: 'daemon' | 'manual' | 'schedule';
+  enabled?: boolean;
+  signal_strategy_id?: string | null;
+  monitor_interval_seconds?: number;
+  schedule_type?: 'interval_minutes' | 'daily_time' | null;
+  schedule_value?: string | null;
+  manual_until?: string | null;
+};
+
+export type DebugLivePayload = {
+  detected_signals: Record<string, number>;
+  source_kind?: string;
+  include_results?: boolean;
+};
+
+export type DebugLiveResult = {
+  camera_id: string;
+  detected_signals: Record<string, number>;
+  matched_count: number;
+  results: Array<Record<string, unknown>>;
+  evaluated_at: string | null;
+};
+
+export type AlertRecord = {
+  id: string;
+  camera_id: string | null;
+  camera_name: string | null;
+  alert_type: string;
+  severity: string;
+  status: string;
+  title: string;
+  message: string | null;
+  detected_signals: Record<string, number> | null;
+  matched_count: number | null;
+  results: Array<Record<string, unknown>> | null;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type AlertRecordWire = {
+  id: string;
+  camera_id: string | null;
+  rule_id: string | null;
+  rule_name: string | null;
+  event_key: string;
+  confidence: number;
+  status: string;
+  message: string | null;
+  media_id: string | null;
+  payload: Record<string, unknown> | null;
+  occurred_at: string | null;
+  acked_at: string | null;
+  resolved_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type AlertWebhook = {
+  id: string;
+  name: string;
+  endpoint: string;
+  enabled: boolean;
+  events: string[];
+  headers: Record<string, string> | null;
+  secret_masked: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  last_error: string | null;
+  last_delivered_at: string | null;
+};
+
+export type AlertWebhookPayload = {
+  name: string;
+  endpoint: string;
+  enabled?: boolean;
+  events?: string[];
+  headers?: Record<string, string>;
+  secret?: string;
+};
+
+type AlertWebhookWire = {
+  id: string;
+  name: string;
+  url: string;
+  status: string;
+  timeout_seconds: number;
+  has_secret: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+function mapAlertWebhookWire(data: AlertWebhookWire): AlertWebhook {
+  return {
+    id: data.id,
+    name: data.name,
+    endpoint: data.url,
+    enabled: data.status === 'active',
+    events: ['alert.created'],
+    headers: null,
+    secret_masked: data.has_secret ? '********' : null,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+    last_error: null,
+    last_delivered_at: null,
+  };
+}
+
+function mapAlertRecordWire(data: AlertRecordWire): AlertRecord {
+  const payload = data.payload && typeof data.payload === 'object' ? data.payload : null;
+  const payloadSeverity =
+    payload && typeof payload.severity === 'string' ? payload.severity : undefined;
+  const inferredSeverity =
+    data.confidence >= 0.9 ? 'critical' : data.confidence >= 0.7 ? 'high' : 'medium';
+  const severity = payloadSeverity || inferredSeverity;
+  const mappedStatus = data.status === 'acked' ? 'acknowledged' : data.status;
+
+  return {
+    id: data.id,
+    camera_id: data.camera_id,
+    camera_name:
+      payload && typeof payload.camera_name === 'string'
+        ? payload.camera_name
+        : null,
+    alert_type: data.event_key,
+    severity,
+    status: mappedStatus,
+    title: data.rule_name || data.event_key || '告警事件',
+    message: data.message,
+    detected_signals:
+      payload && payload.detected_signals && typeof payload.detected_signals === 'object'
+        ? (payload.detected_signals as Record<string, number>)
+        : null,
+    matched_count:
+      payload && typeof payload.matched_count === 'number'
+        ? payload.matched_count
+        : null,
+    results:
+      payload && Array.isArray(payload.results)
+        ? (payload.results as Array<Record<string, unknown>>)
+        : null,
+    acknowledged_at: data.acked_at,
+    acknowledged_by: null,
+    resolved_at: data.resolved_at,
+    resolved_by: null,
+    created_at: data.created_at || data.occurred_at,
+    updated_at: data.updated_at,
+  };
+}
+
 export type DashboardDefinition = {
   id: string;
   name: string;
@@ -186,6 +451,11 @@ export async function listModelProviders() {
 
 export async function updateModelProvider(provider: string, payload: ModelProviderUpdatePayload) {
   const response = await apiClient.put<ModelProvider>(`/api/model-providers/${provider}`, payload);
+  return response.data;
+}
+
+export async function debugModelProvider(provider: string, payload: ModelProviderDebugPayload) {
+  const response = await apiClient.post<ModelProviderDebugResult>(`/api/model-providers/${provider}/debug`, payload);
   return response.data;
 }
 
@@ -292,6 +562,8 @@ export async function diagnoseCamera(cameraId: string, params?: { saveSnapshot?:
 export async function captureCameraPhoto(cameraId: string, payload?: { sourceKind?: string }) {
   const response = await apiClient.post<CameraPhotoCaptureResult>(`/api/cameras/${cameraId}/capture-photo`, {
     source_kind: payload?.sourceKind || 'manual',
+  }, {
+    timeout: 60000,
   });
   return response.data;
 }
@@ -303,12 +575,16 @@ export async function startCameraRecording(
   const response = await apiClient.post<CameraRecordingResult>(`/api/cameras/${cameraId}/recordings/start`, {
     duration_seconds: payload.durationSeconds,
     source_kind: payload.sourceKind || 'manual',
+  }, {
+    timeout: 60000,
   });
   return response.data;
 }
 
 export async function stopCameraRecording(cameraId: string, mediaId: string) {
-  const response = await apiClient.post<CameraRecordingResult>(`/api/cameras/${cameraId}/recordings/${mediaId}/stop`);
+  const response = await apiClient.post<CameraRecordingResult>(`/api/cameras/${cameraId}/recordings/${mediaId}/stop`, undefined, {
+    timeout: 30000,
+  });
   return response.data;
 }
 
@@ -322,10 +598,133 @@ export async function listCameraMedia(cameraId: string, params?: { mediaType?: s
   return response.data;
 }
 
+export async function listCameraTriggerRules(cameraId: string) {
+  const response = await apiClient.get<CameraTriggerRule[]>(`/api/cameras/${cameraId}/trigger-rules`);
+  return response.data;
+}
+
+export async function createCameraTriggerRule(cameraId: string, payload: CameraTriggerRulePayload) {
+  const response = await apiClient.post<CameraTriggerRule>(`/api/cameras/${cameraId}/trigger-rules`, payload);
+  return response.data;
+}
+
+export async function updateCameraTriggerRule(
+  cameraId: string,
+  ruleId: string,
+  payload: Partial<CameraTriggerRulePayload>,
+) {
+  const response = await apiClient.patch<CameraTriggerRule>(
+    `/api/cameras/${cameraId}/trigger-rules/${ruleId}`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function deleteCameraTriggerRule(cameraId: string, ruleId: string) {
+  const response = await apiClient.delete<{ deleted: boolean }>(
+    `/api/cameras/${cameraId}/trigger-rules/${ruleId}`,
+  );
+  return response.data;
+}
+
+export async function debugCameraTriggerRules(
+  cameraId: string,
+  payload: CameraTriggerRuleDebugPayload,
+) {
+  const response = await apiClient.post<CameraTriggerRuleDebugResult>(
+    `/api/cameras/${cameraId}/trigger-rules/debug`,
+    payload,
+    {
+      timeout: 60000,
+    },
+  );
+  return response.data;
+}
+
+export async function getSignalMonitorConfig(cameraId: string) {
+  const response = await apiClient.get<SignalMonitorConfig>(`/api/cameras/${cameraId}/signal-monitor-config`);
+  return response.data;
+}
+
+export async function updateSignalMonitorConfig(cameraId: string, payload: SignalMonitorConfigPayload) {
+  const response = await apiClient.patch<SignalMonitorConfig>(`/api/cameras/${cameraId}/signal-monitor-config`, payload);
+  return response.data;
+}
+
+export async function debugCameraLive(
+  cameraId: string,
+  payload: DebugLivePayload,
+) {
+  const response = await apiClient.post<DebugLiveResult>(
+    `/api/cameras/${cameraId}/debug-live`,
+    payload,
+    { timeout: 60000 },
+  );
+  return response.data;
+}
+
+export async function listAlerts(params?: {
+  cameraId?: string;
+  status?: string;
+  severity?: string;
+  keyword?: string;
+}) {
+  const response = await apiClient.get<AlertRecordWire[]>('/api/alerts', {
+    params: {
+      camera_id: params?.cameraId || undefined,
+      status: params?.status || undefined,
+      severity: params?.severity || undefined,
+      keyword: params?.keyword || undefined,
+    },
+  });
+  return response.data.map(mapAlertRecordWire);
+}
+
+export async function ackAlert(alertId: string) {
+  const response = await apiClient.post<AlertRecordWire>(`/api/alerts/${alertId}/ack`);
+  return mapAlertRecordWire(response.data);
+}
+
+export async function resolveAlert(alertId: string) {
+  const response = await apiClient.post<AlertRecordWire>(`/api/alerts/${alertId}/resolve`);
+  return mapAlertRecordWire(response.data);
+}
+
+export async function listAlertWebhooks() {
+  const response = await apiClient.get<AlertWebhookWire[]>('/api/alert-webhooks');
+  return response.data.map(mapAlertWebhookWire);
+}
+
+export async function createAlertWebhook(payload: AlertWebhookPayload) {
+  const response = await apiClient.post<AlertWebhookWire>('/api/alert-webhooks', {
+    name: payload.name,
+    url: payload.endpoint,
+    status: payload.enabled === false ? 'inactive' : 'active',
+    timeout_seconds: 5,
+    secret: payload.secret,
+  });
+  return mapAlertWebhookWire(response.data);
+}
+
+export async function updateAlertWebhook(webhookId: string, payload: Partial<AlertWebhookPayload>) {
+  const response = await apiClient.patch<AlertWebhookWire>(`/api/alert-webhooks/${webhookId}`, {
+    name: payload.name,
+    url: payload.endpoint,
+    status: payload.enabled === undefined ? undefined : payload.enabled ? 'active' : 'inactive',
+    secret: payload.secret,
+  });
+  return mapAlertWebhookWire(response.data);
+}
+
 export async function fetchCameraMediaFile(cameraId: string, mediaId: string) {
   const response = await apiClient.get<Blob>(`/api/cameras/${cameraId}/media/${mediaId}/file`, {
     responseType: 'blob',
   });
+  return response.data;
+}
+
+export async function deleteCameraMedia(cameraId: string, mediaId: string) {
+  const response = await apiClient.delete<{ deleted: boolean }>(`/api/cameras/${cameraId}/media/${mediaId}`);
   return response.data;
 }
 
