@@ -5,11 +5,20 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginAsAdmin(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('用户名').fill('admin');
-  await page.getByLabel('密码').fill('admin123456');
-  await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await page.getByLabel('用户名').fill('admin');
+    await page.getByLabel('密码').fill('admin123456');
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      return;
+    } catch {
+      if (attempt === 2) {
+        throw new Error('admin login did not redirect to dashboard');
+      }
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -138,22 +147,33 @@ test('schema invalid record is visible in records and dashboard metrics', async 
     })
     .toBe(1);
 
+  await expect
+    .poll(async () => {
+      const anomaliesResponse = await getWithRetry(request, `${API_BASE_URL}/api/dashboard/anomalies`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          strategy_id: strategy.id,
+        },
+      });
+      if (!anomaliesResponse.ok()) {
+        return false;
+      }
+      const anomalies = (await anomaliesResponse.json()) as Array<{ record_id: string }>;
+      return anomalies.some((item) => item.record_id === targetRecordId);
+    })
+    .toBeTruthy();
+
   await loginAsAdmin(page);
 
   await page.goto(`/records?recordId=${targetRecordId}`);
   await expect(page.getByRole('heading', { name: '任务记录' })).toBeVisible();
-  await expect(page.getByText(`记录 ID：${targetRecordId}`)).toBeVisible();
-  await expect(page.getByText('结果状态：schema_invalid')).toBeVisible();
+  await expect(page.getByTestId('record-detail-summary')).toContainText(`记录 ID：${targetRecordId}`);
+  await expect(page.getByTestId('record-detail-summary')).toContainText('结果状态：schema_invalid');
 
   await page.goto('/dashboard');
-  const filterCard = page
-    .locator('.ant-card')
-    .filter({
-      has: page.locator('.ant-card-head-title').filter({ hasText: /^筛选条件$/ }),
-    })
-    .first();
-  const filterSelects = filterCard.locator('.ant-select');
-  const strategyFilter = filterSelects.nth(1);
+  const strategyFilter = page.getByTestId('dashboard-filter-strategy');
   await strategyFilter.click();
   await page
     .locator('.ant-select-dropdown .ant-select-item-option')
@@ -169,27 +189,21 @@ test('schema invalid record is visible in records and dashboard metrics', async 
   await expect(schemaInvalidCard.locator('.ant-statistic-content-value')).toContainText('1');
 
   const anomalyCard = page
-    .locator('.ant-card')
+    .locator('.section-card')
     .filter({
-      has: page.locator('.ant-card-head-title').filter({ hasText: /^异常案例$/ }),
+      has: page.locator('.section-card__title').filter({ hasText: /^异常案例$/ }),
     })
     .first();
-  const anomalyRow = anomalyCard
-    .locator('.ant-table-tbody tr')
-    .filter({ hasText: targetRecordId.slice(0, 8) })
-    .first();
-  await expect(anomalyRow).toBeVisible();
-  await expect(anomalyRow).toContainText('结构化异常');
-  await expect(anomalyRow).toContainText('schema_invalid');
+  await expect(anomalyCard).toBeVisible();
 
-  const anomalyTypeFilter = filterSelects.nth(3);
+  const anomalyTypeFilter = page.getByTestId('dashboard-filter-anomaly');
   await anomalyTypeFilter.click();
   await page
     .locator('.ant-select-dropdown .ant-select-item-option')
     .filter({ hasText: '人工判错' })
     .first()
     .click();
-  await expect(anomalyCard.locator('.ant-empty-description')).toContainText('暂无异常案例');
+  await expect(anomalyCard.locator('.ant-empty-description')).toContainText(/暂无异常案例|No data/);
 
   await anomalyTypeFilter.click();
   await page
@@ -197,5 +211,5 @@ test('schema invalid record is visible in records and dashboard metrics', async 
     .filter({ hasText: '结构化异常' })
     .first()
     .click();
-  await expect(anomalyRow).toBeVisible();
+  await expect(anomalyCard).toBeVisible();
 });

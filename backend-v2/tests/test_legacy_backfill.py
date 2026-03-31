@@ -32,7 +32,7 @@ def test_legacy_backfill_dry_run_does_not_persist(reset_database, tmp_path):
         assert count_rows(db, TaskRecord) == 0
         assert count_rows(db, Camera) == 0
         assert count_rows(db, FileAsset) == 0
-        assert count_rows(db, AnalysisStrategy) == 3
+        assert count_rows(db, AnalysisStrategy) == 4
 
 
 def test_legacy_backfill_apply_is_idempotent(reset_database, tmp_path):
@@ -46,8 +46,8 @@ def test_legacy_backfill_apply_is_idempotent(reset_database, tmp_path):
 
     with SessionLocal() as db:
         assert count_rows(db, Camera) == 1
-        assert count_rows(db, AnalysisStrategy) == 4
-        assert count_rows(db, StrategyVersion) == 4
+        assert count_rows(db, AnalysisStrategy) == 5
+        assert count_rows(db, StrategyVersion) == 5
         assert count_rows(db, JobSchedule) == 1
         assert count_rows(db, Job) == 2
         assert count_rows(db, TaskRecord) == 3
@@ -74,7 +74,7 @@ def test_legacy_backfill_apply_is_idempotent(reset_database, tmp_path):
 
     with SessionLocal() as db:
         assert count_rows(db, Camera) == 1
-        assert count_rows(db, AnalysisStrategy) == 4
+        assert count_rows(db, AnalysisStrategy) == 5
         assert count_rows(db, JobSchedule) == 1
         assert count_rows(db, Job) == 2
         assert count_rows(db, TaskRecord) == 3

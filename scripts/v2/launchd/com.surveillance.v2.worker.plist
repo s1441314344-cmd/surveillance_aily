@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.surveillance.v2.worker</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/bash</string>
+      <string>-lc</string>
+      <string>/Users/shaopeng/Downloads/surveillance_aily/scripts/v2/worker.sh</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>WorkingDirectory</key>
+    <string>/Users/shaopeng/Downloads/surveillance_aily</string>
+    <key>StandardOutPath</key>
+    <string>/Users/shaopeng/Downloads/surveillance_aily/backend-v2/logs/worker.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/shaopeng/Downloads/surveillance_aily/backend-v2/logs/worker.err.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PYTHONUNBUFFERED</key>
+      <string>1</string>
+      <key>V2_CELERY_LOGLEVEL</key>
+      <string>info</string>
+    </dict>
+  </dict>
+</plist>

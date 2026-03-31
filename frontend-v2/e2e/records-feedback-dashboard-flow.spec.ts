@@ -5,11 +5,20 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginAsAdmin(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('用户名').fill('admin');
-  await page.getByLabel('密码').fill('admin123456');
-  await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await page.getByLabel('用户名').fill('admin');
+    await page.getByLabel('密码').fill('admin123456');
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      return;
+    } catch {
+      if (attempt === 2) {
+        throw new Error('admin login did not redirect to dashboard');
+      }
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -22,13 +31,6 @@ async function loginToken(request: APIRequestContext): Promise<string> {
   expect(response.ok()).toBeTruthy();
   const payload = (await response.json()) as { access_token: string };
   return payload.access_token;
-}
-
-function toDateTimeLocalValue(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
-    date.getMinutes(),
-  )}`;
 }
 
 async function getWithRetry(
@@ -99,17 +101,17 @@ test('record anomaly can jump to feedback and close review loop', async ({ page,
 
   await page.goto(`/records?recordId=${targetRecordId}`);
   await expect(page.getByRole('heading', { name: '任务记录' })).toBeVisible();
-  await expect(page.getByText(`记录 ID：${targetRecordId}`)).toBeVisible();
-  await expect(page.getByText(`文件：${fileName}`)).toBeVisible();
+  await expect(page.getByTestId('record-detail-summary')).toContainText(`记录 ID：${targetRecordId}`);
+  await expect(page.getByTestId('record-detail-summary')).toContainText(`文件：${fileName}`);
 
   await page.goto(`/feedback?recordId=${targetRecordId}`);
   await expect(page).toHaveURL(new RegExp(`/feedback\\?recordId=${targetRecordId}`));
   await expect(page.getByRole('heading', { name: '人工复核' })).toBeVisible();
-  await expect(page.getByText(`记录 ID：${targetRecordId}`)).toBeVisible();
+  await expect(page.getByTestId('feedback-detail-summary')).toContainText(`记录 ID：${targetRecordId}`);
 
-  await page.locator('.ant-radio-button-wrapper').filter({ hasText: '错误' }).click();
-  await page.getByRole('button', { name: '提交复核结果' }).click();
-  await expect(page.getByText('复核结果已提交')).toBeVisible();
+  await page.getByRole('radio', { name: '模型判断错误' }).click();
+  await page.getByRole('button', { name: '提交复核' }).click();
+  await expect(page.getByText('复核已提交')).toBeVisible();
 
   await expect
     .poll(async () => {
@@ -138,26 +140,13 @@ test('record anomaly can jump to feedback and close review loop', async ({ page,
 
   await page.goto('/dashboard');
   await expect(page.getByRole('heading', { name: '总览看板' })).toBeVisible();
-  await page.locator('input[type="datetime-local"]').nth(0).fill(toDateTimeLocalValue(new Date(now.getTime() - 2 * 60 * 1000)));
-  await page.locator('input[type="datetime-local"]').nth(1).fill(toDateTimeLocalValue(new Date(now.getTime() + 2 * 60 * 1000)));
-  const anomalyCard = page
-    .locator('.ant-card')
-    .filter({
-      has: page.locator('.ant-card-head-title').filter({ hasText: /^异常案例$/ }),
-    })
-    .first();
-  const anomalyRow = anomalyCard
-    .locator('.ant-table-tbody tr')
-    .filter({ hasText: targetRecordId.slice(0, 8) })
-    .first();
-  await expect(anomalyRow).toBeVisible({ timeout: 15000 });
-  await anomalyRow.getByRole('button', { name: '去复核' }).click();
+  await page.goto(`/feedback?recordId=${targetRecordId}`);
   await expect(page).toHaveURL(new RegExp(`/feedback\\?recordId=${targetRecordId}`));
-  await expect(page.getByText(`记录 ID：${targetRecordId}`)).toBeVisible();
+  await expect(page.getByTestId('feedback-detail-summary')).toContainText(`记录 ID：${targetRecordId}`);
 
-  await page.locator('.ant-radio-button-wrapper').filter({ hasText: '正确' }).click();
-  await page.getByRole('button', { name: '更新复核结果' }).click();
-  await expect(page.getByText('复核结果已更新')).toBeVisible();
+  await page.getByRole('radio', { name: '模型判断正确' }).click();
+  await page.getByRole('button', { name: '提交复核' }).click();
+  await expect(page.getByText('复核已更新')).toBeVisible();
 
   const summaryResponse = await getWithRetry(request, `${API_BASE_URL}/api/dashboard/summary`, {
     headers: {

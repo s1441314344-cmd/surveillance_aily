@@ -417,6 +417,14 @@ def test_camera_manual_photo_capture_and_media_listing(client):
     assert media_file_response.status_code == 200
     assert media_file_response.content
 
+    delete_response = client.delete(f"/api/cameras/{camera['id']}/media/{media['id']}", headers=headers)
+    assert delete_response.status_code == 200
+    assert delete_response.json()["deleted"] is True
+
+    list_media_after_delete = client.get(f"/api/cameras/{camera['id']}/media", headers=headers)
+    assert list_media_after_delete.status_code == 200
+    assert list_media_after_delete.json() == []
+
 
 def test_camera_video_recording_start_and_stop(client, monkeypatch, tmp_path):
     login_data = login_as_admin(client)
@@ -502,3 +510,177 @@ def test_camera_video_recording_start_and_stop(client, monkeypatch, tmp_path):
     stop_result = stop_response.json()
     assert stop_result["success"] is True
     assert stop_result["media"]["stop_requested"] is True
+
+
+def test_camera_trigger_rule_crud_and_debug(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "触发规则测试摄像头",
+            "location": "触发规则测试位",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/trigger-rules",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/trigger-rules",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_rule_response = client.post(
+        f"/api/cameras/{camera['id']}/trigger-rules",
+        headers=headers,
+        json={
+            "name": "人员进入触发",
+            "event_type": "person",
+            "enabled": True,
+            "min_confidence": 0.7,
+            "min_consecutive_frames": 2,
+            "cooldown_seconds": 20,
+            "description": "人员出现且连续2帧命中时抽帧",
+        },
+    )
+    assert create_rule_response.status_code == 200
+    rule = create_rule_response.json()
+    assert rule["event_type"] == "person"
+    assert rule["event_key"] == "person"
+    assert rule["enabled"] is True
+
+    list_rules_response = client.get(f"/api/cameras/{camera['id']}/trigger-rules", headers=headers)
+    assert list_rules_response.status_code == 200
+    assert len(list_rules_response.json()) == 1
+
+    debug_hit_response = client.post(
+        f"/api/cameras/{camera['id']}/trigger-rules/debug",
+        headers=headers,
+        json={
+            "signals": {"person": 0.86, "fire": 0.05, "leak": 0.03},
+            "consecutive_hits": {"person": 2},
+            "dry_run": True,
+            "capture_on_match": False,
+        },
+    )
+    assert debug_hit_response.status_code == 200
+    debug_hit_result = debug_hit_response.json()
+    assert debug_hit_result["matched_count"] == 1
+    assert debug_hit_result["results"][0]["matched"] is True
+    assert debug_hit_result["results"][0]["reason"] == "命中触发条件"
+
+    update_rule_response = client.patch(
+        f"/api/cameras/{camera['id']}/trigger-rules/{rule['id']}",
+        headers=headers,
+        json={"min_confidence": 0.95},
+    )
+    assert update_rule_response.status_code == 200
+    assert update_rule_response.json()["min_confidence"] == 0.95
+
+    debug_miss_response = client.post(
+        f"/api/cameras/{camera['id']}/trigger-rules/debug",
+        headers=headers,
+        json={
+            "signals": {"person": 0.86},
+            "consecutive_hits": {"person": 2},
+            "dry_run": True,
+            "capture_on_match": False,
+        },
+    )
+    assert debug_miss_response.status_code == 200
+    debug_miss_result = debug_miss_response.json()
+    assert debug_miss_result["matched_count"] == 0
+    assert "置信度不足" in debug_miss_result["results"][0]["reason"]
+
+    delete_rule_response = client.delete(
+        f"/api/cameras/{camera['id']}/trigger-rules/{rule['id']}",
+        headers=headers,
+    )
+    assert delete_rule_response.status_code == 200
+    assert delete_rule_response.json()["deleted"] is True
+
+
+def test_camera_trigger_rule_debug_capture_and_cooldown(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "触发规则抓拍摄像头",
+            "location": "触发规则抓拍位",
+            "ip_address": "127.0.0.1",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/trigger-photo",
+            "frame_frequency_seconds": 30,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/trigger-photo",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_rule_response = client.post(
+        f"/api/cameras/{camera['id']}/trigger-rules",
+        headers=headers,
+        json={
+            "name": "疑似着火触发",
+            "event_type": "fire",
+            "enabled": True,
+            "min_confidence": 0.6,
+            "min_consecutive_frames": 1,
+            "cooldown_seconds": 30,
+            "description": "火情高置信度命中后抓拍",
+        },
+    )
+    assert create_rule_response.status_code == 200
+    rule = create_rule_response.json()
+
+    first_debug_response = client.post(
+        f"/api/cameras/{camera['id']}/trigger-rules/debug",
+        headers=headers,
+        json={
+            "signals": {"fire": 0.91},
+            "consecutive_hits": {"fire": 1},
+            "dry_run": False,
+            "capture_on_match": True,
+            "source_kind": "trigger_rule",
+            "rule_ids": [rule["id"]],
+        },
+    )
+    assert first_debug_response.status_code == 200
+    first_debug_result = first_debug_response.json()
+    assert first_debug_result["matched_count"] == 1
+    assert first_debug_result["results"][0]["matched"] is True
+    assert first_debug_result["results"][0]["media"] is not None
+    assert first_debug_result["results"][0]["media"]["media_type"] == "photo"
+    assert first_debug_result["results"][0]["media"]["source_kind"] == "trigger_rule"
+
+    second_debug_response = client.post(
+        f"/api/cameras/{camera['id']}/trigger-rules/debug",
+        headers=headers,
+        json={
+            "signals": {"fire": 0.99},
+            "consecutive_hits": {"fire": 1},
+            "dry_run": False,
+            "capture_on_match": False,
+            "rule_ids": [rule["id"]],
+        },
+    )
+    assert second_debug_response.status_code == 200
+    second_debug_result = second_debug_response.json()
+    assert second_debug_result["matched_count"] == 0
+    assert "冷却中" in second_debug_result["results"][0]["reason"]
+    assert second_debug_result["results"][0]["cooldown_ok"] is False

@@ -60,25 +60,24 @@ class ZhipuAdapter(ModelProviderAdapter):
 
         output_text = _extract_zhipu_message_content(body)
         clean_text = strip_think_blocks(output_text)
-        normalized_json = ensure_object_json(extract_json_payload(clean_text))
-        if normalized_json is None:
-            return ProviderResponse(
-                success=False,
-                raw_response=output_text or json.dumps(body, ensure_ascii=False),
-                normalized_json=None,
-                error_message="Zhipu did not return valid JSON content",
-            )
-
-        return ProviderResponse(
-            success=True,
-            raw_response=output_text or json.dumps(normalized_json, ensure_ascii=False),
-            normalized_json=normalized_json,
-            error_message=None,
+        return _build_provider_response(
+            output_text=clean_text or output_text,
+            raw_fallback=json.dumps(body, ensure_ascii=False),
+            response_format=request.response_format,
             usage=_extract_usage(body),
         )
 
     def _build_payload(self, request: ProviderRequest, model_name: str) -> dict:
-        user_content = [{"type": "text", "text": f"{request.prompt}\n\n{build_schema_instruction(request.response_schema)}"}]
+        response_format = (request.response_format or "json_schema").strip().lower()
+        prompt = request.prompt
+        if response_format == "json_schema":
+            prompt = f"{prompt}\n\n{build_schema_instruction(request.response_schema)}"
+        elif response_format == "json_object":
+            prompt = f"{prompt}\n\n请只返回一个合法 JSON 对象，不要输出额外解释。"
+        elif response_format == "auto":
+            prompt = f"{prompt}\n\n优先返回一个合法 JSON 对象；如果无法结构化，请返回简洁文本结论。"
+
+        user_content = [{"type": "text", "text": prompt}]
         for image_path in request.image_paths:
             user_content.append({"type": "image_url", "image_url": {"url": encode_image_to_base64(image_path)}})
 
@@ -136,3 +135,53 @@ def _extract_usage(body: dict) -> dict | None:
         "output_tokens": int(completion_tokens or 0),
         "total_tokens": int(total_tokens or (int(prompt_tokens or 0) + int(completion_tokens or 0))),
     }
+
+
+def _build_provider_response(
+    *,
+    output_text: str,
+    raw_fallback: str,
+    response_format: str,
+    usage: dict | None,
+) -> ProviderResponse:
+    normalized_format = (response_format or "json_schema").strip().lower()
+    raw_response = output_text or raw_fallback
+
+    if normalized_format == "text":
+        text_content = output_text.strip() if output_text else raw_fallback
+        return ProviderResponse(
+            success=bool(text_content),
+            raw_response=text_content,
+            normalized_json={"raw_text": text_content} if text_content else None,
+            error_message=None if text_content else "Zhipu did not return text content",
+            usage=usage,
+        )
+
+    normalized_json = ensure_object_json(extract_json_payload(output_text))
+    if normalized_json is not None:
+        return ProviderResponse(
+            success=True,
+            raw_response=raw_response,
+            normalized_json=normalized_json,
+            error_message=None,
+            usage=usage,
+        )
+
+    if normalized_format == "auto":
+        fallback_text = output_text.strip() if output_text else ""
+        if fallback_text:
+            return ProviderResponse(
+                success=True,
+                raw_response=fallback_text,
+                normalized_json={"raw_text": fallback_text},
+                error_message=None,
+                usage=usage,
+            )
+
+    return ProviderResponse(
+        success=False,
+        raw_response=raw_response,
+        normalized_json=None,
+        error_message="Zhipu did not return valid JSON content",
+        usage=usage,
+    )

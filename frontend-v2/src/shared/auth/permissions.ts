@@ -11,6 +11,21 @@ export type RoleCode =
   | typeof ROLE_MANUAL_REVIEWER
   | typeof ROLE_ANALYSIS_VIEWER;
 
+export const ROLE_LABEL_MAP: Record<RoleCode, string> = {
+  [ROLE_SYSTEM_ADMIN]: '系统管理员',
+  [ROLE_STRATEGY_CONFIGURATOR]: '策略配置员',
+  [ROLE_TASK_OPERATOR]: '任务操作员',
+  [ROLE_MANUAL_REVIEWER]: '人工复核员',
+  [ROLE_ANALYSIS_VIEWER]: '分析查看者',
+};
+
+export function getRoleLabel(roleCode: string | undefined): string {
+  if (!roleCode) {
+    return '未分配角色';
+  }
+  return ROLE_LABEL_MAP[roleCode as RoleCode] ?? roleCode;
+}
+
 export function hasAnyRole(userRoles: string[] | undefined, requiredRoles?: readonly string[]) {
   if (!requiredRoles || requiredRoles.length === 0) {
     return true;

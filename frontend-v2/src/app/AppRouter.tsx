@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/layouts/AppLayout';
 import { useAuthStore } from '@/shared/state/authStore';
 import {
+  ROLE_ANALYSIS_VIEWER,
   ROLE_MANUAL_REVIEWER,
   ROLE_STRATEGY_CONFIGURATOR,
   ROLE_SYSTEM_ADMIN,
@@ -19,6 +20,19 @@ const DashboardsPage = lazy(() =>
 );
 const StrategiesPage = lazy(() => import('@/pages/StrategiesPage').then((module) => ({ default: module.StrategiesPage })));
 const CamerasPage = lazy(() => import('@/pages/CamerasPage').then((module) => ({ default: module.CamerasPage })));
+const CameraDevicesPane = lazy(() =>
+  import('@/pages/cameras/DevicesPane').then((module) => ({ default: module.DevicesPane })),
+);
+const CameraMonitoringPane = lazy(() =>
+  import('@/pages/cameras/MonitoringPane').then((module) => ({ default: module.MonitoringPane })),
+);
+const CameraMediaPane = lazy(() =>
+  import('@/pages/cameras/MediaPane').then((module) => ({ default: module.MediaPane })),
+);
+const CameraDiagnosticsPane = lazy(() =>
+  import('@/pages/cameras/DiagnosticsPane').then((module) => ({ default: module.DiagnosticsPane })),
+);
+const AlertsPage = lazy(() => import('@/pages/AlertsPage').then((module) => ({ default: module.AlertsPage })));
 const JobsPage = lazy(() => import('@/pages/JobsPage').then((module) => ({ default: module.JobsPage })));
 const RecordsPage = lazy(() => import('@/pages/RecordsPage').then((module) => ({ default: module.RecordsPage })));
 const FeedbackPage = lazy(() => import('@/pages/FeedbackPage').then((module) => ({ default: module.FeedbackPage })));
@@ -31,7 +45,7 @@ const AccessDeniedPage = lazy(() =>
 
 function RouterFallback() {
   return (
-    <div style={{ minHeight: '40vh', display: 'grid', placeItems: 'center' }}>
+    <div className="app-router-fallback">
       <Spin size="large" />
     </div>
   );
@@ -77,6 +91,16 @@ export function AppRouter() {
           <Route
             path="cameras"
             element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN]} element={<CamerasPage />} />}
+          >
+            <Route index element={<Navigate to="devices" replace />} />
+            <Route path="devices" element={<CameraDevicesPane />} />
+            <Route path="monitoring" element={<CameraMonitoringPane />} />
+            <Route path="media" element={<CameraMediaPane />} />
+            <Route path="diagnostics" element={<CameraDiagnosticsPane />} />
+          </Route>
+          <Route
+            path="alerts"
+            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN, ROLE_ANALYSIS_VIEWER]} element={<AlertsPage />} />}
           />
           <Route
             path="jobs"

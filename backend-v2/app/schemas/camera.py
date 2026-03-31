@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CameraBase(BaseModel):
@@ -126,3 +126,134 @@ class CameraRecordingStatusRead(BaseModel):
     success: bool
     media: CameraMediaRead
     message: str | None = None
+
+
+class CameraTriggerRuleBase(BaseModel):
+    name: str
+    event_type: str
+    event_key: str | None = None
+    match_mode: str = "simple"
+    expression_json: dict | None = None
+    priority: int = 100
+    action_policy_json: dict | None = None
+    enabled: bool = True
+    min_confidence: float = Field(default=0.6, ge=0, le=1)
+    min_consecutive_frames: int = Field(default=1, ge=1, le=300)
+    cooldown_seconds: int = Field(default=30, ge=0, le=86400)
+    description: str | None = None
+
+
+class CameraTriggerRuleCreate(CameraTriggerRuleBase):
+    pass
+
+
+class CameraTriggerRuleUpdate(BaseModel):
+    name: str | None = None
+    event_type: str | None = None
+    event_key: str | None = None
+    match_mode: str | None = None
+    expression_json: dict | None = None
+    priority: int | None = None
+    action_policy_json: dict | None = None
+    enabled: bool | None = None
+    min_confidence: float | None = Field(default=None, ge=0, le=1)
+    min_consecutive_frames: int | None = Field(default=None, ge=1, le=300)
+    cooldown_seconds: int | None = Field(default=None, ge=0, le=86400)
+    description: str | None = None
+
+
+class CameraTriggerRuleRead(CameraTriggerRuleBase):
+    id: str
+    camera_id: str
+    last_triggered_at: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class CameraTriggerRuleDebugRequest(BaseModel):
+    signals: dict[str, float] = Field(default_factory=dict)
+    consecutive_hits: dict[str, int] = Field(default_factory=dict)
+    dry_run: bool = True
+    capture_on_match: bool = False
+    source_kind: str = "trigger_rule"
+    rule_ids: list[str] | None = None
+
+
+class CameraTriggerRuleDebugLiveRequest(BaseModel):
+    strategy_id: str | None = None
+    model_provider: str | None = None
+    model_name: str | None = None
+    dry_run: bool = True
+    capture_on_match: bool = False
+    source_kind: str = "trigger_rule_auto"
+    rule_ids: list[str] | None = None
+
+
+class CameraTriggerRuleDebugResult(BaseModel):
+    rule_id: str
+    rule_name: str
+    event_type: str
+    event_key: str
+    match_mode: str = "simple"
+    enabled: bool
+    matched: bool
+    confidence: float
+    threshold: float
+    consecutive_hits: int
+    required_consecutive_hits: int
+    cooldown_ok: bool
+    cooldown_remaining_seconds: int
+    reason: str
+    expression_result: dict | None = None
+    media: CameraMediaRead | None = None
+    error_message: str | None = None
+
+
+class CameraTriggerRuleDebugRead(BaseModel):
+    camera_id: str
+    dry_run: bool
+    capture_on_match: bool
+    matched_count: int
+    evaluated_at: str
+    detected_signals: dict[str, float] | None = None
+    consecutive_hits: dict[str, int] | None = None
+    normalized_json: dict | None = None
+    results: list[CameraTriggerRuleDebugResult]
+
+
+class CameraSignalMonitorConfigBase(BaseModel):
+    enabled: bool = False
+    runtime_mode: str = "daemon"
+    signal_strategy_id: str | None = None
+    monitor_interval_seconds: int = Field(default=30, ge=1, le=3600)
+    schedule_type: str | None = None
+    schedule_value: str | None = None
+    manual_until: str | None = None
+
+
+class CameraSignalMonitorConfigUpdate(CameraSignalMonitorConfigBase):
+    pass
+
+
+class CameraSignalMonitorConfigRead(CameraSignalMonitorConfigBase):
+    id: str
+    camera_id: str
+    next_run_at: str | None = None
+    last_run_at: str | None = None
+    last_error: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class CameraSignalMonitorStartRequest(BaseModel):
+    duration_seconds: int = Field(default=600, ge=30, le=86400)
+
+
+class CameraSignalMonitorStatusRead(BaseModel):
+    camera_id: str
+    enabled: bool
+    runtime_mode: str
+    signal_strategy_id: str | None = None
+    next_run_at: str | None = None
+    last_run_at: str | None = None
+    last_error: str | None = None

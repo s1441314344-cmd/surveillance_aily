@@ -5,11 +5,21 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginByUi(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
-  await page.getByLabel('用户名').fill(username);
-  await page.getByLabel('密码').fill(password);
-  await page.getByRole('button', { name: '登录系统' }).click();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await expect(page.getByRole('heading', { name: '智能巡检系统 V2' })).toBeVisible();
+    await page.getByLabel('用户名').fill(username);
+    await page.getByLabel('密码').fill(password);
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      return;
+    } catch {
+      if (attempt === 2) {
+        throw new Error(`login failed for user ${username}`);
+      }
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -81,18 +91,10 @@ test('dashboard preset filters can be applied from selected dashboard definition
   await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
   await expect(page.getByRole('heading', { name: '总览看板' })).toBeVisible();
 
-  const filterCard = page
-    .locator('.ant-card')
-    .filter({
-      has: page.locator('.ant-card-head-title').filter({ hasText: /^筛选条件$/ }),
-    })
-    .first();
-
-  const filterSelects = filterCard.locator('.ant-select');
-  const dashboardSelect = filterSelects.nth(0);
-  const strategySelect = filterSelects.nth(1);
-  const providerSelect = filterSelects.nth(2);
-  const anomalyTypeSelect = filterSelects.nth(3);
+  const dashboardSelect = page.getByTestId('dashboard-filter-dashboard');
+  const strategySelect = page.getByTestId('dashboard-filter-strategy');
+  const providerSelect = page.getByTestId('dashboard-filter-provider');
+  const anomalyTypeSelect = page.getByTestId('dashboard-filter-anomaly');
 
   await dashboardSelect.click();
   await page
@@ -101,7 +103,7 @@ test('dashboard preset filters can be applied from selected dashboard definition
     .first()
     .click();
 
-  await filterCard.getByRole('button', { name: '应用看板预设筛选' }).click();
+  await page.getByTestId('dashboard-apply-preset').click();
 
   await expect(strategySelect).toContainText(strategyName);
   await expect(providerSelect).toContainText('智谱');

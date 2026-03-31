@@ -5,11 +5,20 @@ const API_BASE_URL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:5800';
 test.setTimeout(120000);
 
 async function loginAsAdmin(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('用户名').fill('admin');
-  await page.getByLabel('密码').fill('admin123456');
-  await page.getByRole('button', { name: '登录系统' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/login');
+    await page.getByLabel('用户名').fill('admin');
+    await page.getByLabel('密码').fill('admin123456');
+    await page.getByRole('button', { name: '登录系统' }).click();
+    try {
+      await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      return;
+    } catch {
+      if (attempt === 2) {
+        throw new Error('admin login did not redirect to dashboard');
+      }
+    }
+  }
 }
 
 async function loginToken(request: APIRequestContext): Promise<string> {
@@ -56,9 +65,9 @@ test('camera once form blocks non-rtsp camera selection in v1 flow', async ({ pa
   await page.getByRole('menuitem', { name: '任务中心' }).click();
   await expect(page).toHaveURL(/\/jobs$/);
 
-  const createTaskCard = page.locator('.ant-card').filter({ hasText: '创建任务' }).first();
+  const createTaskCard = page.locator('.ant-card').filter({ hasText: '任务创建' }).first();
 
-  const taskModeSelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '任务类型' }).locator('.ant-select');
+  const taskModeSelect = createTaskCard.getByTestId('job-create-task-mode');
   await taskModeSelect.click();
   await page
     .locator('.ant-select-dropdown .ant-select-item-option')
@@ -66,7 +75,7 @@ test('camera once form blocks non-rtsp camera selection in v1 flow', async ({ pa
     .first()
     .click();
 
-  const cameraSelect = createTaskCard.locator('.ant-form-item').filter({ hasText: '选择摄像头' }).locator('.ant-select');
+  const cameraSelect = createTaskCard.getByTestId('job-create-camera');
   await cameraSelect.click();
   await page
     .locator('.ant-select-dropdown .ant-select-item-option')

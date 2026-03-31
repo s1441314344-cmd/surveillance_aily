@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.services import scheduler_service
 from app.services.scheduler_service import run_due_job_schedules_once
 from app.workers.tasks import process_job
 
@@ -286,6 +287,71 @@ def test_scheduler_trigger_failure_writes_schedule_last_error(client):
     assert "Camera not found" in refreshed_schedule["last_error"]
     assert refreshed_schedule["last_run_at"] is not None
     assert refreshed_schedule["next_run_at"] is not None
+
+
+def test_scheduler_precheck_not_matched_will_skip_job_creation(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Precheck Camera",
+            "location": "预判测试点",
+            "ip_address": "192.168.1.77",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/precheck-camera",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/precheck-camera",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "precheck_strategy_id": "preset-signal-person-fire-leak",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "1",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+    original_next_run_at = schedule["next_run_at"]
+
+    monkeypatch.setattr(
+        scheduler_service,
+        "_run_schedule_precheck_if_needed",
+        lambda db, schedule: (False, "Precheck not matched (test)"),
+    )
+
+    created_job_ids = run_due_job_schedules_once(
+        now=datetime.fromisoformat(original_next_run_at) + timedelta(seconds=1),
+        dispatch_jobs=False,
+    )
+    assert created_job_ids == []
+
+    jobs_response = client.get(f"/api/jobs?schedule_id={schedule['id']}", headers=headers)
+    assert jobs_response.status_code == 200
+    assert jobs_response.json() == []
+
+    refreshed_schedule_response = client.get(f"/api/job-schedules?camera_id={camera['id']}", headers=headers)
+    assert refreshed_schedule_response.status_code == 200
+    refreshed_schedule = refreshed_schedule_response.json()[0]
+    assert refreshed_schedule["last_run_at"] is not None
+    assert refreshed_schedule["next_run_at"] is not None
+    assert refreshed_schedule["next_run_at"] != original_next_run_at
+    assert refreshed_schedule["last_error"] == "Precheck not matched (test)"
 
 
 def test_list_jobs_filters_by_trigger_mode_camera_and_schedule_id(client):

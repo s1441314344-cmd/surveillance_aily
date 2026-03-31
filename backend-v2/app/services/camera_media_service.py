@@ -64,7 +64,13 @@ def list_camera_media(
     limit: int = 50,
 ) -> list[CameraMediaRead]:
     safe_limit = min(max(limit, 1), 200)
-    stmt = select(CameraMedia).where(CameraMedia.camera_id == camera_id).order_by(CameraMedia.created_at.desc())
+    # Camera center media panel should only contain user-triggered photo/video files.
+    stmt = (
+        select(CameraMedia)
+        .where(CameraMedia.camera_id == camera_id)
+        .where(CameraMedia.related_job_id.is_(None))
+        .order_by(CameraMedia.created_at.desc())
+    )
     if media_type:
         stmt = stmt.where(CameraMedia.media_type == media_type)
     stmt = stmt.limit(safe_limit)
@@ -271,6 +277,40 @@ def stop_video_recording(
         media=serialize_camera_media(refreshed),
         message="已发送停止录制请求",
     )
+
+
+def delete_camera_media(
+    db: Session,
+    *,
+    media: CameraMedia,
+) -> dict[str, bool]:
+    if media.status == RECORDING_STATUS_RECORDING:
+        process: subprocess.Popen | None
+        with _recording_lock:
+            process = _recording_processes.get(media.id)
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except Exception:
+                process.kill()
+
+    storage_path = Path(media.storage_path)
+    if storage_path.exists() and storage_path.is_file():
+        try:
+            storage_path.unlink()
+        except OSError:
+            # Keep DB cleanup best-effort even if filesystem deletion fails.
+            pass
+
+    if media.file_asset_id:
+        file_asset = db.get(FileAsset, media.file_asset_id)
+        if file_asset is not None:
+            db.delete(file_asset)
+
+    db.delete(media)
+    db.commit()
+    return {"deleted": True}
 
 
 def _ensure_camera_has_no_active_recording(db: Session, *, camera_id: str) -> None:

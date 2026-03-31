@@ -24,6 +24,7 @@ export type JobSchedule = {
   id: string;
   camera_id: string;
   strategy_id: string;
+  precheck_strategy_id: string | null;
   schedule_type: string;
   schedule_value: string;
   status: string;
@@ -124,12 +125,14 @@ export async function listJobSchedules(params?: {
 export async function createJobSchedule(payload: {
   cameraId: string;
   strategyId: string;
+  precheckStrategyId?: string;
   scheduleType: string;
   scheduleValue: string;
 }) {
   const response = await apiClient.post<JobSchedule>('/api/job-schedules', {
     camera_id: payload.cameraId,
     strategy_id: payload.strategyId,
+    precheck_strategy_id: payload.precheckStrategyId || null,
     schedule_type: payload.scheduleType,
     schedule_value: payload.scheduleValue,
   });
@@ -141,18 +144,23 @@ export async function updateJobSchedule(
   payload: {
     cameraId?: string;
     strategyId?: string;
+    precheckStrategyId?: string;
     scheduleType?: string;
     scheduleValue?: string;
     status?: string;
   },
 ) {
-  const response = await apiClient.patch<JobSchedule>(`/api/job-schedules/${scheduleId}`, {
+  const requestBody: Record<string, unknown> = {
     camera_id: payload.cameraId,
     strategy_id: payload.strategyId,
     schedule_type: payload.scheduleType,
     schedule_value: payload.scheduleValue,
     status: payload.status,
-  });
+  };
+  if (Object.prototype.hasOwnProperty.call(payload, 'precheckStrategyId')) {
+    requestBody.precheck_strategy_id = payload.precheckStrategyId || null;
+  }
+  const response = await apiClient.patch<JobSchedule>(`/api/job-schedules/${scheduleId}`, requestBody);
   return response.data;
 }
 

@@ -1,7 +1,10 @@
+import os
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.security import encrypt_secret
 from app.core.security import get_password_hash
 from app.models.dashboard_definition import DashboardDefinition
 from app.models.model_provider import ModelProvider
@@ -29,7 +32,30 @@ DEFAULT_PROVIDERS = [
         "timeout_seconds": 120,
         "status": "inactive",
     },
+    {
+        "provider": "google",
+        "display_name": "Google Gemini",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/models",
+        "default_model": "gemini-2.5-flash",
+        "timeout_seconds": 120,
+        "status": "inactive",
+    },
+    {
+        "provider": "ark",
+        "display_name": "豆包 / 火山方舟",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+        "default_model": "your-endpoint-id",
+        "timeout_seconds": 120,
+        "status": "inactive",
+    },
 ]
+
+PROVIDER_API_KEY_ENV = {
+    "zhipu": "ZHIPU_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+    "ark": "ARK_API_KEY",
+}
 
 PRESET_STRATEGIES = [
     {
@@ -39,6 +65,7 @@ PRESET_STRATEGIES = [
         "prompt_template": "请识别图片中的人员安全帽佩戴情况，并严格按照 JSON Schema 返回结果。",
         "model_provider": "zhipu",
         "model_name": "glm-4v-plus",
+        "result_format": "json_schema",
         "response_schema": {
             "type": "object",
             "properties": {
@@ -66,6 +93,7 @@ PRESET_STRATEGIES = [
         "prompt_template": "请判断图片中是否存在火情，并以 JSON 返回风险等级与原因。",
         "model_provider": "zhipu",
         "model_name": "glm-4v-plus",
+        "result_format": "json_schema",
         "response_schema": {
             "type": "object",
             "properties": {
@@ -83,6 +111,7 @@ PRESET_STRATEGIES = [
         "prompt_template": "请识别瓶盖日期信息，并以 JSON 返回日期文本、置信说明与异常判断。",
         "model_provider": "zhipu",
         "model_name": "glm-4v-plus",
+        "result_format": "json_schema",
         "response_schema": {
             "type": "object",
             "properties": {
@@ -91,6 +120,40 @@ PRESET_STRATEGIES = [
                 "summary": {"type": "string"},
             },
             "required": ["recognized_text", "is_valid", "summary"],
+        },
+    },
+    {
+        "id": "preset-signal-person-fire-leak",
+        "name": "触发信号提取（人/火/漏水）",
+        "scene_description": "用于摄像头触发规则：提取人员、火情、漏水信号并返回 0-1 置信度。",
+        "prompt_template": (
+            "请只输出 JSON：{\"signals\":{\"person\":0-1,\"fire\":0-1,\"leak\":0-1},\"summary\":\"...\"}。"
+            "若无对应目标则返回接近 0 的分值。"
+        ),
+        "model_provider": "zhipu",
+        "model_name": "glm-4v-plus",
+        "result_format": "json_schema",
+        "is_signal_strategy": True,
+        "signal_mapping": {
+            "person": "signals.person",
+            "fire": "signals.fire",
+            "leak": "signals.leak",
+        },
+        "response_schema": {
+            "type": "object",
+            "properties": {
+                "signals": {
+                    "type": "object",
+                    "properties": {
+                        "person": {"type": "number"},
+                        "fire": {"type": "number"},
+                        "leak": {"type": "number"},
+                    },
+                    "required": ["person", "fire", "leak"],
+                },
+                "summary": {"type": "string"},
+            },
+            "required": ["signals", "summary"],
         },
     },
 ]
@@ -165,9 +228,29 @@ def _seed_admin_user(db: Session) -> None:
 def _seed_model_providers(db: Session) -> None:
     existing = {provider.provider for provider in db.scalars(select(ModelProvider))}
     for provider_data in DEFAULT_PROVIDERS:
-        if provider_data["provider"] in existing:
+        provider_name = provider_data["provider"]
+        bootstrap_api_key = _load_provider_api_key_from_env(provider_name)
+        bootstrap_api_key_encrypted = encrypt_secret(bootstrap_api_key) if bootstrap_api_key else None
+
+        if provider_name in existing:
+            current = db.get(ModelProvider, provider_name)
+            if (
+                current is not None
+                and not current.api_key_encrypted
+                and bootstrap_api_key_encrypted is not None
+            ):
+                current.api_key_encrypted = bootstrap_api_key_encrypted
             continue
-        db.add(ModelProvider(api_key_encrypted=None, **provider_data))
+
+        db.add(ModelProvider(api_key_encrypted=bootstrap_api_key_encrypted, **provider_data))
+
+
+def _load_provider_api_key_from_env(provider_name: str) -> str | None:
+    env_key = PROVIDER_API_KEY_ENV.get(provider_name.lower())
+    if not env_key:
+        return None
+    value = os.getenv(env_key)
+    return value.strip() if value and value.strip() else None
 
 
 def _seed_preset_strategies(db: Session) -> None:
@@ -185,10 +268,13 @@ def _seed_preset_strategies(db: Session) -> None:
                 prompt_template=preset["prompt_template"],
                 model_provider=preset["model_provider"],
                 model_name=preset["model_name"],
+                result_format=preset.get("result_format", "json_schema"),
                 response_schema=preset["response_schema"],
                 status="active",
                 version=1,
                 is_preset=True,
+                is_signal_strategy=bool(preset.get("is_signal_strategy", False)),
+                signal_mapping=preset.get("signal_mapping"),
             )
             db.add(strategy)
             db.flush()

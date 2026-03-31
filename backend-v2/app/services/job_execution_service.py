@@ -5,7 +5,6 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.models.camera_media import CameraMedia
 from app.models.file_asset import FileAsset
 from app.models.job import Job, JobSchedule
 from app.models.task_record import TaskRecord
@@ -128,6 +127,7 @@ def _process_upload_job(db: Session, job: Job) -> None:
                 model=job.model_name,
                 prompt=strategy_snapshot["prompt_template"],
                 image_paths=[file_asset.storage_path],
+                response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
                 response_schema=strategy_snapshot["response_schema"],
             )
         )
@@ -137,6 +137,7 @@ def _process_upload_job(db: Session, job: Job) -> None:
             normalized_json=provider_response.normalized_json,
             raw_response=provider_response.raw_response,
             error_message=provider_response.error_message,
+            result_format=str(strategy_snapshot.get("result_format") or "json_schema"),
             response_schema=strategy_snapshot.get("response_schema"),
         )
 
@@ -230,31 +231,13 @@ def _process_camera_job(db: Session, job: Job) -> None:
     )
     db.add(file_asset)
     db.flush()
-    camera_media = CameraMedia(
-        id=generate_id(),
-        camera_id=job.camera_id or str(camera_snapshot.get("id") or ""),
-        related_job_id=job.id,
-        file_asset_id=file_asset.id,
-        media_type="photo",
-        source_kind=job.job_type,
-        status=JOB_STATUS_COMPLETED,
-        original_name=captured_frame.original_name,
-        storage_path=storage_path,
-        mime_type=captured_frame.mime_type,
-        duration_seconds=0,
-        stop_requested=False,
-        started_at=_utcnow(),
-        finished_at=_utcnow(),
-        error_message=None,
-    )
-    db.add(camera_media)
-    db.flush()
 
     provider_response = adapter.analyze(
         ProviderRequest(
             model=job.model_name,
             prompt=strategy_snapshot["prompt_template"],
             image_paths=[storage_path],
+            response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
             response_schema=strategy_snapshot["response_schema"],
         )
     )
@@ -264,6 +247,7 @@ def _process_camera_job(db: Session, job: Job) -> None:
         normalized_json=provider_response.normalized_json,
         raw_response=provider_response.raw_response,
         error_message=provider_response.error_message,
+        result_format=str(strategy_snapshot.get("result_format") or "json_schema"),
         response_schema=strategy_snapshot.get("response_schema"),
     )
 
@@ -414,14 +398,17 @@ def _resolve_task_record_status(
     normalized_json: dict | None,
     raw_response: str,
     error_message: str | None,
+    result_format: str,
     response_schema: dict | None,
 ) -> tuple[str, str | None]:
+    normalized_result_format = (result_format or "json_schema").strip().lower()
     if provider_success:
-        if not isinstance(normalized_json, dict):
+        if normalized_result_format in {"json_schema", "json_object"} and not isinstance(normalized_json, dict):
             return RECORD_STATUS_SCHEMA_INVALID, "Model did not produce a structured JSON object"
-        schema_error = _validate_schema_output(normalized_json, response_schema)
-        if schema_error:
-            return RECORD_STATUS_SCHEMA_INVALID, f"Model response failed schema validation: {schema_error}"
+        if normalized_result_format == "json_schema":
+            schema_error = _validate_schema_output(normalized_json, response_schema)
+            if schema_error:
+                return RECORD_STATUS_SCHEMA_INVALID, f"Model response failed schema validation: {schema_error}"
         return JOB_STATUS_COMPLETED, None
 
     resolved_error = error_message or raw_response or "Model analysis failed"

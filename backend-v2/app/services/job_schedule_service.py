@@ -23,6 +23,7 @@ def serialize_job_schedule(schedule: JobSchedule) -> JobScheduleRead:
         id=schedule.id,
         camera_id=schedule.camera_id,
         strategy_id=schedule.strategy_id,
+        precheck_strategy_id=schedule.precheck_strategy_id,
         schedule_type=schedule.schedule_type,
         schedule_value=schedule.schedule_value,
         status=schedule.status,
@@ -64,12 +65,14 @@ def create_job_schedule(db: Session, payload: JobScheduleCreate) -> JobScheduleR
     get_camera_or_404(db, payload.camera_id)
     strategy = get_strategy_or_404(db, payload.strategy_id)
     _ensure_strategy_active(strategy.status)
+    _validate_precheck_strategy(db, payload.precheck_strategy_id)
     current_time = _ensure_aware(datetime.now(timezone.utc))
 
     schedule = JobSchedule(
         id=generate_id(),
         camera_id=payload.camera_id,
         strategy_id=payload.strategy_id,
+        precheck_strategy_id=payload.precheck_strategy_id,
         schedule_type=payload.schedule_type,
         schedule_value=payload.schedule_value,
         status=SCHEDULE_STATUS_ACTIVE,
@@ -92,6 +95,8 @@ def update_job_schedule(db: Session, schedule: JobSchedule, payload: JobSchedule
     if "strategy_id" in updates and updates["strategy_id"] is not None:
         strategy = get_strategy_or_404(db, updates["strategy_id"])
         _ensure_strategy_active(strategy.status)
+    if "precheck_strategy_id" in updates:
+        _validate_precheck_strategy(db, updates.get("precheck_strategy_id"))
 
     next_schedule_type = updates.get("schedule_type", schedule.schedule_type)
     next_schedule_value = updates.get("schedule_value", schedule.schedule_value)
@@ -205,6 +210,13 @@ def _ensure_strategy_active(strategy_status: str) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only active strategies can be scheduled",
         )
+
+
+def _validate_precheck_strategy(db: Session, strategy_id: str | None) -> None:
+    if not strategy_id:
+        return
+    strategy = get_strategy_or_404(db, strategy_id)
+    _ensure_strategy_active(strategy.status)
 
 
 def _ensure_aware(value: datetime) -> datetime:
