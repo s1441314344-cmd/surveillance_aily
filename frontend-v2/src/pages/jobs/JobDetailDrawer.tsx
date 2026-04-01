@@ -1,4 +1,6 @@
-import { Drawer, Space, Typography } from 'antd';
+import { Button, Drawer, Image, Space, Typography } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   DetailPanel,
   FEEDBACK_STATUS_LABELS,
@@ -10,6 +12,7 @@ import {
   UNKNOWN_LABELS,
 } from '@/shared/ui';
 import type { JobDetailViewModel } from '@/pages/jobs/jobDetailMapper';
+import { fetchTaskRecordImage, listTaskRecords, type TaskRecord } from '@/shared/api/tasks';
 
 const { Paragraph, Text } = Typography;
 
@@ -24,6 +27,52 @@ export type JobDetailDrawerProps = {
 };
 
 export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
+  const [recordImageUrl, setRecordImageUrl] = useState<string | null>(null);
+
+  const recordsQuery = useQuery({
+    queryKey: ['jobs', 'detail', job?.id, 'task-records'],
+    queryFn: async () => listTaskRecords({ jobId: job?.id }),
+    enabled: Boolean(open && job?.id),
+  });
+
+  const latestRecord = useMemo<TaskRecord | null>(() => {
+    const records = recordsQuery.data;
+    if (!records || records.length === 0) {
+      return null;
+    }
+    return [...records].sort((a, b) => {
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bTime - aTime;
+    })[0] ?? null;
+  }, [recordsQuery.data]);
+
+  const recordImageQuery = useQuery({
+    queryKey: ['jobs', 'detail', job?.id, 'task-record-image', latestRecord?.id],
+    queryFn: async () => {
+      if (!latestRecord?.id) {
+        return null;
+      }
+      return fetchTaskRecordImage(latestRecord.id);
+    },
+    enabled: Boolean(open && latestRecord?.id),
+  });
+
+  useEffect(() => {
+    if (!recordImageQuery.data) {
+      setRecordImageUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(recordImageQuery.data);
+    setRecordImageUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [recordImageQuery.data]);
+
+  const resultStatusValue = job?.result_status ?? latestRecord?.result_status;
+  const feedbackStatusValue = job?.feedback_status ?? latestRecord?.feedback_status;
+  const normalizedJsonValue = job?.normalized_json ?? latestRecord?.normalized_json ?? null;
+  const rawResponseValue = job?.raw_model_response ?? latestRecord?.raw_model_response ?? '';
+
   if (!job) {
     return (
       <Drawer open={open} title="任务详情" placement="right" size="large" onClose={onClose}>
@@ -75,43 +124,79 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
             <Text>开始时间：{formatDateTime(job.triggered_at)}</Text>
             <Text>完成时间：{formatDateTime(job.finished_at)}</Text>
             <Text>耗时：{job.duration_ms ? `${Math.round(job.duration_ms / 1000)}s` : '-'}</Text>
+            <Text>总条目：{job.total_items ?? '-'}</Text>
+            <Text>完成条目：{job.completed_items ?? '-'}</Text>
+            <Text>失败条目：{job.failed_items ?? '-'}</Text>
+            {job.error_message ? <Text type="danger">失败原因：{job.error_message}</Text> : null}
           </Space>
         </DetailPanel>
 
         <DetailPanel title="结果概览">
           <Space direction="vertical" size={4} className="stack-full">
+            <Text>关联记录：{recordsQuery.isLoading ? '加载中...' : `${recordsQuery.data?.length ?? 0} 条`}</Text>
             <Space size={8} wrap>
               <Text>结果：</Text>
-              {job.result_status ? (
+              {resultStatusValue ? (
                 <StatusBadge
                   namespace="result"
-                  value={job.result_status}
-                  label={RESULT_STATUS_LABELS[job.result_status] ?? UNKNOWN_LABELS.generic}
+                  value={resultStatusValue}
+                  label={RESULT_STATUS_LABELS[resultStatusValue] ?? UNKNOWN_LABELS.generic}
                 />
               ) : <Text>-</Text>}
             </Space>
             <Space size={8} wrap>
               <Text>反馈：</Text>
-              {job.feedback_status ? (
+              {feedbackStatusValue ? (
                 <StatusBadge
                   namespace="feedback"
-                  value={job.feedback_status}
-                  label={FEEDBACK_STATUS_LABELS[job.feedback_status] ?? UNKNOWN_LABELS.generic}
+                  value={feedbackStatusValue}
+                  label={FEEDBACK_STATUS_LABELS[feedbackStatusValue] ?? UNKNOWN_LABELS.generic}
                 />
               ) : <Text>-</Text>}
             </Space>
+            {latestRecord ? (
+              <Text type="secondary">
+                最近记录：{latestRecord.input_filename} · {formatDateTime(latestRecord.created_at)}
+              </Text>
+            ) : null}
           </Space>
+        </DetailPanel>
+
+        <DetailPanel title="图片预览">
+          {!latestRecord ? (
+            <Text type="secondary">暂无关联记录图片</Text>
+          ) : recordImageQuery.isLoading ? (
+            <Text type="secondary">图片加载中...</Text>
+          ) : recordImageUrl ? (
+            <Space direction="vertical" size={8} className="stack-full">
+              <Image
+                src={recordImageUrl}
+                alt={latestRecord.input_filename}
+                className="local-detector-preview__image"
+              />
+              <Button
+                size="small"
+                onClick={() => {
+                  window.open(recordImageUrl, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                新窗口查看原图
+              </Button>
+            </Space>
+          ) : (
+            <Text type="secondary">暂无可预览图片</Text>
+          )}
         </DetailPanel>
 
         <DetailPanel title="结构化 JSON">
           <pre className="page-code-block">
-            {job.normalized_json ? JSON.stringify(job.normalized_json, null, 2) : '-'}
+            {normalizedJsonValue ? JSON.stringify(normalizedJsonValue, null, 2) : '暂无结构化结果'}
           </pre>
         </DetailPanel>
 
         <DetailPanel title="原始模型响应">
-          <Paragraph className="page-code-block" copyable={job.raw_model_response ? { text: job.raw_model_response } : false}>
-            {job.raw_model_response ? job.raw_model_response : '暂无原始响应'}
+          <Paragraph className="page-code-block" copyable={rawResponseValue ? { text: rawResponseValue } : false}>
+            {rawResponseValue || '暂无原始响应'}
           </Paragraph>
         </DetailPanel>
       </Space>

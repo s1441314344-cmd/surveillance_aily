@@ -27,6 +27,17 @@ class Settings(BaseSettings):
     scheduler_poll_interval_seconds: int = 30
     scheduler_camera_status_sweep_enabled: bool = True
     scheduler_camera_status_sweep_interval_seconds: int = 60
+    feedback_training_enabled: bool = True
+    feedback_training_cron: str = "0 2 * * *"
+    feedback_training_min_samples: int = 30
+    feedback_training_positive_ratio: float = 1.0
+    feedback_training_max_samples_per_strategy: int = 2000
+    feedback_training_route_default: str = "finetune"
+    local_detector_enabled: bool = True
+    local_detector_base_url: str = "http://localhost:8091"
+    local_detector_timeout_seconds: int = 5
+    local_detector_person_threshold: float = 0.35
+    local_detector_strict_block: bool = True
     storage_root: str = "./data/storage"
     provider_mock_fallback_enabled: bool = True
     cors_origins: Annotated[list[str], NoDecode] = DEFAULT_CORS_ORIGINS

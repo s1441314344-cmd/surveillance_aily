@@ -36,6 +36,7 @@ class JobSchedule(Base, TimestampMixin):
     camera_id: Mapped[str] = mapped_column(String(36), nullable=False)
     strategy_id: Mapped[str] = mapped_column(String(36), nullable=False)
     precheck_strategy_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    precheck_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     schedule_type: Mapped[str] = mapped_column(String(30), nullable=False)
     schedule_value: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)

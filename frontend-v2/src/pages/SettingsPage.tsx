@@ -15,6 +15,8 @@ import { ProviderDebugForm } from '@/pages/settings/ProviderDebugForm';
 import { ProviderConfigForm } from '@/pages/settings/ProviderConfigForm';
 import { ProviderSelectionRail } from '@/pages/settings/ProviderSelectionRail';
 import { ProviderDebugResultPanel } from '@/pages/settings/ProviderDebugResultPanel';
+import { ProviderCallLogPanel } from '@/pages/settings/ProviderCallLogPanel';
+import { TrainingFeedbackPanel } from '@/pages/settings/TrainingFeedbackPanel';
 import { useSettingsPageController } from '@/pages/settings/useSettingsPageController';
 
 const { Paragraph } = Typography;
@@ -119,6 +121,39 @@ export function SettingsPage() {
                 </div>
               ) : null}
             </DataStateBlock>
+          </SectionCard>
+
+          <SectionCard title="模型调用记录" subtitle="展示该提供方的模型调用时间、触发类型与实际执行情况，便于排查 token 消耗来源">
+            <DataStateBlock
+              empty={!activeProvider}
+              emptyDescription="请选择一个模型提供方后查看调用记录"
+            >
+              {activeProvider ? (
+                <ProviderCallLogPanel
+                  logs={queries.modelCallLogs}
+                  loading={queries.modelCallLogQuery.isLoading}
+                  error={queries.modelCallLogError}
+                />
+              ) : null}
+            </DataStateBlock>
+          </SectionCard>
+
+          <SectionCard
+            title="训练回流"
+            subtitle="基于人工复核结果自动构建数据集、触发训练/增强、离线评估并进入审批发布。"
+          >
+            <TrainingFeedbackPanel
+              provider={activeProvider?.provider ?? null}
+              overview={queries.trainingOverview}
+              datasets={queries.trainingDatasets}
+              runs={queries.trainingRuns}
+              loading={
+                queries.trainingOverviewQuery.isLoading
+                || queries.trainingRunsQuery.isLoading
+                || queries.trainingDatasetsQuery.isLoading
+              }
+              error={queries.trainingError}
+            />
           </SectionCard>
         </div>
       </div>

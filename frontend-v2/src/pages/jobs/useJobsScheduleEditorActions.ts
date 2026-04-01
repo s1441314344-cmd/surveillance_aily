@@ -25,6 +25,9 @@ export function useJobsScheduleEditorActions({
     setEditingSchedule(schedule);
     scheduleEditForm.setFieldsValue({
       precheckStrategyId: schedule.precheck_strategy_id ?? undefined,
+      precheckPersonThreshold: schedule.precheck_config?.person_threshold ?? 0.5,
+      precheckSoftNegativeThreshold: schedule.precheck_config?.soft_negative_threshold ?? 0.2,
+      precheckStateTtlSeconds: schedule.precheck_config?.state_ttl_seconds ?? 120,
       scheduleType: schedule.schedule_type as EditScheduleFormValues['scheduleType'],
       intervalMinutes:
         schedule.schedule_type === 'interval_minutes' ? Number(schedule.schedule_value || 1) : undefined,
@@ -56,6 +59,14 @@ export function useJobsScheduleEditorActions({
       scheduleId: editingSchedule.id,
       payload: {
         precheckStrategyId: values.precheckStrategyId || undefined,
+        precheckConfig:
+          values.precheckStrategyId
+            ? {
+                personThreshold: values.precheckPersonThreshold,
+                softNegativeThreshold: values.precheckSoftNegativeThreshold,
+                stateTtlSeconds: values.precheckStateTtlSeconds,
+              }
+            : {},
         scheduleType: values.scheduleType,
         scheduleValue,
       },

@@ -15,7 +15,9 @@ from app.models.job import Job, JobSchedule
 from app.schemas.auth import CurrentUser
 from app.schemas.job import JobRead
 from app.services.camera_media_service import capture_photo as capture_camera_photo_record
+from app.services.camera_roi_service import extract_analysis_roi
 from app.services.camera_service import get_camera_or_404
+from app.services.camera_signal_monitor_service import get_camera_signal_monitor_config_or_create
 from app.services.ids import generate_id
 from app.services.job_schedule_service import SCHEDULE_STATUS_ACTIVE, calculate_next_run_at
 from app.services.storage import FileStorageService
@@ -193,6 +195,7 @@ def create_camera_once_job(
         strategy_snapshot=strategy_snapshot,
         model_provider=model_provider or strategy.model_provider,
         model_name=model_name or strategy.model_name,
+        analysis_roi=_resolve_camera_analysis_roi_snapshot(db, camera_id=camera.id),
         schedule_id=None,
     )
     db.add(job)
@@ -230,6 +233,7 @@ def create_camera_schedule_job(
         strategy_snapshot=strategy_snapshot,
         model_provider=strategy.model_provider,
         model_name=strategy.model_name,
+        analysis_roi=_resolve_camera_analysis_roi_snapshot(db, camera_id=camera.id),
         schedule_id=schedule.id,
     )
 
@@ -391,6 +395,7 @@ def _build_camera_job(
     strategy_snapshot: dict,
     model_provider: str,
     model_name: str,
+    analysis_roi: dict | None,
     schedule_id: str | None,
 ) -> Job:
     return Job(
@@ -423,9 +428,15 @@ def _build_camera_job(
                 "resolution": camera.resolution,
                 "jpeg_quality": camera.jpeg_quality,
                 "storage_path": camera.storage_path,
+                "analysis_roi": analysis_roi,
             },
         },
     )
+
+
+def _resolve_camera_analysis_roi_snapshot(db: Session, *, camera_id: str) -> dict | None:
+    config = get_camera_signal_monitor_config_or_create(db, camera_id=camera_id)
+    return extract_analysis_roi(config)
 
 
 def _queue_job_processing(db: Session, job: Job, dispatch: bool | None = None) -> None:

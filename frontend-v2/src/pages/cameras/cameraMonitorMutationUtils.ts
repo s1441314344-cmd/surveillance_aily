@@ -17,10 +17,18 @@ export type MonitorConfigMutationPayload = {
   runtime_mode: 'daemon' | 'manual' | 'schedule';
   enabled: boolean;
   signal_strategy_id: string | null;
+  strict_local_gate: boolean;
   monitor_interval_seconds: number;
   schedule_type: 'interval_minutes' | 'daily_time' | null;
   schedule_value: string | null;
   manual_until: string | null;
+  roi_enabled: boolean;
+  roi_x: number | null;
+  roi_y: number | null;
+  roi_width: number | null;
+  roi_height: number | null;
+  roi_shape: 'rect' | 'polygon';
+  roi_points: Array<{ x: number; y: number }> | null;
 };
 
 export type LiveDebugMutationPayload = {

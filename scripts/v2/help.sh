@@ -5,7 +5,7 @@ cat <<'EOF'
 Smart Inspection V2 local commands:
 
   make v2-setup        # install backend + frontend dependencies
-  make v2-deps-up      # start postgres + redis
+  make v2-deps-up      # start postgres + redis + local-detector
   make v2-api          # run FastAPI (backend-v2)
   make v2-worker       # run Celery worker
   make v2-scheduler    # run scheduler process
@@ -28,7 +28,7 @@ Smart Inspection V2 local commands:
   make v2-release-checklist # build final release checklist from UAT + release drill artifacts
   make v2-release-gate # run one-command release gate (UAT + checklist + final verdict)
   make v2-release-gate-final # final release gate (enforce drill apply-backfill, no dry-run)
-  make v2-deps-down    # stop postgres + redis
+  make v2-deps-down    # stop postgres + redis + local-detector
 
 Recommended flow:
   1) make v2-setup

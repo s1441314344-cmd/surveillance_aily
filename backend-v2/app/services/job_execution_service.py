@@ -13,7 +13,9 @@ from app.services.camera_capture_service import (
     capture_camera_frame,
     snapshot_to_capture_config,
 )
+from app.services.camera_roi_service import CameraRoiError, apply_analysis_roi_to_frame
 from app.services.ids import generate_id
+from app.services.model_call_log_service import build_model_call_details, create_model_call_log
 from app.services.providers.base import ProviderRequest
 from app.services.providers.factory import get_provider_adapter
 from app.services.storage import FileStorageService
@@ -131,6 +133,40 @@ def _process_upload_job(db: Session, job: Job) -> None:
                 response_schema=strategy_snapshot["response_schema"],
             )
         )
+        create_model_call_log(
+            db,
+            provider=job.model_provider,
+            model_name=job.model_name,
+            trigger_type="job_upload",
+            trigger_source=job.job_type,
+            response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
+            success=provider_response.success,
+            error_message=provider_response.error_message,
+            usage=provider_response.usage,
+            input_image_count=1,
+            job_id=job.id,
+            schedule_id=job.schedule_id,
+            camera_id=job.camera_id,
+            strategy_id=job.strategy_id,
+            details=build_model_call_details(
+                prompt=str(strategy_snapshot.get("prompt_template") or ""),
+                response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
+                image_paths=[file_asset.storage_path],
+                input_summary={
+                    "input_filename": file_asset.original_name,
+                    "job_type": job.job_type,
+                },
+                raw_response=provider_response.raw_response,
+                normalized_json=provider_response.normalized_json,
+                error_message=provider_response.error_message,
+                context={
+                    "job_id": job.id,
+                    "schedule_id": job.schedule_id,
+                    "camera_id": job.camera_id,
+                    "strategy_id": job.strategy_id,
+                },
+            ),
+        )
         duration_ms = int((time.perf_counter() - started_at) * 1000)
         result_status, record_error_message = _resolve_task_record_status(
             provider_success=provider_response.success,
@@ -215,6 +251,25 @@ def _process_camera_job(db: Session, job: Job) -> None:
         _sync_schedule_error_state(db, job, str(exc))
         return
 
+    try:
+        captured_frame, _applied_roi = apply_analysis_roi_to_frame(
+            captured_frame,
+            camera_snapshot.get("analysis_roi"),
+        )
+    except CameraRoiError as exc:
+        duration_ms = int((time.perf_counter() - started_at) * 1000)
+        _create_failed_camera_record(
+            db,
+            job=job,
+            strategy_snapshot=strategy_snapshot,
+            camera_snapshot=camera_snapshot,
+            error_message=str(exc),
+            duration_ms=duration_ms,
+        )
+        _finish_job(db, job, status=JOB_STATUS_FAILED, error_message=str(exc))
+        _sync_schedule_error_state(db, job, str(exc))
+        return
+
     if _job_cancelled(db, job.id):
         _finish_job(db, job, status=JOB_STATUS_CANCELLED, error_message=job.error_message)
         return
@@ -240,6 +295,40 @@ def _process_camera_job(db: Session, job: Job) -> None:
             response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
             response_schema=strategy_snapshot["response_schema"],
         )
+    )
+    create_model_call_log(
+        db,
+        provider=job.model_provider,
+        model_name=job.model_name,
+        trigger_type="job_camera",
+        trigger_source=job.job_type,
+        response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
+        success=provider_response.success,
+        error_message=provider_response.error_message,
+        usage=provider_response.usage,
+        input_image_count=1,
+        job_id=job.id,
+        schedule_id=job.schedule_id,
+        camera_id=job.camera_id,
+        strategy_id=job.strategy_id,
+        details=build_model_call_details(
+            prompt=str(strategy_snapshot.get("prompt_template") or ""),
+            response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
+            image_paths=[storage_path],
+            input_summary={
+                "camera_name": camera_snapshot.get("name"),
+                "job_type": job.job_type,
+            },
+            raw_response=provider_response.raw_response,
+            normalized_json=provider_response.normalized_json,
+            error_message=provider_response.error_message,
+            context={
+                "job_id": job.id,
+                "schedule_id": job.schedule_id,
+                "camera_id": job.camera_id,
+                "strategy_id": job.strategy_id,
+            },
+        ),
     )
     duration_ms = int((time.perf_counter() - started_at) * 1000)
     result_status, record_error_message = _resolve_task_record_status(

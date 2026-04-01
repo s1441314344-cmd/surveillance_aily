@@ -25,6 +25,11 @@ export type JobSchedule = {
   camera_id: string;
   strategy_id: string;
   precheck_strategy_id: string | null;
+  precheck_config: {
+    person_threshold?: number;
+    soft_negative_threshold?: number;
+    state_ttl_seconds?: number;
+  } | null;
   schedule_type: string;
   schedule_value: string;
   status: string;
@@ -126,13 +131,28 @@ export async function createJobSchedule(payload: {
   cameraId: string;
   strategyId: string;
   precheckStrategyId?: string;
+  precheckConfig?: {
+    personThreshold?: number;
+    softNegativeThreshold?: number;
+    stateTtlSeconds?: number;
+  };
   scheduleType: string;
   scheduleValue: string;
 }) {
+  const precheckConfig =
+    payload.precheckConfig &&
+    Object.keys(payload.precheckConfig).length > 0
+      ? {
+          person_threshold: payload.precheckConfig.personThreshold,
+          soft_negative_threshold: payload.precheckConfig.softNegativeThreshold,
+          state_ttl_seconds: payload.precheckConfig.stateTtlSeconds,
+        }
+      : null;
   const response = await apiClient.post<JobSchedule>('/api/job-schedules', {
     camera_id: payload.cameraId,
     strategy_id: payload.strategyId,
     precheck_strategy_id: payload.precheckStrategyId || null,
+    precheck_config: precheckConfig,
     schedule_type: payload.scheduleType,
     schedule_value: payload.scheduleValue,
   });
@@ -145,6 +165,11 @@ export async function updateJobSchedule(
     cameraId?: string;
     strategyId?: string;
     precheckStrategyId?: string;
+    precheckConfig?: {
+      personThreshold?: number;
+      softNegativeThreshold?: number;
+      stateTtlSeconds?: number;
+    };
     scheduleType?: string;
     scheduleValue?: string;
     status?: string;
@@ -159,6 +184,17 @@ export async function updateJobSchedule(
   };
   if (Object.prototype.hasOwnProperty.call(payload, 'precheckStrategyId')) {
     requestBody.precheck_strategy_id = payload.precheckStrategyId || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'precheckConfig')) {
+    const cfg = payload.precheckConfig;
+    requestBody.precheck_config =
+      cfg && Object.keys(cfg).length > 0
+        ? {
+            person_threshold: cfg.personThreshold,
+            soft_negative_threshold: cfg.softNegativeThreshold,
+            state_ttl_seconds: cfg.stateTtlSeconds,
+          }
+        : null;
   }
   const response = await apiClient.patch<JobSchedule>(`/api/job-schedules/${scheduleId}`, requestBody);
   return response.data;

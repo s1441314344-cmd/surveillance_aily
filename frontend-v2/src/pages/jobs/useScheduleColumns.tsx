@@ -139,6 +139,19 @@ function createScheduleColumns(params: {
         value ? strategyNameMap.get(value) ?? UNKNOWN_LABELS.strategy : '无',
     },
     {
+      title: '门控参数',
+      dataIndex: 'precheck_config',
+      render: (value: JobSchedule['precheck_config']) => {
+        if (!value) {
+          return '-';
+        }
+        const personThreshold = value.person_threshold ?? 0.5;
+        const softNegativeThreshold = value.soft_negative_threshold ?? 0.2;
+        const stateTtlSeconds = value.state_ttl_seconds ?? 120;
+        return `人≥${personThreshold} / 火漏<${softNegativeThreshold} / TTL=${stateTtlSeconds}s`;
+      },
+    },
+    {
       title: '计划类型',
       dataIndex: 'schedule_type',
       render: (value: string) => SCHEDULE_TYPE_LABELS[value] ?? UNKNOWN_LABELS.generic,

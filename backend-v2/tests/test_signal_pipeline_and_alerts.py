@@ -4,6 +4,7 @@ from sqlalchemy import select
 
 from app.core.database import SessionLocal
 from app.models.alert import AlertWebhookDelivery
+from app.models.model_call_log import ModelCallLog
 from app.services.scheduler_service import run_due_signal_monitors_once
 
 from .test_auth_and_users import auth_headers, login_as_admin
@@ -114,6 +115,7 @@ def test_signal_monitor_schedule_triggers_alert(client):
             "enabled": True,
             "runtime_mode": "daemon",
             "signal_strategy_id": strategy["id"],
+            "strict_local_gate": False,
             "monitor_interval_seconds": 1,
         },
     )
@@ -137,6 +139,65 @@ def test_signal_monitor_schedule_triggers_alert(client):
     alerts = list_alerts_response.json()
     assert len(alerts) >= 1
     assert alerts[0]["camera_id"] == camera["id"]
+
+
+def test_signal_monitor_strict_local_gate_blocks_model_call(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+    camera = _create_mock_camera(client, headers, name="monitor-local-gate-camera")
+
+    create_rule_response = client.post(
+        f"/api/cameras/{camera['id']}/trigger-rules",
+        headers=headers,
+        json={
+            "name": "仅人员规则",
+            "event_type": "person",
+            "enabled": True,
+            "min_confidence": 0.6,
+            "min_consecutive_frames": 1,
+            "cooldown_seconds": 0,
+        },
+    )
+    assert create_rule_response.status_code == 200
+
+    update_config_response = client.put(
+        f"/api/cameras/{camera['id']}/signal-monitor-config",
+        headers=headers,
+        json={
+            "enabled": True,
+            "runtime_mode": "daemon",
+            "strict_local_gate": True,
+            "monitor_interval_seconds": 1,
+        },
+    )
+    assert update_config_response.status_code == 200
+
+    start_response = client.post(
+        f"/api/cameras/{camera['id']}/signal-monitor/start",
+        headers=headers,
+        json={"duration_seconds": 120},
+    )
+    assert start_response.status_code == 200
+
+    processed_camera_ids = run_due_signal_monitors_once(
+        now=datetime.now() + timedelta(seconds=5),
+        dispatch_jobs=False,
+    )
+    assert camera["id"] not in processed_camera_ids
+
+    config_response = client.get(f"/api/cameras/{camera['id']}/signal-monitor-config", headers=headers)
+    assert config_response.status_code == 200
+    assert "Local gate blocked" in (config_response.json().get("last_error") or "")
+
+    with SessionLocal() as db:
+        logs = list(
+            db.scalars(
+                select(ModelCallLog)
+                .where(ModelCallLog.camera_id == camera["id"])
+                .where(ModelCallLog.trigger_type == "signal_monitor")
+            )
+        )
+    assert logs == []
 
 
 def test_alert_webhook_delivery_record_created(client, monkeypatch):

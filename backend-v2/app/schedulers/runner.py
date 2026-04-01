@@ -1,9 +1,11 @@
 import logging
 
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_database
+from app.services.feedback_training_pipeline_service import run_feedback_training_pipeline_once
 from app.services.bootstrap import seed_defaults
 from app.services.scheduler_service import (
     run_camera_status_sweep_once,
@@ -60,6 +62,15 @@ def main() -> None:
             coalesce=True,
             replace_existing=True,
         )
+    if settings.feedback_training_enabled:
+        scheduler.add_job(
+            _run_feedback_training_pipeline,
+            trigger=_build_feedback_training_trigger(settings.feedback_training_cron),
+            id="surveillance-v2-feedback-training",
+            max_instances=1,
+            coalesce=True,
+            replace_existing=True,
+        )
 
     logger.info("scheduler started with poll interval=%s seconds", settings.scheduler_poll_interval_seconds)
     if settings.scheduler_camera_status_sweep_enabled:
@@ -69,6 +80,10 @@ def main() -> None:
         )
     else:
         logger.info("camera status sweep disabled")
+    if settings.feedback_training_enabled:
+        logger.info("feedback training scheduler enabled with cron=%s", settings.feedback_training_cron)
+    else:
+        logger.info("feedback training scheduler disabled")
 
     _run_due_schedules()
     _run_due_signal_monitors()
@@ -106,6 +121,26 @@ def _run_due_alert_webhooks() -> None:
     delivered = run_due_alert_webhook_deliveries_once()
     if delivered:
         logger.info("processed alert webhook deliveries: %s", ", ".join(delivered))
+
+
+def _run_feedback_training_pipeline() -> None:
+    summary = run_feedback_training_pipeline_once(trigger_source="scheduler", triggered_by="scheduler")
+    if summary.run_ids:
+        logger.info(
+            "feedback training pipeline runs created=%s run_ids=%s",
+            len(summary.run_ids),
+            ", ".join(summary.run_ids),
+        )
+    elif summary.skipped:
+        logger.info("feedback training pipeline skipped: %s", summary.skipped)
+
+
+def _build_feedback_training_trigger(cron_expression: str):
+    try:
+        return CronTrigger.from_crontab(cron_expression, timezone="UTC")
+    except Exception:
+        logger.warning("invalid FEEDBACK_TRAINING_CRON '%s', fallback to daily 02:00 UTC", cron_expression)
+        return CronTrigger.from_crontab("0 2 * * *", timezone="UTC")
 
 
 if __name__ == "__main__":

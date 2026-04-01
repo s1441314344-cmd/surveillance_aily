@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from app.services import scheduler_service
+from app.services.local_detector_service import LocalDetectorError, LocalDetectorResult
 from app.services.scheduler_service import run_due_job_schedules_once
 from app.workers.tasks import process_job
 
@@ -332,7 +333,7 @@ def test_scheduler_precheck_not_matched_will_skip_job_creation(client, monkeypat
     monkeypatch.setattr(
         scheduler_service,
         "_run_schedule_precheck_if_needed",
-        lambda db, schedule: (False, "Precheck not matched (test)"),
+        lambda db, schedule, now=None: (False, "Precheck not matched (test)"),
     )
 
     created_job_ids = run_due_job_schedules_once(
@@ -352,6 +353,214 @@ def test_scheduler_precheck_not_matched_will_skip_job_creation(client, monkeypat
     assert refreshed_schedule["next_run_at"] is not None
     assert refreshed_schedule["next_run_at"] != original_next_run_at
     assert refreshed_schedule["last_error"] == "Precheck not matched (test)"
+
+
+def test_scheduler_precheck_person_hard_gate_skips_model_call(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Precheck Local Gate Camera",
+            "location": "预判本地门控测试点",
+            "ip_address": "192.168.1.88",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/precheck-local-gate",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/precheck-local-gate",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "precheck_strategy_id": "preset-signal-person-fire-leak",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "1",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+    original_next_run_at = schedule["next_run_at"]
+
+    def _fail_if_model_called(*args, **kwargs):
+        raise AssertionError("model adapter should not be called when person hard gate blocks precheck")
+
+    monkeypatch.setattr(scheduler_service, "get_provider_adapter", _fail_if_model_called)
+    monkeypatch.setattr(
+        scheduler_service,
+        "detect_with_local_detector",
+        lambda **kwargs: LocalDetectorResult(
+            passed=False,
+            reason="local detector gate blocked: person<0.40",
+            signals={"person": 0.2},
+            response_payload=None,
+        ),
+    )
+
+    created_job_ids = run_due_job_schedules_once(
+        now=datetime.fromisoformat(original_next_run_at) + timedelta(seconds=1),
+        dispatch_jobs=False,
+    )
+    assert created_job_ids == []
+
+    refreshed_schedule_response = client.get(f"/api/job-schedules?camera_id={camera['id']}", headers=headers)
+    assert refreshed_schedule_response.status_code == 200
+    refreshed_schedule = refreshed_schedule_response.json()[0]
+    assert refreshed_schedule["last_error"] is not None
+    assert "Precheck blocked by local detector" in refreshed_schedule["last_error"]
+
+
+def test_scheduler_precheck_detector_unavailable_strict_block(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Precheck Refresh Camera",
+            "location": "预判刷新测试点",
+            "ip_address": "192.168.1.89",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/precheck-refresh",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/precheck-refresh",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "precheck_strategy_id": "preset-signal-person-fire-leak",
+            "precheck_config": {
+                "person_threshold": 0.4,
+                "state_ttl_seconds": 90,
+                "refresh_interval_seconds": 3600,
+            },
+            "schedule_type": "interval_minutes",
+            "schedule_value": "1",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+
+    calls = {"count": 0}
+
+    def _fail_if_model_called(*args, **kwargs):
+        calls["count"] += 1
+        raise AssertionError("model adapter should not be called when detector is unavailable in strict mode")
+
+    def _raise_detector_unavailable(**kwargs):
+        raise LocalDetectorError("connection refused")
+
+    monkeypatch.setattr(scheduler_service, "get_provider_adapter", _fail_if_model_called)
+    monkeypatch.setattr(
+        scheduler_service,
+        "detect_with_local_detector",
+        _raise_detector_unavailable,
+    )
+
+    created_job_ids = run_due_job_schedules_once(
+        now=datetime.fromisoformat(schedule["next_run_at"]) + timedelta(seconds=1),
+        dispatch_jobs=False,
+    )
+    assert created_job_ids == []
+    assert calls["count"] == 0
+
+    refreshed_schedule = client.get(f"/api/job-schedules?camera_id={camera['id']}", headers=headers).json()[0]
+    assert "Precheck blocked by local detector" in (refreshed_schedule.get("last_error") or "")
+
+
+def test_job_schedule_precheck_config_can_be_persisted(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Precheck Config Camera",
+            "location": "配置测试点",
+            "ip_address": "192.168.1.99",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/precheck-config",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/precheck-config",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "precheck_strategy_id": "preset-signal-person-fire-leak",
+            "precheck_config": {
+                "person_threshold": 0.65,
+                "soft_negative_threshold": 0.15,
+                "state_ttl_seconds": 300,
+            },
+            "schedule_type": "interval_minutes",
+            "schedule_value": "5",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    created_schedule = create_schedule_response.json()
+    assert created_schedule["precheck_config"] == {
+        "person_threshold": 0.65,
+        "soft_negative_threshold": 0.15,
+        "state_ttl_seconds": 300,
+    }
+
+    update_schedule_response = client.patch(
+        f"/api/job-schedules/{created_schedule['id']}",
+        headers=headers,
+        json={
+            "precheck_config": {
+                "person_threshold": 0.7,
+                "soft_negative_threshold": 0.1,
+                "state_ttl_seconds": 180,
+            }
+        },
+    )
+    assert update_schedule_response.status_code == 200
+    updated_schedule = update_schedule_response.json()
+    assert updated_schedule["precheck_config"] == {
+        "person_threshold": 0.7,
+        "soft_negative_threshold": 0.1,
+        "state_ttl_seconds": 180,
+    }
 
 
 def test_list_jobs_filters_by_trigger_mode_camera_and_schedule_id(client):
