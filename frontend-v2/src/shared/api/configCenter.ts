@@ -50,6 +50,96 @@ export type ModelProviderDebugResult = {
   usage: Record<string, unknown> | null;
 };
 
+export type ModelCallLog = {
+  id: string;
+  provider: string;
+  model_name: string;
+  trigger_type: string;
+  trigger_source: string | null;
+  response_format: string | null;
+  success: boolean;
+  error_message: string | null;
+  usage: Record<string, unknown> | null;
+  input_image_count: number;
+  job_id: string | null;
+  schedule_id: string | null;
+  camera_id: string | null;
+  strategy_id: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string | null;
+};
+
+export type TrainingOverview = {
+  reviewed_samples: number;
+  candidate_samples: number;
+  pending_release_requests: number;
+  last_run_id: string | null;
+  last_run_status: string | null;
+  last_run_at: string | null;
+  last_error: string | null;
+};
+
+export type TrainingDataset = {
+  id: string;
+  strategy_id: string;
+  strategy_name: string;
+  model_provider: string;
+  model_name: string;
+  sample_count: number;
+  incorrect_count: number;
+  correct_count: number;
+  positive_ratio: number;
+  status: string;
+  dataset_path: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type TrainingRun = {
+  id: string;
+  dataset_id: string;
+  strategy_id: string;
+  strategy_name: string;
+  model_provider: string;
+  baseline_model_name: string;
+  route_requested: string;
+  route_actual: string;
+  status: string;
+  candidate_version: string | null;
+  sample_count: number;
+  evaluation_summary: Record<string, unknown> | null;
+  release_status: string | null;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type TrainingRunDetail = TrainingRun & {
+  candidate_snapshot: Record<string, unknown> | null;
+  evaluation_report_path: string | null;
+  release_request: Record<string, unknown> | null;
+};
+
+export type TrainingPipelineRunResponse = {
+  trigger_source: string;
+  triggered_by: string;
+  strategy_id: string | null;
+  dataset_ids: string[];
+  run_ids: string[];
+  skipped: Array<Record<string, unknown>>;
+};
+
+export type TrainingRunReviewResponse = {
+  run_id: string;
+  release_request_id: string;
+  status: string;
+  reviewed_at: string | null;
+  reviewer: string | null;
+  comment: string | null;
+};
+
 export type Strategy = {
   id: string;
   name: string;
@@ -254,10 +344,18 @@ export type SignalMonitorConfig = {
   runtime_mode: 'daemon' | 'manual' | 'schedule';
   enabled: boolean;
   signal_strategy_id: string | null;
+  strict_local_gate: boolean;
   monitor_interval_seconds: number;
   schedule_type: 'interval_minutes' | 'daily_time' | null;
   schedule_value: string | null;
   manual_until: string | null;
+  roi_enabled: boolean;
+  roi_x: number | null;
+  roi_y: number | null;
+  roi_width: number | null;
+  roi_height: number | null;
+  roi_shape: 'rect' | 'polygon' | string;
+  roi_points: Array<{ x: number; y: number }> | null;
   last_run_at: string | null;
   next_run_at: string | null;
   last_error: string | null;
@@ -269,10 +367,18 @@ export type SignalMonitorConfigPayload = {
   runtime_mode?: 'daemon' | 'manual' | 'schedule';
   enabled?: boolean;
   signal_strategy_id?: string | null;
+  strict_local_gate?: boolean;
   monitor_interval_seconds?: number;
   schedule_type?: 'interval_minutes' | 'daily_time' | null;
   schedule_value?: string | null;
   manual_until?: string | null;
+  roi_enabled?: boolean;
+  roi_x?: number | null;
+  roi_y?: number | null;
+  roi_width?: number | null;
+  roi_height?: number | null;
+  roi_shape?: 'rect' | 'polygon' | string;
+  roi_points?: Array<{ x: number; y: number }> | null;
 };
 
 export type DebugLivePayload = {
@@ -456,6 +562,90 @@ export async function updateModelProvider(provider: string, payload: ModelProvid
 
 export async function debugModelProvider(provider: string, payload: ModelProviderDebugPayload) {
   const response = await apiClient.post<ModelProviderDebugResult>(`/api/model-providers/${provider}/debug`, payload);
+  return response.data;
+}
+
+export async function getTrainingOverview(params?: { provider?: string }) {
+  const response = await apiClient.get<TrainingOverview>('/api/training/overview', {
+    params: {
+      provider: params?.provider || undefined,
+    },
+  });
+  return response.data;
+}
+
+export async function runTrainingPipeline(payload?: { strategy_id?: string }) {
+  const response = await apiClient.post<TrainingPipelineRunResponse>('/api/training/pipeline/run', payload || {});
+  return response.data;
+}
+
+export async function listTrainingDatasets(params?: {
+  provider?: string;
+  strategyId?: string;
+  limit?: number;
+}) {
+  const response = await apiClient.get<TrainingDataset[]>('/api/training/datasets', {
+    params: {
+      provider: params?.provider || undefined,
+      strategy_id: params?.strategyId || undefined,
+      limit: params?.limit ?? 100,
+    },
+  });
+  return response.data;
+}
+
+export async function listTrainingRuns(params?: {
+  provider?: string;
+  strategyId?: string;
+  status?: string;
+  limit?: number;
+}) {
+  const response = await apiClient.get<TrainingRun[]>('/api/training/runs', {
+    params: {
+      provider: params?.provider || undefined,
+      strategy_id: params?.strategyId || undefined,
+      status: params?.status || undefined,
+      limit: params?.limit ?? 100,
+    },
+  });
+  return response.data;
+}
+
+export async function getTrainingRunDetail(runId: string) {
+  const response = await apiClient.get<TrainingRunDetail>(`/api/training/runs/${runId}`);
+  return response.data;
+}
+
+export async function approveTrainingRun(runId: string, payload?: { comment?: string }) {
+  const response = await apiClient.post<TrainingRunReviewResponse>(
+    `/api/training/runs/${runId}/approve`,
+    payload || {},
+  );
+  return response.data;
+}
+
+export async function rejectTrainingRun(runId: string, payload?: { comment?: string }) {
+  const response = await apiClient.post<TrainingRunReviewResponse>(
+    `/api/training/runs/${runId}/reject`,
+    payload || {},
+  );
+  return response.data;
+}
+
+export async function listModelCallLogs(params?: {
+  provider?: string;
+  triggerType?: string;
+  success?: boolean;
+  limit?: number;
+}) {
+  const response = await apiClient.get<ModelCallLog[]>('/api/model-providers/call-logs', {
+    params: {
+      provider: params?.provider || undefined,
+      trigger_type: params?.triggerType || undefined,
+      success: params?.success,
+      limit: params?.limit ?? 100,
+    },
+  });
   return response.data;
 }
 

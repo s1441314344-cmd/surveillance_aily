@@ -1,5 +1,6 @@
 import {
   AlertOutlined,
+  ApiOutlined,
   AppstoreOutlined,
   AuditOutlined,
   CameraOutlined,
@@ -117,6 +118,14 @@ const menuItems: Array<{
     description: '维护模型提供方并执行联调调试。',
     group: 'configuration',
     requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR],
+  },
+  {
+    key: '/local-detector',
+    icon: <ApiOutlined />,
+    label: '本地检测',
+    description: '查看本地检测服务状态并执行单图门控调试。',
+    group: 'configuration',
+    requiredRoles: [ROLE_SYSTEM_ADMIN],
   },
   {
     key: '/users',

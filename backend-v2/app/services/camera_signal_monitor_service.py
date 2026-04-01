@@ -26,10 +26,18 @@ def serialize_camera_signal_monitor_config(config: CameraSignalMonitorConfig) ->
         enabled=config.enabled,
         runtime_mode=config.runtime_mode,
         signal_strategy_id=config.signal_strategy_id,
+        strict_local_gate=config.strict_local_gate,
         monitor_interval_seconds=config.monitor_interval_seconds,
         schedule_type=config.schedule_type,
         schedule_value=config.schedule_value,
         manual_until=_serialize_datetime(config.manual_until),
+        roi_enabled=bool(getattr(config, "roi_enabled", False)),
+        roi_x=getattr(config, "roi_x", None),
+        roi_y=getattr(config, "roi_y", None),
+        roi_width=getattr(config, "roi_width", None),
+        roi_height=getattr(config, "roi_height", None),
+        roi_shape=str(getattr(config, "roi_shape", "rect") or "rect"),
+        roi_points=getattr(config, "roi_points", None),
         next_run_at=_serialize_datetime(config.next_run_at),
         last_run_at=_serialize_datetime(config.last_run_at),
         last_error=config.last_error,
@@ -54,10 +62,18 @@ def get_camera_signal_monitor_config_or_create(
         enabled=False,
         runtime_mode="daemon",
         signal_strategy_id=_resolve_default_signal_strategy_id(db),
+        strict_local_gate=True,
         monitor_interval_seconds=30,
         schedule_type=None,
         schedule_value=None,
         manual_until=None,
+        roi_enabled=False,
+        roi_x=None,
+        roi_y=None,
+        roi_width=None,
+        roi_height=None,
+        roi_shape="rect",
+        roi_points=None,
         next_run_at=None,
         last_run_at=None,
         last_error=None,
@@ -104,7 +120,30 @@ def update_camera_signal_monitor_config(
                 )
         if field_name == "manual_until":
             value = _parse_datetime(value)
+        if field_name == "roi_shape" and value is not None:
+            normalized_shape = str(value).strip().lower()
+            if normalized_shape not in {"rect", "polygon"}:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Unsupported roi_shape: {value}",
+                )
+            value = normalized_shape
         setattr(config, field_name, value)
+
+    if not bool(getattr(config, "roi_enabled", False)):
+        config.roi_x = None
+        config.roi_y = None
+        config.roi_width = None
+        config.roi_height = None
+        config.roi_shape = "rect"
+        config.roi_points = None
+    elif str(getattr(config, "roi_shape", "rect") or "rect") == "polygon":
+        config.roi_x = None
+        config.roi_y = None
+        config.roi_width = None
+        config.roi_height = None
+    else:
+        config.roi_points = None
 
     if config.enabled:
         _recalculate_next_run_at(config, now=_utcnow())

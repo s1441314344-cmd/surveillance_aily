@@ -83,6 +83,14 @@ export async function handleJobsUploadSubmit(
       cameraId,
       strategyId: values.strategyId,
       precheckStrategyId: values.precheckStrategyId || undefined,
+      precheckConfig:
+        values.precheckStrategyId
+          ? {
+              personThreshold: values.precheckPersonThreshold,
+              softNegativeThreshold: values.precheckSoftNegativeThreshold,
+              stateTtlSeconds: values.precheckStateTtlSeconds,
+            }
+          : undefined,
       scheduleType: values.scheduleType,
       scheduleValue,
     });

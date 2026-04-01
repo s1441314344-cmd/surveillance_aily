@@ -10,6 +10,9 @@ import { handleJobsUploadSubmit } from './jobsSubmitActions';
 
 const SCHEDULE_RESET_FIELDS = {
   precheckStrategyId: undefined,
+  precheckPersonThreshold: DEFAULT_FORM_VALUES.precheckPersonThreshold,
+  precheckSoftNegativeThreshold: DEFAULT_FORM_VALUES.precheckSoftNegativeThreshold,
+  precheckStateTtlSeconds: DEFAULT_FORM_VALUES.precheckStateTtlSeconds,
   scheduleType: DEFAULT_FORM_VALUES.scheduleType,
   intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
   dailyTime: DEFAULT_FORM_VALUES.dailyTime,

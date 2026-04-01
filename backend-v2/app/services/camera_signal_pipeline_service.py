@@ -16,11 +16,13 @@ from app.schemas.camera import (
 )
 from app.services.alert_service import create_alert_event
 from app.services.camera_capture_service import capture_camera_frame
+from app.services.camera_roi_service import CameraRoiError, apply_analysis_roi_to_frame, extract_analysis_roi
 from app.services.camera_media_service import capture_photo
 from app.services.camera_service import get_camera_or_404
 from app.services.camera_signal_monitor_service import get_camera_signal_monitor_config_or_create
 from app.services.camera_trigger_rule_service import evaluate_camera_trigger_rule
 from app.services.ids import generate_id
+from app.services.model_call_log_service import build_model_call_details, create_model_call_log
 from app.services.providers.base import ProviderRequest
 from app.services.providers.factory import get_provider_adapter
 from app.services.signal_extractor import extract_signals
@@ -58,8 +60,14 @@ def process_camera_signal_cycle(
     camera = get_camera_or_404(db, camera_id)
     strategy = _resolve_strategy(db, camera_id=camera.id, strategy_id=strategy_id)
     strategy_snapshot = build_strategy_snapshot(strategy)
+    monitor_config = get_camera_signal_monitor_config_or_create(db, camera_id=camera.id)
+    analysis_roi = extract_analysis_roi(monitor_config)
 
     frame = capture_camera_frame(camera)
+    try:
+        frame, _ = apply_analysis_roi_to_frame(frame, analysis_roi)
+    except CameraRoiError as exc:
+        raise ValueError(f"Signal monitor ROI crop failed: {exc}") from exc
     frame_path = FileStorageService(root=camera.storage_path or None).save_bytes(
         frame.content,
         frame.original_name,
@@ -75,6 +83,37 @@ def process_camera_signal_cycle(
             response_format=str(strategy.result_format or "json_schema"),
             response_schema=strategy.response_schema,
         )
+    )
+    create_model_call_log(
+        db,
+        provider=model_provider or strategy.model_provider,
+        model_name=model_name or strategy.model_name,
+        trigger_type="signal_monitor",
+        trigger_source=trigger_source,
+        response_format=str(strategy.result_format or "json_schema"),
+        success=provider_response.success,
+        error_message=provider_response.error_message,
+        usage=provider_response.usage,
+        input_image_count=1,
+        camera_id=camera.id,
+        strategy_id=strategy.id,
+        details=build_model_call_details(
+            prompt=str(strategy.prompt_template or ""),
+            response_format=str(strategy.result_format or "json_schema"),
+            image_paths=[frame_path],
+            input_summary={
+                "dry_run": dry_run,
+                "trigger_source": trigger_source,
+            },
+            raw_response=provider_response.raw_response,
+            normalized_json=provider_response.normalized_json,
+            error_message=provider_response.error_message,
+            context={
+                "camera_id": camera.id,
+                "strategy_id": strategy.id,
+                "trigger_source": trigger_source,
+            },
+        ),
     )
     normalized_json = provider_response.normalized_json if isinstance(provider_response.normalized_json, dict) else {}
     signals = extract_signals(normalized_json=normalized_json, strategy_snapshot=strategy_snapshot)
@@ -182,8 +221,7 @@ def process_camera_signal_cycle(
             )
         )
 
-    if not dry_run:
-        db.commit()
+    db.commit()
 
     return CameraTriggerRuleDebugRead(
         camera_id=camera.id,

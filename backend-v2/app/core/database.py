@@ -46,6 +46,7 @@ def ensure_runtime_schema_columns() -> None:
         },
         "job_schedules": {
             "precheck_strategy_id": "VARCHAR(36)",
+            "precheck_config": "JSON",
             "next_run_at": "TIMESTAMP",
             "last_run_at": "TIMESTAMP",
             "last_error": "TEXT",
@@ -63,10 +64,18 @@ def ensure_runtime_schema_columns() -> None:
             "enabled": "BOOLEAN DEFAULT 0",
             "runtime_mode": "VARCHAR(20) DEFAULT 'daemon'",
             "signal_strategy_id": "VARCHAR(36)",
+            "strict_local_gate": "BOOLEAN DEFAULT true",
             "monitor_interval_seconds": "INTEGER DEFAULT 30",
             "schedule_type": "VARCHAR(30)",
             "schedule_value": "VARCHAR(100)",
             "manual_until": "TIMESTAMP",
+            "roi_enabled": "BOOLEAN DEFAULT false",
+            "roi_x": "FLOAT",
+            "roi_y": "FLOAT",
+            "roi_width": "FLOAT",
+            "roi_height": "FLOAT",
+            "roi_shape": "VARCHAR(20) DEFAULT 'rect'",
+            "roi_points": "JSON",
             "next_run_at": "TIMESTAMP",
             "last_run_at": "TIMESTAMP",
             "last_error": "TEXT",
@@ -103,6 +112,81 @@ def ensure_runtime_schema_columns() -> None:
             "last_error": "TEXT",
             "next_retry_at": "TIMESTAMP",
             "last_attempt_at": "TIMESTAMP",
+        },
+        "model_call_logs": {
+            "trigger_source": "VARCHAR(80)",
+            "response_format": "VARCHAR(30)",
+            "error_message": "TEXT",
+            "usage": "JSON",
+            "input_image_count": "INTEGER DEFAULT 0",
+            "job_id": "VARCHAR(36)",
+            "schedule_id": "VARCHAR(36)",
+            "camera_id": "VARCHAR(36)",
+            "strategy_id": "VARCHAR(36)",
+            "details": "JSON",
+        },
+        "feedback_training_candidates": {
+            "feedback_id": "VARCHAR(36)",
+            "strategy_id": "VARCHAR(36)",
+            "strategy_name": "VARCHAR(120)",
+            "judgement": "VARCHAR(20)",
+            "corrected_label": "VARCHAR(255)",
+            "comment": "TEXT",
+            "reviewer": "VARCHAR(100)",
+            "input_image_path": "TEXT",
+            "strategy_snapshot": "JSON",
+            "model_provider": "VARCHAR(50)",
+            "model_name": "VARCHAR(100)",
+            "source_created_at": "TIMESTAMP",
+            "sample_payload": "JSON",
+            "reviewed_at": "TIMESTAMP",
+        },
+        "feedback_training_datasets": {
+            "strategy_id": "VARCHAR(36)",
+            "strategy_name": "VARCHAR(120)",
+            "model_provider": "VARCHAR(50)",
+            "model_name": "VARCHAR(100)",
+            "sample_count": "INTEGER DEFAULT 0",
+            "incorrect_count": "INTEGER DEFAULT 0",
+            "correct_count": "INTEGER DEFAULT 0",
+            "positive_ratio": "FLOAT DEFAULT 1.0",
+            "dataset_path": "TEXT",
+            "sample_manifest": "JSON",
+            "status": "VARCHAR(20) DEFAULT 'ready'",
+            "built_by": "VARCHAR(100)",
+            "trigger_source": "VARCHAR(40)",
+        },
+        "feedback_training_runs": {
+            "dataset_id": "VARCHAR(36)",
+            "strategy_id": "VARCHAR(36)",
+            "strategy_name": "VARCHAR(120)",
+            "model_provider": "VARCHAR(50)",
+            "baseline_model_name": "VARCHAR(100)",
+            "route_requested": "VARCHAR(30)",
+            "route_actual": "VARCHAR(30)",
+            "candidate_version": "VARCHAR(120)",
+            "candidate_snapshot": "JSON",
+            "status": "VARCHAR(20) DEFAULT 'queued'",
+            "sample_count": "INTEGER DEFAULT 0",
+            "evaluation_summary": "JSON",
+            "evaluation_report_path": "TEXT",
+            "error_message": "TEXT",
+            "started_at": "TIMESTAMP",
+            "finished_at": "TIMESTAMP",
+            "trigger_source": "VARCHAR(40)",
+            "triggered_by": "VARCHAR(100)",
+        },
+        "feedback_release_requests": {
+            "run_id": "VARCHAR(36)",
+            "strategy_id": "VARCHAR(36)",
+            "candidate_version": "VARCHAR(120)",
+            "status": "VARCHAR(20) DEFAULT 'pending'",
+            "requested_by": "VARCHAR(100)",
+            "reviewer": "VARCHAR(100)",
+            "reviewed_at": "TIMESTAMP",
+            "review_comment": "TEXT",
+            "release_payload": "JSON",
+            "is_published": "BOOLEAN DEFAULT false",
         },
     }
 
@@ -165,6 +249,27 @@ def ensure_runtime_schema_columns() -> None:
                     "WHERE monitor_interval_seconds IS NULL OR monitor_interval_seconds <= 0"
                 )
             )
+            connection.execute(
+                text(
+                    "UPDATE camera_signal_monitor_configs "
+                    "SET strict_local_gate = true "
+                    "WHERE strict_local_gate IS NULL"
+                )
+            )
+            connection.execute(
+                text(
+                    "UPDATE camera_signal_monitor_configs "
+                    "SET roi_enabled = false "
+                    "WHERE roi_enabled IS NULL"
+                )
+            )
+            connection.execute(
+                text(
+                    "UPDATE camera_signal_monitor_configs "
+                    "SET roi_shape = 'rect' "
+                    "WHERE roi_shape IS NULL OR roi_shape = ''"
+                )
+            )
 
         if "alert_events" in inspector.get_table_names():
             connection.execute(
@@ -190,3 +295,29 @@ def ensure_runtime_schema_columns() -> None:
                     "WHERE timeout_seconds IS NULL OR timeout_seconds <= 0"
                 )
             )
+
+        if "feedback_training_runs" in inspector.get_table_names():
+            run_columns = {column["name"] for column in inspector.get_columns("feedback_training_runs")}
+            if "baseline_model_name" in run_columns and "base_model_name" in run_columns:
+                connection.execute(
+                    text(
+                        "UPDATE feedback_training_runs "
+                        "SET baseline_model_name = base_model_name "
+                        "WHERE (baseline_model_name IS NULL OR baseline_model_name = '') "
+                        "AND base_model_name IS NOT NULL "
+                        "AND base_model_name <> ''"
+                    )
+                )
+
+        if "feedback_release_requests" in inspector.get_table_names():
+            release_columns = {column["name"] for column in inspector.get_columns("feedback_release_requests")}
+            if "reviewer" in release_columns and "reviewed_by" in release_columns:
+                connection.execute(
+                    text(
+                        "UPDATE feedback_release_requests "
+                        "SET reviewer = reviewed_by "
+                        "WHERE (reviewer IS NULL OR reviewer = '') "
+                        "AND reviewed_by IS NOT NULL "
+                        "AND reviewed_by <> ''"
+                    )
+                )

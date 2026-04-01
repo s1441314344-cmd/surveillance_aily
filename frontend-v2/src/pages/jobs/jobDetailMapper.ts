@@ -13,6 +13,10 @@ export type JobDetailViewModel = {
   finished_at?: string | null;
   created_at?: string | null;
   duration_ms?: number;
+  total_items?: number;
+  completed_items?: number;
+  failed_items?: number;
+  error_message?: string | null;
   result_status?: string;
   feedback_status?: string;
   raw_model_response?: string;
@@ -36,5 +40,13 @@ export const mapJobToDetailView = (job: Job | null): JobDetailViewModel | null =
     triggered_at: job.started_at,
     finished_at: job.finished_at,
     created_at: job.created_at,
+    total_items: job.total_items,
+    completed_items: job.completed_items,
+    failed_items: job.failed_items,
+    error_message: job.error_message,
+    duration_ms:
+      job.started_at && job.finished_at
+        ? Math.max(0, new Date(job.finished_at).getTime() - new Date(job.started_at).getTime())
+        : undefined,
   };
 };

@@ -51,3 +51,22 @@ class ModelProviderDebugRead(BaseModel):
     normalized_json: dict | None = None
     error_message: str | None = None
     usage: dict | None = None
+
+
+class ModelCallLogRead(BaseModel):
+    id: str
+    provider: str
+    model_name: str
+    trigger_type: str
+    trigger_source: str | None = None
+    response_format: str | None = None
+    success: bool
+    error_message: str | None = None
+    usage: dict | None = None
+    input_image_count: int = 0
+    job_id: str | None = None
+    schedule_id: str | None = None
+    camera_id: str | None = None
+    strategy_id: str | None = None
+    details: dict | None = None
+    created_at: str | None = None

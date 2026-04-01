@@ -5,6 +5,9 @@ export type UploadFormValues = {
   strategyId: string;
   cameraId?: string;
   precheckStrategyId?: string;
+  precheckPersonThreshold?: number;
+  precheckSoftNegativeThreshold?: number;
+  precheckStateTtlSeconds?: number;
   scheduleType?: 'interval_minutes' | 'daily_time';
   intervalMinutes?: number;
   dailyTime?: string;
@@ -12,9 +15,12 @@ export type UploadFormValues = {
 
 export type EditScheduleFormValues = {
   scheduleType: 'interval_minutes' | 'daily_time';
+  precheckStrategyId?: string;
+  precheckPersonThreshold?: number;
+  precheckSoftNegativeThreshold?: number;
+  precheckStateTtlSeconds?: number;
   intervalMinutes?: number;
   dailyTime?: string;
-  precheckStrategyId?: string;
 };
 
 export const JOB_TASK_MODE_OPTIONS = [
@@ -35,6 +41,9 @@ export const DEFAULT_FORM_VALUES: UploadFormValues = {
   strategyId: '',
   cameraId: undefined,
   precheckStrategyId: undefined,
+  precheckPersonThreshold: 0.5,
+  precheckSoftNegativeThreshold: 0.2,
+  precheckStateTtlSeconds: 120,
   scheduleType: 'interval_minutes',
   intervalMinutes: 15,
   dailyTime: '08:30',

@@ -19,7 +19,7 @@ cp .env.example .env
 3. 启动本地依赖
 
 ```bash
-docker compose -f ../docker-compose.v2.yml up -d postgres redis
+docker compose -f ../docker-compose.v2.yml up -d postgres redis local-detector
 ```
 
 4. 启动 API
@@ -45,6 +45,16 @@ python -m app.schedulers.runner
 - `SCHEDULER_POLL_INTERVAL_SECONDS`：定时任务扫描周期（秒）
 - `SCHEDULER_CAMERA_STATUS_SWEEP_ENABLED`：是否启用摄像头状态后台巡检
 - `SCHEDULER_CAMERA_STATUS_SWEEP_INTERVAL_SECONDS`：摄像头状态巡检周期（秒）
+- `LOCAL_DETECTOR_BASE_URL`：本地检测服务地址（默认 `http://localhost:8091`）
+- `LOCAL_DETECTOR_TIMEOUT_SECONDS`：本地检测请求超时时间（秒）
+- `LOCAL_DETECTOR_PERSON_THRESHOLD`：本地人员硬门控阈值
+- `LOCAL_DETECTOR_STRICT_BLOCK`：本地检测不可用时是否严格阻断（默认 `true`）
+- `FEEDBACK_TRAINING_ENABLED`：是否开启复核回流训练定时流水线
+- `FEEDBACK_TRAINING_CRON`：复核回流训练 Cron（UTC）
+- `FEEDBACK_TRAINING_MIN_SAMPLES`：单策略最小回流样本门槛
+- `FEEDBACK_TRAINING_POSITIVE_RATIO`：`correct` 抽样比例（相对 `incorrect`）
+- `FEEDBACK_TRAINING_MAX_SAMPLES_PER_STRATEGY`：单策略最大样本数
+- `FEEDBACK_TRAINING_ROUTE_DEFAULT`：默认训练路由（`finetune` / `prompt_enhance`）
 - `ZHIPU_API_KEY` / `OPENAI_API_KEY` / `ARK_API_KEY`：可选，首次启动时自动写入对应 provider（加密存储）
 
 ## 推荐联调方式
@@ -78,6 +88,12 @@ make v2-release-gate
 ```
 
 `make v2-dev` 只负责启动依赖并给出下一步提示，不会一次性拉起过多后台进程，便于分别观察 API、worker、scheduler 和前端日志。
+
+本地检测微服务健康检查：
+
+```bash
+curl http://localhost:8091/healthz
+```
 
 默认 `CORS_ORIGINS` 已覆盖 `localhost/127.0.0.1` 的 `5173-5180` 端口，兼容 Vite 开发端口回退。
 
@@ -150,10 +166,31 @@ make v2-release-gate
 - `POST /api/jobs/cameras/once` 只负责校验输入并创建 `queued` 状态的 Job。
 - Celery worker 通过 `jobs.process(job_id)` 执行抓帧、模型调用、Schema 校验和记录写入。
 - scheduler 进程负责扫描到期的 `job_schedules`，创建 `camera_schedule` Job，并派发到 worker。
+- 若计划配置了 `precheck_strategy_id`，scheduler 会先调用本地检测微服务做前置门控；未通过则不会创建 Job，也不会调用大模型。
+- 摄像头监测（signal monitor）在 `strict_local_gate=true` 时同样先走本地门控，未通过则不会进入模型分析链路。
 - scheduler 进程会按配置周期执行摄像头状态巡检，批量写入 `camera_status_logs`，供监控页面读取。
 - 管理端可通过 `POST /api/cameras/check-all` 手动触发全量或指定摄像头的状态巡检。
 - 管理端可通过 `POST /api/job-schedules/{id}/run-now` 对某个计划进行一次立即触发（仍按 `camera_schedule` 入队）。
 - `task_records`、`feedback`、`dashboard` 继续复用统一的任务闭环。
+
+## 复核回流训练
+
+- 管理接口：
+  - `GET /api/training/overview`
+  - `POST /api/training/pipeline/run`
+  - `GET /api/training/datasets`
+  - `GET /api/training/runs`
+  - `GET /api/training/runs/{id}`
+  - `POST /api/training/runs/{id}/approve`
+  - `POST /api/training/runs/{id}/reject`
+- 样本规则：
+  - 仅纳入已复核（`correct` / `incorrect`）记录
+  - `incorrect` 全量入池
+  - `correct` 按比例抽样（`FEEDBACK_TRAINING_POSITIVE_RATIO`）
+- 发布规则：
+  - 训练完成后仅生成候选版本与审批单
+  - 未审批不会切换策略
+  - 审批通过后才更新策略版本
 
 ## 历史数据回填
 

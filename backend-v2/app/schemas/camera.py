@@ -225,10 +225,18 @@ class CameraSignalMonitorConfigBase(BaseModel):
     enabled: bool = False
     runtime_mode: str = "daemon"
     signal_strategy_id: str | None = None
+    strict_local_gate: bool = True
     monitor_interval_seconds: int = Field(default=30, ge=1, le=3600)
     schedule_type: str | None = None
     schedule_value: str | None = None
     manual_until: str | None = None
+    roi_enabled: bool = False
+    roi_x: float | None = Field(default=None, ge=0, le=1)
+    roi_y: float | None = Field(default=None, ge=0, le=1)
+    roi_width: float | None = Field(default=None, gt=0, le=1)
+    roi_height: float | None = Field(default=None, gt=0, le=1)
+    roi_shape: str = "rect"
+    roi_points: list[dict[str, float]] | None = None
 
 
 class CameraSignalMonitorConfigUpdate(CameraSignalMonitorConfigBase):

@@ -278,6 +278,33 @@ body {
   font-size: 13px;
 }
 
+.call-log-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.call-log-clamp-text {
+  margin-bottom: 0 !important;
+  line-height: 1.45;
+}
+
+.call-log-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: #f8fbff;
+}
+
+.call-log-code-block {
+  max-height: 220px;
+  overflow: auto;
+}
+
 .page-image-frame {
   width: 100%;
   border-radius: var(--radius-md);
@@ -492,6 +519,129 @@ body {
   min-height: 360px;
 }
 
+.local-detector-uploader.ant-upload-wrapper .ant-upload.ant-upload-drag {
+  border-radius: var(--radius-md);
+  border-color: var(--app-border-strong);
+  background: rgba(247, 251, 255, 0.9);
+}
+
+.local-detector-uploader.ant-upload-wrapper .ant-upload.ant-upload-drag:hover {
+  border-color: var(--app-accent);
+}
+
+.local-detector-preview {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  background: rgba(248, 251, 255, 0.9);
+}
+
+.local-detector-preview__image {
+  max-width: 320px;
+  border-radius: 8px;
+  border: 1px solid var(--app-border);
+}
+
+.camera-roi-selector {
+  position: relative;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  width: 100%;
+  max-width: 620px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #f7fafc;
+  cursor: crosshair;
+}
+
+.camera-roi-selector__image {
+  width: 100%;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.camera-roi-selector__rect {
+  position: absolute;
+  border: 2px solid #0ea5e9;
+  background: rgba(14, 165, 233, 0.2);
+  box-shadow: 0 0 0 1px rgba(2, 132, 199, 0.45) inset;
+}
+
+.camera-roi-selector__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.camera-roi-selector__polygon {
+  fill: rgba(14, 165, 233, 0.32);
+  stroke: rgba(2, 132, 199, 0.95);
+  stroke-width: 0.7;
+  filter: drop-shadow(0 0 2px rgba(14, 165, 233, 0.45));
+}
+
+.camera-roi-selector__polyline {
+  fill: none;
+  stroke: rgba(2, 132, 199, 0.95);
+  stroke-width: 0.6;
+  stroke-dasharray: 1.2 1;
+}
+
+.camera-roi-selector__point {
+  fill: #fff;
+  stroke: rgba(14, 165, 233, 0.98);
+  stroke-width: 0.3;
+}
+
+.camera-roi-summary-preview {
+  position: relative;
+  width: 220px;
+  height: 140px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.camera-roi-summary-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-roi-summary-preview svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.camera-roi-summary-preview__polygon {
+  fill: rgba(14, 165, 233, 0.22);
+  stroke: rgba(2, 132, 199, 0.95);
+  stroke-width: 0.7;
+}
+
+.camera-roi-summary-preview__rect {
+  fill: rgba(14, 165, 233, 0.22);
+  stroke: rgba(2, 132, 199, 0.95);
+  stroke-width: 0.7;
+}
+
+.camera-roi-summary-preview__point {
+  fill: #fff;
+  stroke: rgba(14, 165, 233, 0.98);
+  stroke-width: 0.35;
+}
 @media (max-width: 1200px) {
   .app-shell__header {
     flex-direction: column;

@@ -7,6 +7,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 cat <<'EOF'
 [v2] dependencies are ready.
+  - postgres
+  - redis
+  - local-detector
 
 Open separate terminals to run:
   make v2-api

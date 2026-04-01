@@ -24,6 +24,7 @@ def serialize_job_schedule(schedule: JobSchedule) -> JobScheduleRead:
         camera_id=schedule.camera_id,
         strategy_id=schedule.strategy_id,
         precheck_strategy_id=schedule.precheck_strategy_id,
+        precheck_config=schedule.precheck_config,
         schedule_type=schedule.schedule_type,
         schedule_value=schedule.schedule_value,
         status=schedule.status,
@@ -66,6 +67,7 @@ def create_job_schedule(db: Session, payload: JobScheduleCreate) -> JobScheduleR
     strategy = get_strategy_or_404(db, payload.strategy_id)
     _ensure_strategy_active(strategy.status)
     _validate_precheck_strategy(db, payload.precheck_strategy_id)
+    normalized_precheck_config = _normalize_precheck_config(payload.precheck_config)
     current_time = _ensure_aware(datetime.now(timezone.utc))
 
     schedule = JobSchedule(
@@ -73,6 +75,7 @@ def create_job_schedule(db: Session, payload: JobScheduleCreate) -> JobScheduleR
         camera_id=payload.camera_id,
         strategy_id=payload.strategy_id,
         precheck_strategy_id=payload.precheck_strategy_id,
+        precheck_config=normalized_precheck_config,
         schedule_type=payload.schedule_type,
         schedule_value=payload.schedule_value,
         status=SCHEDULE_STATUS_ACTIVE,
@@ -97,6 +100,8 @@ def update_job_schedule(db: Session, schedule: JobSchedule, payload: JobSchedule
         _ensure_strategy_active(strategy.status)
     if "precheck_strategy_id" in updates:
         _validate_precheck_strategy(db, updates.get("precheck_strategy_id"))
+    if "precheck_config" in updates:
+        updates["precheck_config"] = _normalize_precheck_config(updates.get("precheck_config"))
 
     next_schedule_type = updates.get("schedule_type", schedule.schedule_type)
     next_schedule_value = updates.get("schedule_value", schedule.schedule_value)
@@ -217,6 +222,56 @@ def _validate_precheck_strategy(db: Session, strategy_id: str | None) -> None:
         return
     strategy = get_strategy_or_404(db, strategy_id)
     _ensure_strategy_active(strategy.status)
+
+
+def _normalize_precheck_config(value: dict | None) -> dict | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="precheck_config must be an object",
+        )
+
+    normalized: dict[str, float | int] = {}
+
+    if "person_threshold" in value and value["person_threshold"] is not None:
+        threshold = float(value["person_threshold"])
+        if threshold < 0 or threshold > 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="precheck_config.person_threshold must be between 0 and 1",
+            )
+        normalized["person_threshold"] = threshold
+
+    if "soft_negative_threshold" in value and value["soft_negative_threshold"] is not None:
+        threshold = float(value["soft_negative_threshold"])
+        if threshold < 0 or threshold > 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="precheck_config.soft_negative_threshold must be between 0 and 1",
+            )
+        normalized["soft_negative_threshold"] = threshold
+
+    if "state_ttl_seconds" in value and value["state_ttl_seconds"] is not None:
+        ttl_seconds = int(value["state_ttl_seconds"])
+        if ttl_seconds < 1 or ttl_seconds > 3600:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="precheck_config.state_ttl_seconds must be between 1 and 3600",
+            )
+        normalized["state_ttl_seconds"] = ttl_seconds
+
+    if "refresh_interval_seconds" in value and value["refresh_interval_seconds"] is not None:
+        refresh_interval_seconds = int(value["refresh_interval_seconds"])
+        if refresh_interval_seconds < 0 or refresh_interval_seconds > 86400:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="precheck_config.refresh_interval_seconds must be between 0 and 86400",
+            )
+        normalized["refresh_interval_seconds"] = refresh_interval_seconds
+
+    return normalized or None
 
 
 def _ensure_aware(value: datetime) -> datetime:

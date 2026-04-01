@@ -30,10 +30,18 @@ export type MonitorConfigFormValues = {
   runtime_mode: 'daemon' | 'manual' | 'schedule';
   enabled: boolean;
   signal_strategy_id?: string;
+  strict_local_gate: boolean;
   monitor_interval_seconds: number;
   schedule_type?: 'interval_minutes' | 'daily_time';
   schedule_value?: string;
   manual_until?: string;
+  roi_enabled: boolean;
+  roi_x?: number;
+  roi_y?: number;
+  roi_width?: number;
+  roi_height?: number;
+  roi_shape?: 'rect' | 'polygon';
+  roi_points?: Array<{ x: number; y: number }>;
 };
 
 export const DEFAULT_CAMERA_VALUES: CameraFormValues = {
@@ -66,10 +74,18 @@ export const DEFAULT_MONITOR_CONFIG_VALUES: MonitorConfigFormValues = {
   runtime_mode: 'daemon',
   enabled: true,
   signal_strategy_id: undefined,
+  strict_local_gate: true,
   monitor_interval_seconds: 30,
   schedule_type: 'interval_minutes',
   schedule_value: '1',
   manual_until: '',
+  roi_enabled: false,
+  roi_x: undefined,
+  roi_y: undefined,
+  roi_width: undefined,
+  roi_height: undefined,
+  roi_shape: 'rect',
+  roi_points: undefined,
 };
 
 export const STATUS_COLOR_MAP: Record<string, string> = {

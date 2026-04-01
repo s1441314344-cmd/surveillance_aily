@@ -37,6 +37,9 @@ function getScheduleCreateSuccessFormValues(form: FormInstance<UploadFormValues>
     strategyId: form.getFieldValue('strategyId'),
     cameraId: form.getFieldValue('cameraId'),
     precheckStrategyId: undefined,
+    precheckPersonThreshold: DEFAULT_FORM_VALUES.precheckPersonThreshold,
+    precheckSoftNegativeThreshold: DEFAULT_FORM_VALUES.precheckSoftNegativeThreshold,
+    precheckStateTtlSeconds: DEFAULT_FORM_VALUES.precheckStateTtlSeconds,
     scheduleType: DEFAULT_FORM_VALUES.scheduleType,
     intervalMinutes: DEFAULT_FORM_VALUES.intervalMinutes,
     dailyTime: DEFAULT_FORM_VALUES.dailyTime,
@@ -80,7 +83,16 @@ export function useScheduleMutations({
       payload,
     }: {
       scheduleId: string;
-      payload: { scheduleType: string; scheduleValue: string; precheckStrategyId?: string };
+      payload: {
+        scheduleType: string;
+        scheduleValue: string;
+        precheckStrategyId?: string;
+        precheckConfig?: {
+          personThreshold?: number;
+          softNegativeThreshold?: number;
+          stateTtlSeconds?: number;
+        };
+      };
     }) => updateJobSchedule(scheduleId, payload),
     onSuccess: async () => {
       await handleScheduleMutationSuccess('计划配置已更新');

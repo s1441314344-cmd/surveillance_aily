@@ -86,6 +86,18 @@ def test_model_provider_debug_returns_logs_and_output(client, monkeypatch):
     assert body["raw_response"] == "provider debug ok"
     assert len(body["logs"]) >= 2
 
+    call_logs_response = client.get(
+        "/api/model-providers/call-logs?provider=openai&trigger_type=provider_debug&limit=20",
+        headers=headers,
+    )
+    assert call_logs_response.status_code == 200
+    call_logs = call_logs_response.json()
+    assert len(call_logs) >= 1
+    latest = call_logs[0]
+    assert latest["provider"] == "openai"
+    assert latest["trigger_type"] == "provider_debug"
+    assert latest["success"] is True
+
 
 def test_model_provider_debug_rejects_inactive_provider(client):
     login_data = login_as_admin(client)

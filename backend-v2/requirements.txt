@@ -12,4 +12,5 @@ redis==6.4.0
 APScheduler==3.10.4
 jsonschema==4.25.1
 httpx==0.28.1
+Pillow==10.4.0
 pytest==8.4.2

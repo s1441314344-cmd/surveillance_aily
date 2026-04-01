@@ -6,8 +6,15 @@ from app.models.camera_media import CameraMedia
 from app.models.camera_signal import CameraRuleHitLog, CameraSignalMonitorConfig, CameraSignalState
 from app.models.dashboard_definition import DashboardDefinition
 from app.models.file_asset import FileAsset
+from app.models.feedback_training import (
+    FeedbackReleaseRequest,
+    FeedbackTrainingCandidate,
+    FeedbackTrainingDataset,
+    FeedbackTrainingRun,
+)
 from app.models.job import Job, JobSchedule
 from app.models.model_provider import ModelProvider
+from app.models.model_call_log import ModelCallLog
 from app.models.rbac import Role, User, UserRole
 from app.models.strategy import AnalysisStrategy, StrategyVersion
 from app.models.task_record import PredictionFeedback, TaskRecord
@@ -26,10 +33,15 @@ __all__ = [
     "CameraStatusLog",
     "CameraTriggerRule",
     "DashboardDefinition",
+    "FeedbackReleaseRequest",
+    "FeedbackTrainingCandidate",
+    "FeedbackTrainingDataset",
+    "FeedbackTrainingRun",
     "FileAsset",
     "Job",
     "JobSchedule",
     "ModelProvider",
+    "ModelCallLog",
     "OperationAuditLog",
     "PredictionFeedback",
     "Role",

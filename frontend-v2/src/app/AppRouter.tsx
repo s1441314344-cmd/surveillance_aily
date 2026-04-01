@@ -37,6 +37,9 @@ const JobsPage = lazy(() => import('@/pages/JobsPage').then((module) => ({ defau
 const RecordsPage = lazy(() => import('@/pages/RecordsPage').then((module) => ({ default: module.RecordsPage })));
 const FeedbackPage = lazy(() => import('@/pages/FeedbackPage').then((module) => ({ default: module.FeedbackPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
+const LocalDetectorPage = lazy(() =>
+  import('@/pages/LocalDetectorPage').then((module) => ({ default: module.LocalDetectorPage })),
+);
 const UsersPage = lazy(() => import('@/pages/UsersPage').then((module) => ({ default: module.UsersPage })));
 const AuditLogsPage = lazy(() => import('@/pages/AuditLogsPage').then((module) => ({ default: module.AuditLogsPage })));
 const AccessDeniedPage = lazy(() =>
@@ -133,6 +136,10 @@ export function AppRouter() {
                 element={<SettingsPage />}
               />
             }
+          />
+          <Route
+            path="local-detector"
+            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN]} element={<LocalDetectorPage />} />}
           />
           <Route
             path="users"
