@@ -16,12 +16,16 @@ from app.core.database import SessionLocal
 from app.models.feedback_training import (
     FeedbackReleaseRequest,
     FeedbackTrainingCandidate,
+    FeedbackTrainingConfig,
     FeedbackTrainingDataset,
     FeedbackTrainingRun,
 )
 from app.models.task_record import PredictionFeedback, TaskRecord
 from app.schemas.training import (
+    TrainingConfigRead,
     TrainingDatasetRead,
+    TrainingHistoryRead,
+    TrainingConfigUpdate,
     TrainingOverviewRead,
     TrainingPipelineRunRead,
     TrainingRunDetailRead,
@@ -50,12 +54,22 @@ RELEASE_STATUS_REJECTED = "rejected"
 TRAINING_ROUTE_FINETUNE = "finetune"
 TRAINING_ROUTE_PROMPT_ENHANCE = "prompt_enhance"
 SUPPORTED_FINETUNE_PROVIDERS = {"openai"}
+TRAINING_CONFIG_DEFAULT_ID = "default"
 
 
 @dataclass
 class ReviewedSample:
     record: TaskRecord
     feedback: PredictionFeedback
+    candidate: FeedbackTrainingCandidate | None = None
+
+
+@dataclass
+class SampleSelectionResult:
+    selected: list[ReviewedSample]
+    reviewed_total: int
+    already_reflowed_count: int
+    included_after_reflow_filter: int
 
 
 def get_training_overview(db: Session, *, provider: str | None = None) -> TrainingOverviewRead:
@@ -89,6 +103,24 @@ def get_training_overview(db: Session, *, provider: str | None = None) -> Traini
         last_run_at=_serialize_datetime(last_run.created_at) if last_run else None,
         last_error=last_run.error_message if last_run and last_run.status == RUN_STATUS_FAILED else None,
     )
+
+
+def get_training_config(db: Session) -> TrainingConfigRead:
+    config = _get_or_create_training_config(db)
+    return TrainingConfigRead(min_samples=int(config.min_samples))
+
+
+def update_training_config(db: Session, payload: TrainingConfigUpdate) -> TrainingConfigRead:
+    min_samples = int(payload.min_samples)
+    if min_samples < 1:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="min_samples must be >= 1")
+    if min_samples > 10000:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="min_samples must be <= 10000")
+
+    config = _get_or_create_training_config(db)
+    config.min_samples = min_samples
+    db.commit()
+    return TrainingConfigRead(min_samples=int(config.min_samples))
 
 
 def list_training_datasets(
@@ -135,6 +167,33 @@ def list_training_runs(
     dataset_map = _build_dataset_map(db, [run.dataset_id for run in runs])
     release_map = _build_release_map(db, [run.id for run in runs])
     return [_serialize_run(run, dataset_map=dataset_map, release_map=release_map) for run in runs]
+
+
+def list_training_history(
+    db: Session,
+    *,
+    provider: str | None = None,
+    strategy_id: str | None = None,
+    limit: int = 100,
+) -> list[TrainingHistoryRead]:
+    _sync_candidate_reflow_history_from_runs(db)
+    safe_limit = min(max(int(limit or 100), 1), 500)
+    stmt = (
+        select(FeedbackTrainingCandidate)
+        .where(FeedbackTrainingCandidate.is_reflowed.is_(True))
+        .order_by(
+            FeedbackTrainingCandidate.reflowed_at.desc(),
+            FeedbackTrainingCandidate.updated_at.desc(),
+            FeedbackTrainingCandidate.id.desc(),
+        )
+        .limit(safe_limit)
+    )
+    if provider:
+        stmt = stmt.where(FeedbackTrainingCandidate.model_provider == provider.strip().lower())
+    if strategy_id:
+        stmt = stmt.where(FeedbackTrainingCandidate.strategy_id == strategy_id)
+    candidates = list(db.scalars(stmt))
+    return [_serialize_history_item(item) for item in candidates]
 
 
 def get_training_run_detail_or_404(db: Session, run_id: str) -> TrainingRunDetailRead:
@@ -302,6 +361,9 @@ def run_feedback_training_pipeline(
     trigger_source: str,
     triggered_by: str,
 ) -> TrainingPipelineRunRead:
+    _sync_candidate_reflow_history_from_runs(db)
+    config = _get_or_create_training_config(db)
+    min_samples = int(config.min_samples or settings.feedback_training_min_samples or 30)
     grouped = _collect_reviewed_samples_by_strategy(db, strategy_id=strategy_id)
     dataset_ids: list[str] = []
     run_ids: list[str] = []
@@ -319,9 +381,22 @@ def run_feedback_training_pipeline(
 
     for group_strategy_id, samples in grouped.items():
         strategy = get_strategy_or_404(db, group_strategy_id)
-        selected_samples = _select_training_samples_for_strategy(strategy.id, samples)
+        selection = _select_training_samples_for_strategy(strategy.id, samples)
+        selected_samples = selection.selected
         _upsert_training_candidates(db, samples=samples)
         db.commit()
+
+        if selection.included_after_reflow_filter == 0 and selection.already_reflowed_count > 0:
+            skipped.append(
+                {
+                    "strategy_id": strategy.id,
+                    "strategy_name": strategy.name,
+                    "reason": "already_reflowed",
+                    "reviewed_count": selection.reviewed_total,
+                    "already_reflowed_count": selection.already_reflowed_count,
+                }
+            )
+            continue
 
         if not selected_samples:
             skipped.append(
@@ -333,14 +408,14 @@ def run_feedback_training_pipeline(
             )
             continue
 
-        if len(selected_samples) < int(settings.feedback_training_min_samples):
+        if len(selected_samples) < min_samples:
             skipped.append(
                 {
                     "strategy_id": strategy.id,
                     "strategy_name": strategy.name,
                     "reason": "insufficient_samples",
                     "sample_count": len(selected_samples),
-                    "min_samples": int(settings.feedback_training_min_samples),
+                    "min_samples": min_samples,
                 }
             )
             continue
@@ -359,6 +434,7 @@ def run_feedback_training_pipeline(
             db,
             dataset=dataset,
             strategy=strategy,
+            selected_samples=selected_samples,
             trigger_source=trigger_source,
             triggered_by=triggered_by,
         )
@@ -381,8 +457,9 @@ def _collect_reviewed_samples_by_strategy(
     strategy_id: str | None,
 ) -> dict[str, list[ReviewedSample]]:
     stmt = (
-        select(TaskRecord, PredictionFeedback)
+        select(TaskRecord, PredictionFeedback, FeedbackTrainingCandidate)
         .join(PredictionFeedback, PredictionFeedback.record_id == TaskRecord.id)
+        .outerjoin(FeedbackTrainingCandidate, FeedbackTrainingCandidate.record_id == TaskRecord.id)
         .where(TaskRecord.feedback_status.in_(tuple(REVIEWED_STATUSES)))
         .order_by(TaskRecord.created_at.desc(), TaskRecord.id.desc())
     )
@@ -390,14 +467,21 @@ def _collect_reviewed_samples_by_strategy(
         stmt = stmt.where(TaskRecord.strategy_id == strategy_id)
 
     grouped: dict[str, list[ReviewedSample]] = {}
-    for record, feedback in db.execute(stmt):
-        grouped.setdefault(record.strategy_id, []).append(ReviewedSample(record=record, feedback=feedback))
+    for record, feedback, candidate in db.execute(stmt):
+        grouped.setdefault(record.strategy_id, []).append(
+            ReviewedSample(record=record, feedback=feedback, candidate=candidate)
+        )
     return grouped
 
 
-def _select_training_samples_for_strategy(strategy_id: str, samples: list[ReviewedSample]) -> list[ReviewedSample]:
-    incorrect = [item for item in samples if item.feedback.judgement == "incorrect"]
-    correct = [item for item in samples if item.feedback.judgement == "correct"]
+def _select_training_samples_for_strategy(strategy_id: str, samples: list[ReviewedSample]) -> SampleSelectionResult:
+    eligible = [
+        item
+        for item in samples
+        if not (item.candidate is not None and bool(item.candidate.is_reflowed))
+    ]
+    incorrect = [item for item in eligible if item.feedback.judgement == "incorrect"]
+    correct = [item for item in eligible if item.feedback.judgement == "correct"]
 
     ratio = float(settings.feedback_training_positive_ratio or 1.0)
     ratio = max(ratio, 0.0)
@@ -409,11 +493,16 @@ def _select_training_samples_for_strategy(strategy_id: str, samples: list[Review
         randomizer = random.Random(seed)
         selected_correct = randomizer.sample(correct, required_correct)
 
-    selected = incorrect + selected_correct
+    selected: list[ReviewedSample] = incorrect + selected_correct
     max_samples = int(settings.feedback_training_max_samples_per_strategy or 2000)
     if len(selected) > max_samples:
         selected = selected[:max_samples]
-    return selected
+    return SampleSelectionResult(
+        selected=selected,
+        reviewed_total=len(samples),
+        already_reflowed_count=len(samples) - len(eligible),
+        included_after_reflow_filter=len(eligible),
+    )
 
 
 def _upsert_training_candidates(
@@ -445,6 +534,9 @@ def _upsert_training_candidates(
                 sample_payload=payload,
             )
             db.add(candidate)
+            continue
+
+        if candidate.is_reflowed:
             continue
 
         candidate.feedback_id = sample.feedback.id
@@ -560,6 +652,7 @@ def _create_training_run(
     *,
     dataset: FeedbackTrainingDataset,
     strategy,
+    selected_samples: list[ReviewedSample],
     trigger_source: str,
     triggered_by: str,
 ) -> FeedbackTrainingRun:
@@ -630,6 +723,12 @@ def _create_training_run(
         )
         db.add(release_request)
         dataset.status = "used"
+        _mark_training_samples_reflowed(
+            db,
+            run_id=run.id,
+            dataset_id=dataset.id,
+            selected_samples=selected_samples,
+        )
     except Exception as exc:  # pragma: no cover
         run.status = RUN_STATUS_FAILED
         run.finished_at = _utcnow()
@@ -637,6 +736,94 @@ def _create_training_run(
         dataset.status = "failed"
 
     return run
+
+
+def _mark_training_samples_reflowed(
+    db: Session,
+    *,
+    run_id: str,
+    dataset_id: str,
+    selected_samples: list[ReviewedSample],
+) -> None:
+    now = _utcnow()
+    for sample in selected_samples:
+        candidate = db.scalar(
+            select(FeedbackTrainingCandidate).where(FeedbackTrainingCandidate.record_id == sample.record.id)
+        )
+        if candidate is None:
+            continue
+        candidate.is_reflowed = True
+        candidate.reflowed_at = now
+        candidate.reflow_run_id = run_id
+        candidate.reflow_dataset_id = dataset_id
+
+
+def _sync_candidate_reflow_history_from_runs(db: Session) -> None:
+    completed_runs = list(
+        db.scalars(
+            select(FeedbackTrainingRun)
+            .where(FeedbackTrainingRun.status == RUN_STATUS_COMPLETED)
+            .order_by(FeedbackTrainingRun.created_at.desc(), FeedbackTrainingRun.id.desc())
+        )
+    )
+    if not completed_runs:
+        return
+
+    run_by_dataset: dict[str, FeedbackTrainingRun] = {}
+    for run in completed_runs:
+        if run.dataset_id and run.dataset_id not in run_by_dataset:
+            run_by_dataset[run.dataset_id] = run
+    if not run_by_dataset:
+        return
+
+    datasets = list(
+        db.scalars(select(FeedbackTrainingDataset).where(FeedbackTrainingDataset.id.in_(list(run_by_dataset.keys()))))
+    )
+    if not datasets:
+        return
+
+    touched = False
+    for dataset in datasets:
+        run = run_by_dataset.get(dataset.id)
+        if run is None:
+            continue
+        samples = ((dataset.sample_manifest or {}).get("samples") or []) if dataset.sample_manifest else []
+        if not isinstance(samples, list):
+            continue
+        for item in samples:
+            if not isinstance(item, dict):
+                continue
+            record_id = str(item.get("record_id") or "").strip()
+            if not record_id:
+                continue
+            candidate = db.scalar(
+                select(FeedbackTrainingCandidate).where(FeedbackTrainingCandidate.record_id == record_id)
+            )
+            if candidate is None:
+                continue
+            if candidate.is_reflowed and candidate.reflow_run_id and candidate.reflow_dataset_id:
+                continue
+            candidate.is_reflowed = True
+            candidate.reflowed_at = run.finished_at or run.created_at
+            candidate.reflow_run_id = run.id
+            candidate.reflow_dataset_id = dataset.id
+            touched = True
+
+    if touched:
+        db.commit()
+
+
+def _get_or_create_training_config(db: Session) -> FeedbackTrainingConfig:
+    config = db.get(FeedbackTrainingConfig, TRAINING_CONFIG_DEFAULT_ID)
+    if config is not None:
+        return config
+    fallback = int(settings.feedback_training_min_samples or 30)
+    if fallback < 1:
+        fallback = 1
+    config = FeedbackTrainingConfig(id=TRAINING_CONFIG_DEFAULT_ID, min_samples=fallback)
+    db.add(config)
+    db.commit()
+    return config
 
 
 def _run_training_route(
@@ -931,6 +1118,23 @@ def _serialize_release_request_payload(release_request: FeedbackReleaseRequest |
         "release_payload": release_request.release_payload,
         "is_published": release_request.is_published,
     }
+
+
+def _serialize_history_item(item: FeedbackTrainingCandidate) -> TrainingHistoryRead:
+    return TrainingHistoryRead(
+        candidate_id=item.id,
+        record_id=item.record_id,
+        strategy_id=item.strategy_id,
+        strategy_name=item.strategy_name,
+        judgement=item.judgement,
+        reviewer=item.reviewer,
+        comment=item.comment,
+        model_provider=item.model_provider,
+        model_name=item.model_name,
+        reflowed_at=_serialize_datetime(item.reflowed_at),
+        reflow_run_id=item.reflow_run_id,
+        reflow_dataset_id=item.reflow_dataset_id,
+    )
 
 
 def _feedback_training_root_dir() -> Path:

@@ -143,14 +143,19 @@ export function SettingsPage() {
             subtitle="基于人工复核结果自动构建数据集、触发训练/增强、离线评估并进入审批发布。"
           >
             <TrainingFeedbackPanel
-              provider={activeProvider?.provider ?? null}
               overview={queries.trainingOverview}
+              config={queries.trainingConfig}
               datasets={queries.trainingDatasets}
               runs={queries.trainingRuns}
+              strategies={queries.trainingStrategies}
+              history={queries.trainingHistory}
               loading={
                 queries.trainingOverviewQuery.isLoading
+                || queries.trainingConfigQuery.isLoading
                 || queries.trainingRunsQuery.isLoading
                 || queries.trainingDatasetsQuery.isLoading
+                || queries.trainingStrategiesQuery.isLoading
+                || queries.trainingHistoryQuery.isLoading
               }
               error={queries.trainingError}
             />

@@ -29,13 +29,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_kwargs = {
+    "allow_origins": settings.cors_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+
+# Development convenience: allow localhost origins on any port so Vite
+# port changes (e.g. 5173/5188) do not break login with CORS errors.
+if settings.app_env != "production":
+    cors_kwargs["allow_origin_regex"] = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 
 @app.middleware("http")

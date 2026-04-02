@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     local_detector_timeout_seconds: int = 5
     local_detector_person_threshold: float = 0.35
     local_detector_strict_block: bool = True
+    alert_lark_notify_enabled: bool = False
+    alert_lark_cli_bin: str = "lark-cli"
+    alert_lark_cli_timeout_seconds: int = 15
     storage_root: str = "./data/storage"
     provider_mock_fallback_enabled: bool = True
     cors_origins: Annotated[list[str], NoDecode] = DEFAULT_CORS_ORIGINS

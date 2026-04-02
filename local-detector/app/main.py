@@ -25,6 +25,14 @@ DEFAULT_CORS_ORIGINS = ",".join(
     for port in range(5173, 5181)
     for host in ("localhost", "127.0.0.1")
 )
+DEFAULT_CORS_ORIGIN_REGEX = (
+    r"^https?://("
+    r"localhost|127\.0\.0\.1|"
+    r"10(?:\.\d{1,3}){3}|"
+    r"192\.168(?:\.\d{1,3}){2}|"
+    r"172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2}"
+    r")(:\d+)?$"
+)
 
 MODEL_PATH = Path(os.getenv("DETECTOR_MODEL_PATH", "/tmp/models/yolox_nano.onnx"))
 MODEL_URL = os.getenv("DETECTOR_MODEL_URL", DEFAULT_MODEL_URL).strip()
@@ -34,8 +42,15 @@ SCORE_THRESHOLD = float(os.getenv("DETECTOR_SCORE_THRESHOLD", "0.2"))
 NMS_THRESHOLD = float(os.getenv("DETECTOR_NMS_THRESHOLD", "0.45"))
 DEFAULT_PERSON_THRESHOLD = float(os.getenv("DETECTOR_PERSON_THRESHOLD", "0.35"))
 DETECTOR_CORS_ORIGINS = os.getenv("DETECTOR_CORS_ORIGINS", DEFAULT_CORS_ORIGINS)
+DETECTOR_CORS_ORIGIN_REGEX = os.getenv("DETECTOR_CORS_ORIGIN_REGEX", DEFAULT_CORS_ORIGIN_REGEX).strip()
 DETECTOR_PREPROCESS_MODE = os.getenv("DETECTOR_PREPROCESS_MODE", "auto").strip().lower()
 DETECTOR_MODEL_PROFILE = os.getenv("DETECTOR_MODEL_PROFILE", "speed").strip().lower()
+DETECTOR_PERSON_FACE_FALLBACK = os.getenv("DETECTOR_PERSON_FACE_FALLBACK", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 VALID_PREPROCESS_MODES = {"auto", "bgr_255", "rgb_255", "bgr_01", "rgb_01"}
 MODEL_PROFILE_PRESETS = {
@@ -115,10 +130,13 @@ app = FastAPI(title="Local Detector Service", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[item.strip() for item in DETECTOR_CORS_ORIGINS.split(",") if item.strip()],
+    allow_origin_regex=DETECTOR_CORS_ORIGIN_REGEX or None,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_face_cascade: cv2.CascadeClassifier | None = None
 
 
 class DetectorEngine:
@@ -186,6 +204,7 @@ class DetectorEngine:
         latency_ms = int((time.perf_counter() - started) * 1000)
 
         person_confidence = 0.0
+        used_face_proxy = False
         mapped: list[dict[str, Any]] = []
         for det in detections:
             class_id = int(det["class_id"])
@@ -201,8 +220,19 @@ class DetectorEngine:
                 }
             )
 
+        if person_confidence < max(min(person_threshold, 1.0), 0.0) and DETECTOR_PERSON_FACE_FALLBACK:
+            proxy_confidence = _detect_person_proxy_from_face(image_bgr)
+            if proxy_confidence > person_confidence:
+                person_confidence = proxy_confidence
+                used_face_proxy = True
+
         pass_detect = person_confidence >= max(min(person_threshold, 1.0), 0.0)
-        reason = "person_detected" if pass_detect else f"person<{person_threshold:.2f}"
+        if pass_detect and used_face_proxy:
+            reason = "person_detected(face_proxy)"
+        elif pass_detect:
+            reason = "person_detected"
+        else:
+            reason = f"person<{person_threshold:.2f}"
         return {
             "signals": {
                 "person": round(person_confidence, 4),
@@ -684,6 +714,57 @@ def _build_best_input_tensor(
         return fallback_tensor, fallback_ratio, "bgr_255"
 
     return best_tensor, best_ratio, best_variant
+
+
+def _detect_person_proxy_from_face(image_bgr: np.ndarray) -> float:
+    cascade = _get_face_cascade()
+    if cascade is None:
+        return 0.0
+    if image_bgr is None or image_bgr.size == 0:
+        return 0.0
+    height, width = image_bgr.shape[:2]
+    if height <= 2 or width <= 2:
+        return 0.0
+    image_area = float(height * width)
+    best_area_ratio = 0.0
+    found = 0
+
+    rotations = (
+        image_bgr,
+        cv2.rotate(image_bgr, cv2.ROTATE_90_CLOCKWISE),
+        cv2.rotate(image_bgr, cv2.ROTATE_180),
+        cv2.rotate(image_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE),
+    )
+    for rotated in rotations:
+        gray = cv2.cvtColor(rotated, cv2.COLOR_BGR2GRAY)
+        faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(20, 20))
+        if faces is None or len(faces) == 0:
+            continue
+        found += int(len(faces))
+        for _x, _y, w, h in faces:
+            area_ratio = float(w * h) / image_area
+            if area_ratio > best_area_ratio:
+                best_area_ratio = area_ratio
+
+    if found <= 0:
+        return 0.0
+    confidence = 0.38 + min(0.24, best_area_ratio * 8.0)
+    return float(min(confidence, 0.95))
+
+
+def _get_face_cascade() -> cv2.CascadeClassifier | None:
+    global _face_cascade
+    if _face_cascade is not None:
+        return _face_cascade
+    try:
+        cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        cascade = cv2.CascadeClassifier(cascade_path)
+        if cascade.empty():
+            return None
+        _face_cascade = cascade
+        return _face_cascade
+    except Exception:
+        return None
 
 
 def _estimate_max_score(output: np.ndarray) -> float:

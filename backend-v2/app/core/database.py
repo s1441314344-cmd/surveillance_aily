@@ -92,6 +92,8 @@ def ensure_runtime_schema_columns() -> None:
             "alert_event_id": "VARCHAR(36)",
         },
         "alert_events": {
+            "strategy_id": "VARCHAR(36)",
+            "strategy_name": "VARCHAR(120)",
             "status": "VARCHAR(20) DEFAULT 'open'",
             "message": "TEXT",
             "media_id": "VARCHAR(36)",
@@ -112,6 +114,20 @@ def ensure_runtime_schema_columns() -> None:
             "last_error": "TEXT",
             "next_retry_at": "TIMESTAMP",
             "last_attempt_at": "TIMESTAMP",
+        },
+        "alert_notification_routes": {
+            "strategy_id": "VARCHAR(36)",
+            "event_key": "VARCHAR(80)",
+            "severity": "VARCHAR(20)",
+            "camera_id": "VARCHAR(36)",
+            "recipient_type": "VARCHAR(20)",
+            "recipient_id": "VARCHAR(120)",
+            "enabled": "BOOLEAN DEFAULT true",
+            "priority": "INTEGER DEFAULT 100",
+            "cooldown_seconds": "INTEGER DEFAULT 0",
+            "message_template": "TEXT",
+            "last_error": "TEXT",
+            "last_delivered_at": "TIMESTAMP",
         },
         "model_call_logs": {
             "trigger_source": "VARCHAR(80)",
@@ -140,6 +156,10 @@ def ensure_runtime_schema_columns() -> None:
             "source_created_at": "TIMESTAMP",
             "sample_payload": "JSON",
             "reviewed_at": "TIMESTAMP",
+            "is_reflowed": "BOOLEAN DEFAULT false",
+            "reflowed_at": "TIMESTAMP",
+            "reflow_run_id": "VARCHAR(36)",
+            "reflow_dataset_id": "VARCHAR(36)",
         },
         "feedback_training_datasets": {
             "strategy_id": "VARCHAR(36)",
@@ -187,6 +207,9 @@ def ensure_runtime_schema_columns() -> None:
             "review_comment": "TEXT",
             "release_payload": "JSON",
             "is_published": "BOOLEAN DEFAULT false",
+        },
+        "feedback_training_configs": {
+            "min_samples": "INTEGER DEFAULT 30",
         },
     }
 
@@ -309,6 +332,15 @@ def ensure_runtime_schema_columns() -> None:
                     )
                 )
 
+        if "feedback_training_candidates" in inspector.get_table_names():
+            connection.execute(
+                text(
+                    "UPDATE feedback_training_candidates "
+                    "SET is_reflowed = false "
+                    "WHERE is_reflowed IS NULL"
+                )
+            )
+
         if "feedback_release_requests" in inspector.get_table_names():
             release_columns = {column["name"] for column in inspector.get_columns("feedback_release_requests")}
             if "reviewer" in release_columns and "reviewed_by" in release_columns:
@@ -321,3 +353,12 @@ def ensure_runtime_schema_columns() -> None:
                         "AND reviewed_by <> ''"
                     )
                 )
+
+        if "feedback_training_configs" in inspector.get_table_names():
+            connection.execute(
+                text(
+                    "UPDATE feedback_training_configs "
+                    "SET min_samples = 30 "
+                    "WHERE min_samples IS NULL OR min_samples <= 0"
+                )
+            )

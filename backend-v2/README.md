@@ -173,6 +173,44 @@ curl http://localhost:8091/healthz
 - 管理端可通过 `POST /api/job-schedules/{id}/run-now` 对某个计划进行一次立即触发（仍按 `camera_schedule` 入队）。
 - `task_records`、`feedback`、`dashboard` 继续复用统一的任务闭环。
 
+## 告警通知路由（飞书 CLI）
+
+告警中心支持在 Webhook 之外，按策略/事件/摄像头/严重级别路由到飞书用户或群组。
+
+环境变量：
+
+- `ALERT_LARK_NOTIFY_ENABLED`：是否启用飞书通知路由发送（默认 `false`）
+- `ALERT_LARK_CLI_BIN`：飞书 CLI 命令名（默认 `lark-cli`）
+- `ALERT_LARK_CLI_TIMEOUT_SECONDS`：单次发送超时（秒，默认 `15`）
+
+路由管理接口：
+
+- `GET /api/alert-notification-routes`
+- `POST /api/alert-notification-routes`
+- `PATCH /api/alert-notification-routes/{route_id}`
+
+匹配与发送规则：
+
+- 仅匹配 `enabled=true` 的路由，按 `priority ASC -> created_at ASC -> id ASC` 依次处理
+- 支持按 `strategy_id`、`event_key`、`camera_id`、`severity` 组合过滤
+- 命中后调用 `lark-cli im +messages-send --as bot` 发送到 `user` 或 `chat`
+- `cooldown_seconds` 生效时，同一路由在冷却窗口内不会重复发送
+- 发送成功会刷新 `last_delivered_at`，失败会写入 `last_error`
+
+联调前置条件：
+
+- 本机可执行 `lark-cli`，并已完成登录授权（例如 `lark-cli auth login`）
+- 发送主体为 bot（代码固定 `--as bot`），需具备 IM 发送权限
+- 若发送到群组，bot 需在目标群内；若发送到用户，目标用户需在应用可见范围
+
+最小联调步骤：
+
+1. 在 `backend-v2/.env` 设置 `ALERT_LARK_NOTIFY_ENABLED=true`
+2. 重启 API 服务
+3. 在前端「告警中心 -> 通知路由（飞书）」新增一条路由（可绑定策略）
+4. 触发一条命中规则的告警（如 trigger rule `debug-live`）
+5. 检查飞书收信结果与路由字段 `last_delivered_at / last_error`
+
 ## 复核回流训练
 
 - 管理接口：
