@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -43,6 +44,8 @@ PRECHECK_SIGNAL_THRESHOLD = 0.5
 PRECHECK_LOCAL_STATE_TTL_SECONDS = 120
 PRECHECK_SOFT_NEGATIVE_THRESHOLD = 0.2
 PRECHECK_LOCAL_REFRESH_INTERVAL_SECONDS = 300
+PRECHECK_LOCAL_FRAME_SAMPLES = 3
+PRECHECK_LOCAL_SAMPLE_INTERVAL_MS = 200
 SIGNAL_MONITOR_PERSON_THRESHOLD = 0.6
 SIGNAL_MONITOR_DEFAULT_THRESHOLD = 0.5
 SIGNAL_MONITOR_STATE_TTL_SECONDS = 120
@@ -367,31 +370,32 @@ def _run_schedule_precheck_if_needed(
     precheck_config = _resolve_precheck_config(schedule.precheck_config)
     expected_signal_keys = _infer_expected_signal_keys(strategy_snapshot=build_strategy_snapshot(strategy))
 
-    try:
-        frame = capture_camera_frame(camera)
-    except CameraCaptureError as exc:
-        return False, f"Precheck capture failed: {exc}"
-    try:
-        frame, _ = apply_analysis_roi_to_frame(frame, analysis_roi)
-    except CameraRoiError as exc:
-        return False, f"Precheck ROI crop failed: {exc}"
-
-    try:
-        local_result = detect_with_local_detector(
-            camera=camera,
-            expected_signal_keys=expected_signal_keys,
-            person_threshold=float(precheck_config["person_threshold"]),
-            frame=frame,
-            analysis_roi=None,
-        )
-    except LocalDetectorError as exc:
+    local_gate = _run_schedule_local_gate_with_sampling(
+        camera=camera,
+        analysis_roi=analysis_roi,
+        expected_signal_keys=expected_signal_keys,
+        person_threshold=float(precheck_config["person_threshold"]),
+        frame_samples=int(precheck_config["frame_samples"]),
+        sample_interval_ms=int(precheck_config["sample_interval_ms"]),
+    )
+    if local_gate["error"] is not None:
         if settings.local_detector_strict_block:
-            return False, f"Precheck blocked by local detector: {exc}"
-        logger.warning("local detector unavailable for schedule_id=%s: %s", schedule.id, exc)
-        local_result = None
+            return False, f"Precheck blocked by local detector: {local_gate['error']}"
+        logger.warning("local detector unavailable for schedule_id=%s: %s", schedule.id, local_gate["error"])
+    else:
+        local_result = local_gate["result"]
+        if local_result is not None and not local_result.passed:
+            best_person = float(local_gate["best_person_confidence"])
+            threshold = float(precheck_config["person_threshold"])
+            attempts = int(local_gate["attempts"])
+            return False, (
+                "Precheck blocked by local detector: "
+                f"person<{threshold:.2f} (best={best_person:.3f}, sampled_frames={attempts})"
+            )
 
-    if local_result is not None and not local_result.passed:
-        return False, f"Precheck blocked by local detector: {local_result.reason}"
+    frame = local_gate.get("frame")
+    if frame is None:
+        return False, "Precheck capture failed: no valid frame after sampling"
 
     storage = FileStorageService(root=camera.storage_path or None)
     frame_path = storage.save_bytes(
@@ -452,6 +456,88 @@ def _run_schedule_precheck_if_needed(
     if matched:
         return True, None
     return False, f"Precheck not matched (strategy={strategy.id})"
+
+
+def _run_schedule_local_gate_with_sampling(
+    *,
+    camera: Camera,
+    analysis_roi: dict | None,
+    expected_signal_keys: set[str],
+    person_threshold: float,
+    frame_samples: int,
+    sample_interval_ms: int,
+) -> dict:
+    attempts = max(1, min(int(frame_samples or 1), 5))
+    interval_ms = max(0, min(int(sample_interval_ms or 0), 2000))
+
+    best_frame = None
+    best_result = None
+    best_person_confidence = -1.0
+
+    for index in range(attempts):
+        try:
+            frame = capture_camera_frame(camera)
+        except CameraCaptureError as exc:
+            return {
+                "frame": None,
+                "result": None,
+                "best_person_confidence": 0.0,
+                "attempts": index + 1,
+                "error": f"capture failed: {exc}",
+            }
+        try:
+            frame, _ = apply_analysis_roi_to_frame(frame, analysis_roi)
+        except CameraRoiError as exc:
+            return {
+                "frame": None,
+                "result": None,
+                "best_person_confidence": 0.0,
+                "attempts": index + 1,
+                "error": f"ROI crop failed: {exc}",
+            }
+
+        try:
+            local_result = detect_with_local_detector(
+                camera=camera,
+                expected_signal_keys=expected_signal_keys,
+                person_threshold=person_threshold,
+                frame=frame,
+                analysis_roi=None,
+            )
+        except LocalDetectorError as exc:
+            return {
+                "frame": None,
+                "result": None,
+                "best_person_confidence": 0.0,
+                "attempts": index + 1,
+                "error": str(exc),
+            }
+
+        person_confidence = float((local_result.signals or {}).get("person") or 0.0)
+        if person_confidence >= best_person_confidence:
+            best_person_confidence = person_confidence
+            best_frame = frame
+            best_result = local_result
+
+        if local_result.passed:
+            return {
+                "frame": frame,
+                "result": local_result,
+                "best_person_confidence": person_confidence,
+                "attempts": index + 1,
+                "error": None,
+            }
+
+        if index < attempts - 1 and interval_ms > 0:
+            time.sleep(interval_ms / 1000.0)
+
+    return {
+        "frame": best_frame,
+        "result": best_result,
+        "best_person_confidence": max(best_person_confidence, 0.0),
+        "attempts": attempts,
+        "error": None,
+    }
 
 
 def _infer_expected_signal_keys(*, strategy_snapshot: dict) -> set[str]:
@@ -553,6 +639,8 @@ def _resolve_precheck_config(raw_config: dict | None) -> dict[str, float | int]:
     soft_negative_threshold = float(config.get("soft_negative_threshold", PRECHECK_SOFT_NEGATIVE_THRESHOLD))
     state_ttl_seconds = int(config.get("state_ttl_seconds", PRECHECK_LOCAL_STATE_TTL_SECONDS))
     refresh_interval_seconds = int(config.get("refresh_interval_seconds", PRECHECK_LOCAL_REFRESH_INTERVAL_SECONDS))
+    frame_samples = int(config.get("frame_samples", PRECHECK_LOCAL_FRAME_SAMPLES))
+    sample_interval_ms = int(config.get("sample_interval_ms", PRECHECK_LOCAL_SAMPLE_INTERVAL_MS))
 
     if person_threshold < 0 or person_threshold > 1:
         person_threshold = PRECHECK_SIGNAL_THRESHOLD
@@ -562,12 +650,22 @@ def _resolve_precheck_config(raw_config: dict | None) -> dict[str, float | int]:
         state_ttl_seconds = PRECHECK_LOCAL_STATE_TTL_SECONDS
     if refresh_interval_seconds < 0:
         refresh_interval_seconds = PRECHECK_LOCAL_REFRESH_INTERVAL_SECONDS
+    if frame_samples < 1:
+        frame_samples = PRECHECK_LOCAL_FRAME_SAMPLES
+    if frame_samples > 5:
+        frame_samples = 5
+    if sample_interval_ms < 0:
+        sample_interval_ms = 0
+    if sample_interval_ms > 2000:
+        sample_interval_ms = 2000
 
     return {
         "person_threshold": person_threshold,
         "soft_negative_threshold": soft_negative_threshold,
         "state_ttl_seconds": state_ttl_seconds,
         "refresh_interval_seconds": refresh_interval_seconds,
+        "frame_samples": frame_samples,
+        "sample_interval_ms": sample_interval_ms,
     }
 
 

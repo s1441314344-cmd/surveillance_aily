@@ -1,21 +1,16 @@
 import { useState } from 'react';
 import { Form } from 'antd';
+import { useAlertNotificationRouteFormState } from '@/pages/alerts/useAlertNotificationRouteFormState';
 import { useAlertWebhookFormState } from '@/pages/alerts/useAlertWebhookFormState';
 import { useAlertsFilterState } from '@/pages/alerts/useAlertsFilterState';
 import { useAlertsMutationState } from '@/pages/alerts/useAlertsMutationState';
 import { useAlertsQueryState } from '@/pages/alerts/useAlertsQueryState';
+import { useAlertNotificationRouteColumns } from '@/pages/alerts/useAlertNotificationRouteColumns';
 import { useAlertsTableColumns } from '@/pages/alerts/useAlertsTableColumns';
-import { type WebhookFormValues } from '@/pages/alerts/types';
-
-function buildWebhookFormMutations(mutations: ReturnType<typeof useAlertsMutationState>) {
-  return {
-    ackMutation: mutations.ackMutation,
-    resolveMutation: mutations.resolveMutation,
-    createWebhookMutation: mutations.createWebhookMutation,
-    updateWebhookMutation: mutations.updateWebhookMutation,
-    normalizeWebhookPayload: mutations.normalizeWebhookPayload,
-  };
-}
+import {
+  type NotificationRouteFormValues,
+  type WebhookFormValues,
+} from '@/pages/alerts/types';
 
 function useWebhookForms() {
   const [createForm] = Form.useForm<WebhookFormValues>();
@@ -23,10 +18,18 @@ function useWebhookForms() {
   return { createForm, updateForm };
 }
 
+function useNotificationRouteForms() {
+  const [createForm] = Form.useForm<NotificationRouteFormValues>();
+  const [updateForm] = Form.useForm<NotificationRouteFormValues>();
+  return { createForm, updateForm };
+}
+
 export function useAlertsPageController() {
   const { createForm, updateForm } = useWebhookForms();
+  const { createForm: notificationCreateForm, updateForm: notificationUpdateForm } = useNotificationRouteForms();
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedWebhookId, setSelectedWebhookId] = useState<string | null>(null);
+  const [selectedNotificationRouteId, setSelectedNotificationRouteId] = useState<string | null>(null);
   const filters = useAlertsFilterState();
 
   const queries = useAlertsQueryState({
@@ -37,11 +40,15 @@ export function useAlertsPageController() {
 
   const mutations = useAlertsMutationState();
 
-  const webhookFormMutations = buildWebhookFormMutations(mutations);
   const formState = useAlertWebhookFormState({
     createForm,
     updateForm,
-    mutations: webhookFormMutations,
+    mutations,
+  });
+  const notificationRouteFormState = useAlertNotificationRouteFormState({
+    createForm: notificationCreateForm,
+    updateForm: notificationUpdateForm,
+    mutations,
   });
 
   const columns = useAlertsTableColumns({
@@ -50,19 +57,29 @@ export function useAlertsPageController() {
     updateWebhookMutation: mutations.updateWebhookMutation,
     openWebhookEditor: formState.openWebhookEditor,
   });
+  const notificationRouteColumns = useAlertNotificationRouteColumns({
+    updateNotificationRouteMutation: mutations.updateNotificationRouteMutation,
+    openNotificationRouteEditor: notificationRouteFormState.openNotificationRouteEditor,
+  });
 
   return {
     createForm,
     updateForm,
+    notificationCreateForm,
+    notificationUpdateForm,
     selectedAlertId,
     setSelectedAlertId,
     selectedWebhookId,
     setSelectedWebhookId,
+    selectedNotificationRouteId,
+    setSelectedNotificationRouteId,
     filters,
     queries,
     mutations,
     formState,
+    notificationRouteFormState,
     columns,
+    notificationRouteColumns,
     handleResetEventFilters: filters.resetFilters,
   };
 }

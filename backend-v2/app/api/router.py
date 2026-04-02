@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    alert_notification_routes,
     alert_webhooks,
     alerts,
     audit_logs,
@@ -27,6 +28,11 @@ api_router.include_router(me.router, tags=["auth"])
 api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit-logs"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(alert_webhooks.router, prefix="/alert-webhooks", tags=["alert-webhooks"])
+api_router.include_router(
+    alert_notification_routes.router,
+    prefix="/alert-notification-routes",
+    tags=["alert-notification-routes"],
+)
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(model_providers.router, prefix="/model-providers", tags=["model-providers"])
 api_router.include_router(strategies.router, prefix="/strategies", tags=["strategies"])

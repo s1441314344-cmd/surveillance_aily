@@ -166,6 +166,8 @@ def process_camera_signal_cycle(
             alert_event = create_alert_event(
                 db,
                 camera_id=camera.id,
+                strategy_id=strategy.id,
+                strategy_name=strategy.name,
                 rule_id=rule.id,
                 rule_name=rule.name,
                 event_key=evaluation.event_key,
@@ -174,6 +176,9 @@ def process_camera_signal_cycle(
                 media_id=media.id if media is not None else None,
                 payload={
                     "trigger_source": trigger_source,
+                    "camera_name": camera.name,
+                    "strategy_id": strategy.id,
+                    "strategy_name": strategy.name,
                     "signals": signals,
                     "normalized_json": normalized_json,
                     "expression_result": evaluation.expression_result,

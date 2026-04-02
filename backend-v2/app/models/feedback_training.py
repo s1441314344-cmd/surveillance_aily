@@ -25,6 +25,10 @@ class FeedbackTrainingCandidate(Base, TimestampMixin):
     source_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     sample_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_reflowed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    reflowed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reflow_run_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    reflow_dataset_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
 
 class FeedbackTrainingDataset(Base, TimestampMixin):
@@ -84,3 +88,10 @@ class FeedbackReleaseRequest(Base, TimestampMixin):
     review_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     release_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class FeedbackTrainingConfig(Base, TimestampMixin):
+    __tablename__ = "feedback_training_configs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    min_samples: Mapped[int] = mapped_column(Integer, default=30, nullable=False)

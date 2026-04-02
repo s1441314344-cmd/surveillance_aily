@@ -92,3 +92,32 @@ class TrainingRunReviewRead(BaseModel):
     reviewed_at: str | None = None
     reviewer: str | None = None
     comment: str | None = None
+
+
+class TrainingHistoryRead(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    candidate_id: str
+    record_id: str
+    strategy_id: str
+    strategy_name: str
+    judgement: str
+    reviewer: str | None = None
+    comment: str | None = None
+    model_provider: str
+    model_name: str
+    reflowed_at: str | None = None
+    reflow_run_id: str | None = None
+    reflow_dataset_id: str | None = None
+
+
+class TrainingConfigRead(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    min_samples: int
+
+
+class TrainingConfigUpdate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    min_samples: int

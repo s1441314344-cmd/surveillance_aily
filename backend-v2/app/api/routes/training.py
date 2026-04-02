@@ -5,7 +5,10 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
 from app.schemas.training import (
+    TrainingConfigRead,
+    TrainingConfigUpdate,
     TrainingDatasetRead,
+    TrainingHistoryRead,
     TrainingOverviewRead,
     TrainingPipelineRunRead,
     TrainingPipelineRunRequest,
@@ -16,12 +19,15 @@ from app.schemas.training import (
 )
 from app.services.feedback_training_pipeline_service import (
     approve_training_run,
+    get_training_config,
     get_training_overview,
     get_training_run_detail_or_404,
     list_training_datasets,
+    list_training_history,
     list_training_runs,
     reject_training_run,
     run_feedback_training_pipeline,
+    update_training_config,
 )
 from app.services.rbac import ROLE_STRATEGY_CONFIGURATOR, ROLE_SYSTEM_ADMIN
 
@@ -35,6 +41,23 @@ def training_overview(
     db: Session = Depends(get_db),
 ):
     return get_training_overview(db, provider=provider)
+
+
+@router.get("/config", response_model=TrainingConfigRead)
+def training_config(
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR)),
+    db: Session = Depends(get_db),
+):
+    return get_training_config(db)
+
+
+@router.put("/config", response_model=TrainingConfigRead)
+def put_training_config(
+    payload: TrainingConfigUpdate,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR)),
+    db: Session = Depends(get_db),
+):
+    return update_training_config(db, payload)
 
 
 @router.post("/pipeline/run", response_model=TrainingPipelineRunRead)
@@ -82,6 +105,22 @@ def training_runs(
         provider=provider,
         strategy_id=strategy_id,
         status_filter=status,
+        limit=limit,
+    )
+
+
+@router.get("/history", response_model=list[TrainingHistoryRead])
+def training_history(
+    provider: str | None = None,
+    strategy_id: str | None = None,
+    limit: int = 100,
+    _: CurrentUser = Depends(require_roles(ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR)),
+    db: Session = Depends(get_db),
+):
+    return list_training_history(
+        db,
+        provider=provider,
+        strategy_id=strategy_id,
         limit=limit,
     )
 

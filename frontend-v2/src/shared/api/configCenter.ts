@@ -79,6 +79,10 @@ export type TrainingOverview = {
   last_error: string | null;
 };
 
+export type TrainingConfig = {
+  min_samples: number;
+};
+
 export type TrainingDataset = {
   id: string;
   strategy_id: string;
@@ -114,6 +118,21 @@ export type TrainingRun = {
   finished_at: string | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+export type TrainingHistory = {
+  candidate_id: string;
+  record_id: string;
+  strategy_id: string;
+  strategy_name: string;
+  judgement: string;
+  reviewer: string | null;
+  comment: string | null;
+  model_provider: string;
+  model_name: string;
+  reflowed_at: string | null;
+  reflow_run_id: string | null;
+  reflow_dataset_id: string | null;
 };
 
 export type TrainingRunDetail = TrainingRun & {
@@ -399,6 +418,8 @@ export type AlertRecord = {
   id: string;
   camera_id: string | null;
   camera_name: string | null;
+  strategy_id: string | null;
+  strategy_name: string | null;
   alert_type: string;
   severity: string;
   status: string;
@@ -418,6 +439,8 @@ export type AlertRecord = {
 type AlertRecordWire = {
   id: string;
   camera_id: string | null;
+  strategy_id?: string | null;
+  strategy_name?: string | null;
   rule_id: string | null;
   rule_name: string | null;
   event_key: string;
@@ -456,6 +479,72 @@ export type AlertWebhookPayload = {
   secret?: string;
 };
 
+export type AlertNotificationRoute = {
+  id: string;
+  name: string;
+  strategy_id: string | null;
+  strategy_name: string | null;
+  event_key: string | null;
+  severity: string | null;
+  camera_id: string | null;
+  recipient_type: 'user' | 'chat';
+  recipient_id: string;
+  enabled: boolean;
+  priority: number;
+  cooldown_seconds: number;
+  message_template: string | null;
+  last_error: string | null;
+  last_delivered_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type AlertNotificationRoutePayload = {
+  name: string;
+  strategy_id?: string | null;
+  event_key?: string | null;
+  severity?: string | null;
+  camera_id?: string | null;
+  recipient_type: 'user' | 'chat';
+  recipient_id: string;
+  enabled?: boolean;
+  priority?: number;
+  cooldown_seconds?: number;
+  message_template?: string | null;
+};
+
+export type AlertFeishuUserCandidate = {
+  id: string;
+  open_id: string;
+  user_id: string | null;
+  employee_id: string | null;
+  name: string;
+  avatar_url: string | null;
+  department_ids: string[];
+};
+
+export type AlertFeishuUserSearchResult = {
+  items: AlertFeishuUserCandidate[];
+  has_more: boolean;
+  page_token: string | null;
+};
+
+export type AlertFeishuChatCandidate = {
+  id: string;
+  chat_id: string;
+  name: string;
+  avatar_url: string | null;
+  description: string | null;
+  owner_open_id: string | null;
+  external: boolean;
+};
+
+export type AlertFeishuChatSearchResult = {
+  items: AlertFeishuChatCandidate[];
+  has_more: boolean;
+  page_token: string | null;
+};
+
 type AlertWebhookWire = {
   id: string;
   name: string;
@@ -466,6 +555,8 @@ type AlertWebhookWire = {
   created_at: string | null;
   updated_at: string | null;
 };
+
+type AlertNotificationRouteWire = AlertNotificationRoute;
 
 function mapAlertWebhookWire(data: AlertWebhookWire): AlertWebhook {
   return {
@@ -499,6 +590,18 @@ function mapAlertRecordWire(data: AlertRecordWire): AlertRecord {
       payload && typeof payload.camera_name === 'string'
         ? payload.camera_name
         : null,
+    strategy_id:
+      typeof data.strategy_id === 'string'
+        ? data.strategy_id
+        : payload && typeof payload.strategy_id === 'string'
+          ? payload.strategy_id
+          : null,
+    strategy_name:
+      typeof data.strategy_name === 'string'
+        ? data.strategy_name
+        : payload && typeof payload.strategy_name === 'string'
+          ? payload.strategy_name
+          : null,
     alert_type: data.event_key,
     severity,
     status: mappedStatus,
@@ -579,6 +682,16 @@ export async function runTrainingPipeline(payload?: { strategy_id?: string }) {
   return response.data;
 }
 
+export async function getTrainingConfig() {
+  const response = await apiClient.get<TrainingConfig>('/api/training/config');
+  return response.data;
+}
+
+export async function updateTrainingConfig(payload: TrainingConfig) {
+  const response = await apiClient.put<TrainingConfig>('/api/training/config', payload);
+  return response.data;
+}
+
 export async function listTrainingDatasets(params?: {
   provider?: string;
   strategyId?: string;
@@ -605,6 +718,21 @@ export async function listTrainingRuns(params?: {
       provider: params?.provider || undefined,
       strategy_id: params?.strategyId || undefined,
       status: params?.status || undefined,
+      limit: params?.limit ?? 100,
+    },
+  });
+  return response.data;
+}
+
+export async function listTrainingHistory(params?: {
+  provider?: string;
+  strategyId?: string;
+  limit?: number;
+}) {
+  const response = await apiClient.get<TrainingHistory[]>('/api/training/history', {
+    params: {
+      provider: params?.provider || undefined,
+      strategy_id: params?.strategyId || undefined,
       limit: params?.limit ?? 100,
     },
   });
@@ -885,6 +1013,19 @@ export async function listAlertWebhooks() {
   return response.data.map(mapAlertWebhookWire);
 }
 
+export async function listAlertNotificationRoutes(params?: {
+  strategyId?: string;
+  enabled?: boolean;
+}) {
+  const response = await apiClient.get<AlertNotificationRouteWire[]>('/api/alert-notification-routes', {
+    params: {
+      strategy_id: params?.strategyId || undefined,
+      enabled: params?.enabled,
+    },
+  });
+  return response.data;
+}
+
 export async function createAlertWebhook(payload: AlertWebhookPayload) {
   const response = await apiClient.post<AlertWebhookWire>('/api/alert-webhooks', {
     name: payload.name,
@@ -904,6 +1045,58 @@ export async function updateAlertWebhook(webhookId: string, payload: Partial<Ale
     secret: payload.secret,
   });
   return mapAlertWebhookWire(response.data);
+}
+
+export async function createAlertNotificationRoute(payload: AlertNotificationRoutePayload) {
+  const response = await apiClient.post<AlertNotificationRouteWire>('/api/alert-notification-routes', payload);
+  return response.data;
+}
+
+export async function updateAlertNotificationRoute(
+  routeId: string,
+  payload: Partial<AlertNotificationRoutePayload>,
+) {
+  const response = await apiClient.patch<AlertNotificationRouteWire>(
+    `/api/alert-notification-routes/${routeId}`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function searchAlertFeishuUsers(params: {
+  keyword: string;
+  limit?: number;
+  pageToken?: string;
+}) {
+  const response = await apiClient.get<AlertFeishuUserSearchResult>(
+    '/api/alert-notification-routes/recipients/users/search',
+    {
+      params: {
+        keyword: params.keyword,
+        limit: params.limit ?? 20,
+        page_token: params.pageToken || undefined,
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function searchAlertFeishuChats(params?: {
+  keyword?: string;
+  limit?: number;
+  pageToken?: string;
+}) {
+  const response = await apiClient.get<AlertFeishuChatSearchResult>(
+    '/api/alert-notification-routes/recipients/chats/search',
+    {
+      params: {
+        keyword: params?.keyword?.trim() || undefined,
+        limit: params?.limit ?? 20,
+        page_token: params?.pageToken || undefined,
+      },
+    },
+  );
+  return response.data;
 }
 
 export async function fetchCameraMediaFile(cameraId: string, mediaId: string) {

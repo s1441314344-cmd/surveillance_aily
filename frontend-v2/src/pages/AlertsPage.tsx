@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { Tabs } from 'antd';
 import { PageHeader } from '@/shared/ui';
 import { AlertEventsTab } from '@/pages/alerts/AlertEventsTab';
+import { AlertNotificationRouteEditModal } from '@/pages/alerts/AlertNotificationRouteEditModal';
+import { AlertNotificationRoutesWorkspace } from '@/pages/alerts/AlertNotificationRoutesWorkspace';
 import { AlertSummaryBadges } from '@/pages/alerts/AlertSummaryBadges';
 import { AlertWebhookEditModal } from '@/pages/alerts/AlertWebhookEditModal';
 import { AlertWebhooksWorkspace } from '@/pages/alerts/AlertWebhooksWorkspace';
@@ -15,13 +17,27 @@ export function AlertsPage() {
     setSelectedAlertId,
     selectedWebhookId,
     setSelectedWebhookId,
+    selectedNotificationRouteId,
+    setSelectedNotificationRouteId,
     filters,
     queries,
     mutations,
     formState,
+    notificationRouteFormState,
     columns,
+    notificationRouteColumns,
+    notificationCreateForm,
+    notificationUpdateForm,
     handleResetEventFilters,
   } = useAlertsPageController();
+  const strategyOptions = useMemo(
+    () =>
+      queries.strategies.map((item) => ({
+        label: item.name,
+        value: item.id,
+      })),
+    [queries.strategies],
+  );
   const tabsItems = useMemo(
     () => [
       {
@@ -62,6 +78,24 @@ export function AlertsPage() {
           />
         ),
       },
+      {
+        key: 'notification-routes',
+        label: '通知路由（飞书）',
+        children: (
+          <AlertNotificationRoutesWorkspace
+            loading={queries.notificationRoutesQuery.isLoading || queries.strategiesQuery.isLoading}
+            error={queries.notificationRoutesError || queries.strategiesError}
+            routes={queries.notificationRoutes}
+            selectedRouteId={selectedNotificationRouteId}
+            columns={notificationRouteColumns}
+            createForm={notificationCreateForm}
+            createLoading={mutations.createNotificationRouteMutation.isPending}
+            strategyOptions={strategyOptions}
+            onCreateRoute={notificationRouteFormState.handleCreateNotificationRoute}
+            onSelectRoute={setSelectedNotificationRouteId}
+          />
+        ),
+      },
     ],
     [
       filters.statusFilter,
@@ -76,16 +110,29 @@ export function AlertsPage() {
       queries.webhooksQuery.isLoading,
       queries.webhooksError,
       queries.webhooks,
+      queries.notificationRoutesQuery.isLoading,
+      queries.notificationRoutesError,
+      queries.notificationRoutes,
+      queries.strategiesQuery.isLoading,
+      queries.strategiesError,
+      queries.strategies,
       selectedAlertId,
       selectedWebhookId,
+      selectedNotificationRouteId,
       columns.alertColumns,
       columns.webhookColumns,
+      notificationRouteColumns,
       handleResetEventFilters,
       setSelectedAlertId,
       setSelectedWebhookId,
+      setSelectedNotificationRouteId,
       createForm,
+      notificationCreateForm,
       formState.handleCreateWebhook,
+      notificationRouteFormState.handleCreateNotificationRoute,
       mutations.createWebhookMutation.isPending,
+      mutations.createNotificationRouteMutation.isPending,
+      strategyOptions,
     ],
   );
 
@@ -117,6 +164,15 @@ export function AlertsPage() {
         confirmLoading={mutations.updateWebhookMutation.isPending}
         onCancel={formState.closeWebhookEditor}
         onSubmit={formState.handleUpdateWebhook}
+      />
+
+      <AlertNotificationRouteEditModal
+        form={notificationUpdateForm}
+        open={Boolean(notificationRouteFormState.editingRoute)}
+        confirmLoading={mutations.updateNotificationRouteMutation.isPending}
+        strategyOptions={strategyOptions}
+        onCancel={notificationRouteFormState.closeNotificationRouteEditor}
+        onSubmit={notificationRouteFormState.handleUpdateNotificationRoute}
       />
     </div>
   );

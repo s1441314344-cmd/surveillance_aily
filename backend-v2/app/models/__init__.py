@@ -1,4 +1,9 @@
-from app.models.alert import AlertEvent, AlertWebhookDelivery, AlertWebhookEndpoint
+from app.models.alert import (
+    AlertEvent,
+    AlertNotificationRoute,
+    AlertWebhookDelivery,
+    AlertWebhookEndpoint,
+)
 from app.models.audit_log import OperationAuditLog
 from app.models.base import Base
 from app.models.camera import Camera, CameraStatusLog, CameraTriggerRule
@@ -9,6 +14,7 @@ from app.models.file_asset import FileAsset
 from app.models.feedback_training import (
     FeedbackReleaseRequest,
     FeedbackTrainingCandidate,
+    FeedbackTrainingConfig,
     FeedbackTrainingDataset,
     FeedbackTrainingRun,
 )
@@ -22,6 +28,7 @@ from app.models.task_record import PredictionFeedback, TaskRecord
 __all__ = [
     "AnalysisStrategy",
     "AlertEvent",
+    "AlertNotificationRoute",
     "AlertWebhookDelivery",
     "AlertWebhookEndpoint",
     "Base",
@@ -35,6 +42,7 @@ __all__ = [
     "DashboardDefinition",
     "FeedbackReleaseRequest",
     "FeedbackTrainingCandidate",
+    "FeedbackTrainingConfig",
     "FeedbackTrainingDataset",
     "FeedbackTrainingRun",
     "FileAsset",
