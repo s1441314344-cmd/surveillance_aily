@@ -22,6 +22,7 @@ from app.services.ids import generate_id
 from app.services.job_schedule_service import SCHEDULE_STATUS_ACTIVE, calculate_next_run_at
 from app.services.storage import FileStorageService
 from app.services.strategy_service import build_strategy_snapshot, get_strategy_or_404
+from app.services.task_dispatcher import dispatch_job_processing
 
 settings = get_settings()
 
@@ -445,10 +446,7 @@ def _queue_job_processing(db: Session, job: Job, dispatch: bool | None = None) -
         return
 
     try:
-        from app.workers.tasks import process_job
-
-        async_result = process_job.delay(job.id)
-        job.celery_task_id = async_result.id
+        job.celery_task_id = dispatch_job_processing(job_id=job.id)
         db.commit()
     except Exception as exc:  # pragma: no cover - broker/runtime dependent
         job.status = JOB_STATUS_FAILED

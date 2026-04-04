@@ -25,7 +25,6 @@ from app.services.camera_signal_monitor_service import (
     list_due_monitor_configs,
     mark_monitor_error,
 )
-from app.services.camera_signal_pipeline_service import process_camera_signal_cycle
 from app.services.camera_service import check_camera_status
 from app.services.ids import generate_id
 from app.services.job_schedule_service import calculate_next_run_at
@@ -34,9 +33,11 @@ from app.services.local_detector_service import LocalDetectorError, detect_with_
 from app.services.model_call_log_service import build_model_call_details, create_model_call_log
 from app.services.providers.base import ProviderRequest
 from app.services.providers.factory import get_provider_adapter
+from app.services.scheduler_signal_monitor_sweep_service import process_due_monitor_config
 from app.services.signal_extractor import extract_signals
 from app.services.storage import FileStorageService
 from app.services.strategy_service import build_strategy_snapshot, get_strategy_or_404
+from app.services.task_dispatcher import dispatch_signal_monitor_cycle
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -177,43 +178,24 @@ def run_due_signal_monitors_once_with_db(
     now: datetime | None = None,
     dispatch_jobs: bool | None = None,
 ) -> list[str]:
-    from app.workers.tasks import process_camera_cycle as enqueue_signal_cycle
-
     current_time = _ensure_aware(now or datetime.now(timezone.utc))
     due_configs = list_due_monitor_configs(db, now=current_time)
     processed_camera_ids: list[str] = []
     should_dispatch = settings.celery_enabled if dispatch_jobs is None else dispatch_jobs
 
     for config in due_configs:
-        try:
-            if bool(getattr(config, "strict_local_gate", True)):
-                local_gate_passed, local_gate_message = _run_signal_monitor_local_gate(
-                    db=db,
-                    camera_id=config.camera_id,
-                    strategy_id=config.signal_strategy_id,
-                    monitor_config=config,
-                )
-                if not local_gate_passed:
-                    advance_monitor_schedule(config, now=current_time)
-                    config.last_error = local_gate_message or "Signal monitor local gate blocked"
-                    db.commit()
-                    continue
-
-            advance_monitor_schedule(config, now=current_time)
-            db.commit()
-            if should_dispatch:
-                enqueue_signal_cycle.delay(config.camera_id, "signal_monitor")
-            else:
-                process_camera_signal_cycle(db, camera_id=config.camera_id, trigger_source="signal_monitor_inline")
+        processed = process_due_monitor_config(
+            db=db,
+            config=config,
+            current_time=current_time,
+            should_dispatch=should_dispatch,
+            run_local_gate=_run_signal_monitor_local_gate,
+            advance_schedule=advance_monitor_schedule,
+            mark_error=mark_monitor_error,
+            dispatch_cycle=dispatch_signal_monitor_cycle,
+        )
+        if processed:
             processed_camera_ids.append(config.camera_id)
-        except Exception as exc:  # pragma: no cover - safety fallback
-            db.rollback()
-            persisted_config = db.get(type(config), config.id)
-            if persisted_config is None:
-                continue
-            mark_monitor_error(persisted_config, error_message=str(exc), now=current_time)
-            db.commit()
-            logger.warning("signal monitor cycle failed for camera_id=%s: %s", config.camera_id, exc)
 
     return processed_camera_ids
 
