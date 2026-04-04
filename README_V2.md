@@ -1,13 +1,20 @@
 # 智能巡检系统 V2
 
-V2 按“先拆 backlog，再建工程骨架”的方式推进，当前仓库已经补齐需求基线、实施设计、执行分工和 Phase 1 工程骨架。
+V2 按“先统一基线与证据链，再推进工程骨架”的方式推进，当前仓库以冻结版需求基线、实施设计、追踪矩阵和验收清单作为唯一交付口径。
 
 ## 文档入口
 
-- `docs/智能巡检系统_需求规格与功能更新方案_v2.md`
-- `docs/智能巡检系统_V2_实施计划与功能设计方案.md`
-- `docs/智能巡检系统_V2_技术架构搭建与功能清单整改方案.md`
-- `docs/智能巡检系统_V2_Backlog与工程骨架方案.md`
+- `docs/INDEX.md`（目录索引）
+- `docs/product/智能巡检系统_需求规格与功能更新方案_v2.md`
+- `docs/plan/智能巡检系统_V2_实施计划与功能设计方案.md`
+- `docs/architecture/智能巡检系统_V2_技术架构搭建与功能清单整改方案.md`
+- `docs/architecture/智能巡检系统_V2_终版综合分析报告.md`
+- `docs/plan/智能巡检系统_V2_Backlog与工程骨架方案.md`
+- `docs/plan/智能巡检系统_V2_需求到验证追踪矩阵.md`
+- `docs/plan/智能巡检系统_V2_协作与缺陷治理规范.md`
+- `docs/testing/智能巡检系统_V2_全量验收清单.md`
+- `docs/testing/智能巡检系统_V2_提审模板.md`
+- `docs/testing/摄像头中心_抽帧触发规则配置说明与测试报告.md`
 
 ## 工程目录
 
@@ -21,6 +28,30 @@ V2 按“先拆 backlog，再建工程骨架”的方式推进，当前仓库已
 - `docker` / `docker compose`
 - `python3`
 - `node` / `npm`
+
+## 快速开始
+
+查看可用命令：
+
+```bash
+make v2-help
+```
+
+准备本地环境：
+
+```bash
+make v2-setup
+make v2-dev
+```
+
+分别启动核心进程：
+
+```bash
+make v2-api
+make v2-worker
+make v2-scheduler
+make v2-frontend
+```
 
 ## 推荐联调命令
 
@@ -95,6 +126,15 @@ make v2-preflight
 ./scripts/v2/preflight.sh --with-e2e
 ```
 
+如需单独执行发布前安全验证与切换期对账：
+
+```bash
+make v2-security
+make v2-reconcile
+./scripts/v2/security.sh --output-dir /tmp/v2-security
+./scripts/v2/reconcile.sh --output-dir /tmp/v2-reconcile
+```
+
 如需单独控制依赖：
 
 ```bash
@@ -161,13 +201,65 @@ cd backend-v2
 python3 -m celery -A app.core.celery_app.celery_app worker --loglevel=info
 ```
 
-4. 启动前端
+4. 启动 scheduler
+
+```bash
+cd backend-v2
+python -m app.schedulers.runner
+```
+
+5. 启动前端
 
 ```bash
 cd frontend-v2
 npm install
 npm run dev
 ```
+
+## 模块运行要点
+
+### 后端
+
+- 环境变量：`cp .env.example .env`（完整配置项见 `.env.example`）
+- 依赖服务：`docker compose -f ../docker-compose.v2.yml up -d postgres redis local-detector`
+- 关键进程：API / worker / scheduler 三个进程需要同时运行
+- 本地检测健康检查：`curl http://localhost:8091/healthz`
+- 常用环境变量：
+  - `SCHEDULER_POLL_INTERVAL_SECONDS` / `SCHEDULER_CAMERA_STATUS_SWEEP_ENABLED`
+  - `LOCAL_DETECTOR_BASE_URL` / `LOCAL_DETECTOR_TIMEOUT_SECONDS` / `LOCAL_DETECTOR_PERSON_THRESHOLD`
+  - `FEEDBACK_TRAINING_ENABLED` / `FEEDBACK_TRAINING_CRON`
+  - `ALERT_LARK_NOTIFY_ENABLED` / `ALERT_LARK_CLI_BIN` / `ALERT_LARK_CLI_TIMEOUT_SECONDS`
+  - `ZHIPU_API_KEY` / `OPENAI_API_KEY` / `ARK_API_KEY`
+- 告警通知路由（飞书 CLI）：`/api/alert-notification-routes` 系列接口，需开启 `ALERT_LARK_NOTIFY_ENABLED`
+
+#### 策略输出格式
+
+- `/api/strategies` 支持 `result_format`
+- 可选值：`json_schema`、`json_object`、`auto`、`text`
+- 推荐默认：`json_schema`
+
+#### 异步执行链路
+
+- `POST /api/jobs/uploads`：创建上传任务
+- `POST /api/jobs/cameras/once`：创建摄像头单次任务
+- worker 负责抓帧、模型调用、Schema 校验与记录写入
+- scheduler 负责扫描 `job_schedules` 并创建到期任务
+- 摄像头状态巡检由 scheduler 周期写入 `camera_status_logs`
+
+### 前端
+
+- 安装依赖：`npm install`
+- 启动开发：`npm run dev`（默认端口 `5174`）
+- 常用检查：`npm run lint` / `npm run test` / `npm run build`
+- E2E 回归：`npx playwright install chromium` 后执行 `npm run e2e`
+
+#### 当前包含
+
+- 登录、会话状态与路由守卫
+- 401 自动刷新 access token
+- 基于角色的菜单过滤与页面级 RBAC 访问控制
+- 摄像头中心状态聚合与异常高亮
+- 任务中心、任务记录、人工反馈、看板分析、审计日志页面
 
 ## 当前阶段
 
