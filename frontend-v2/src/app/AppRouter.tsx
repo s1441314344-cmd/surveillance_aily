@@ -5,11 +5,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/layouts/AppLayout';
 import { useAuthStore } from '@/shared/state/authStore';
 import {
-  ROLE_ANALYSIS_VIEWER,
-  ROLE_MANUAL_REVIEWER,
-  ROLE_STRATEGY_CONFIGURATOR,
-  ROLE_SYSTEM_ADMIN,
-  ROLE_TASK_OPERATOR,
+  getRequiredRolesForPath,
   hasAnyRole,
 } from '@/shared/auth/permissions';
 
@@ -71,6 +67,8 @@ function RoleRoute({
 }
 
 export function AppRouter() {
+  const routeRoles = (path: string) => getRequiredRolesForPath(path) ?? [];
+
   return (
     <Suspense fallback={<RouterFallback />}>
       <Routes>
@@ -80,20 +78,20 @@ export function AppRouter() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route
             path="dashboards"
-            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN]} element={<DashboardsPage />} />}
+            element={<RoleRoute allowedRoles={routeRoles('/dashboards')} element={<DashboardsPage />} />}
           />
           <Route
             path="strategies"
             element={
               <RoleRoute
-                allowedRoles={[ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR]}
+                allowedRoles={routeRoles('/strategies')}
                 element={<StrategiesPage />}
               />
             }
           />
           <Route
             path="cameras"
-            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN]} element={<CamerasPage />} />}
+            element={<RoleRoute allowedRoles={routeRoles('/cameras')} element={<CamerasPage />} />}
           >
             <Route index element={<Navigate to="devices" replace />} />
             <Route path="devices" element={<CameraDevicesPane />} />
@@ -103,13 +101,13 @@ export function AppRouter() {
           </Route>
           <Route
             path="alerts"
-            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN, ROLE_ANALYSIS_VIEWER]} element={<AlertsPage />} />}
+            element={<RoleRoute allowedRoles={routeRoles('/alerts')} element={<AlertsPage />} />}
           />
           <Route
             path="jobs"
             element={
               <RoleRoute
-                allowedRoles={[ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR]}
+                allowedRoles={routeRoles('/jobs')}
                 element={<JobsPage />}
               />
             }
@@ -119,31 +117,31 @@ export function AppRouter() {
             path="feedback"
             element={
               <RoleRoute
-                allowedRoles={[ROLE_SYSTEM_ADMIN, ROLE_MANUAL_REVIEWER]}
+                allowedRoles={routeRoles('/feedback')}
                 element={<FeedbackPage />}
               />
             }
           />
           <Route
             path="audit-logs"
-            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN]} element={<AuditLogsPage />} />}
+            element={<RoleRoute allowedRoles={routeRoles('/audit-logs')} element={<AuditLogsPage />} />}
           />
           <Route
             path="settings"
             element={
               <RoleRoute
-                allowedRoles={[ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR]}
+                allowedRoles={routeRoles('/settings')}
                 element={<SettingsPage />}
               />
             }
           />
           <Route
             path="local-detector"
-            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN]} element={<LocalDetectorPage />} />}
+            element={<RoleRoute allowedRoles={routeRoles('/local-detector')} element={<LocalDetectorPage />} />}
           />
           <Route
             path="users"
-            element={<RoleRoute allowedRoles={[ROLE_SYSTEM_ADMIN]} element={<UsersPage />} />}
+            element={<RoleRoute allowedRoles={routeRoles('/users')} element={<UsersPage />} />}
           />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

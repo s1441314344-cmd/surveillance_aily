@@ -20,11 +20,8 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useAuthStore } from '@/shared/state/authStore';
 import {
-  ROLE_ANALYSIS_VIEWER,
-  ROLE_MANUAL_REVIEWER,
-  ROLE_STRATEGY_CONFIGURATOR,
-  ROLE_SYSTEM_ADMIN,
-  ROLE_TASK_OPERATOR,
+  APP_NAVIGATION_ITEMS,
+  type AppNavigationItem,
   getRoleLabel,
   hasAnyRole,
 } from '@/shared/auth/permissions';
@@ -33,109 +30,31 @@ import { StatusBadge } from '@/shared/ui';
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
 
-const menuItems: Array<{
+const menuItemIconMap: Record<string, ReactNode> = {
+  '/dashboard': <DashboardOutlined />,
+  '/dashboards': <AppstoreOutlined />,
+  '/strategies': <RobotOutlined />,
+  '/cameras': <CameraOutlined />,
+  '/alerts': <AlertOutlined />,
+  '/jobs': <ScheduleOutlined />,
+  '/records': <FileSearchOutlined />,
+  '/feedback': <SafetyCertificateOutlined />,
+  '/audit-logs': <AuditOutlined />,
+  '/settings': <SettingOutlined />,
+  '/local-detector': <ApiOutlined />,
+  '/users': <TeamOutlined />,
+};
+
+type MenuItem = AppNavigationItem & {
   key: string;
-  icon: ReactNode;
-  label: string;
-  description: string;
-  group: 'overview' | 'operations' | 'configuration' | 'governance';
-  requiredRoles?: readonly string[];
-}> = [
-  {
-    key: '/dashboard',
-    icon: <DashboardOutlined />,
-    label: '总览看板',
-    description: '监控全局指标、趋势和异常案例。',
-    group: 'overview',
-  },
-  {
-    key: '/dashboards',
-    icon: <AppstoreOutlined />,
-    label: '看板配置',
-    description: '维护可复用看板定义和展示规则。',
-    group: 'overview',
-    requiredRoles: [ROLE_SYSTEM_ADMIN],
-  },
-  {
-    key: '/strategies',
-    icon: <RobotOutlined />,
-    label: '策略中心',
-    description: '管理巡检策略、模型与输出约束。',
-    group: 'configuration',
-    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR],
-  },
-  {
-    key: '/cameras',
-    icon: <CameraOutlined />,
-    label: '摄像头中心',
-    description: '维护设备、监测规则、媒体与诊断。',
-    group: 'operations',
-    requiredRoles: [ROLE_SYSTEM_ADMIN],
-  },
-  {
-    key: '/alerts',
-    icon: <AlertOutlined />,
-    label: '告警中心',
-    description: '查看告警事件并管理 Webhook 分发。',
-    group: 'operations',
-    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_ANALYSIS_VIEWER],
-  },
-  {
-    key: '/jobs',
-    icon: <ScheduleOutlined />,
-    label: '任务中心',
-    description: '创建任务、跟踪队列与定时计划。',
-    group: 'operations',
-    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR],
-  },
-  {
-    key: '/records',
-    icon: <FileSearchOutlined />,
-    label: '任务记录',
-    description: '查询执行记录、原图与结构化结果。',
-    group: 'operations',
-  },
-  {
-    key: '/feedback',
-    icon: <SafetyCertificateOutlined />,
-    label: '人工复核',
-    description: '复核模型结论并沉淀反馈样本。',
-    group: 'operations',
-    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_MANUAL_REVIEWER],
-  },
-  {
-    key: '/audit-logs',
-    icon: <AuditOutlined />,
-    label: '操作审计',
-    description: '查看后台操作与异常行为轨迹。',
-    group: 'governance',
-    requiredRoles: [ROLE_SYSTEM_ADMIN],
-  },
-  {
-    key: '/settings',
-    icon: <SettingOutlined />,
-    label: '模型与设置',
-    description: '维护模型提供方并执行联调调试。',
-    group: 'configuration',
-    requiredRoles: [ROLE_SYSTEM_ADMIN, ROLE_STRATEGY_CONFIGURATOR],
-  },
-  {
-    key: '/local-detector',
-    icon: <ApiOutlined />,
-    label: '本地检测',
-    description: '查看本地检测服务状态并执行单图门控调试。',
-    group: 'configuration',
-    requiredRoles: [ROLE_SYSTEM_ADMIN],
-  },
-  {
-    key: '/users',
-    icon: <TeamOutlined />,
-    label: '用户与权限',
-    description: '管理用户状态、角色与系统治理。',
-    group: 'governance',
-    requiredRoles: [ROLE_SYSTEM_ADMIN],
-  },
-];
+  icon?: ReactNode;
+};
+
+const menuItems: readonly MenuItem[] = APP_NAVIGATION_ITEMS.map((item) => ({
+  ...item,
+  key: item.path,
+  icon: menuItemIconMap[item.path],
+}));
 
 const menuGroupTitleMap = {
   overview: '总览与洞察',
