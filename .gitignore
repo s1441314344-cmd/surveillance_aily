@@ -112,3 +112,4 @@ data/terminal_captures/
 data/hik_verify_*/
 data/screenshot_*
 data/screenshot_probe_*
+.worktrees/
