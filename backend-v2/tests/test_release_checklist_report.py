@@ -4,18 +4,27 @@ from app.services.release_checklist_service import (
 )
 
 
+def _uat_checks_with_gate_extensions(*, security: str | None = "passed", reconcile: str | None = "passed") -> dict:
+    checks = {
+        "backend_pytest": {"status": "passed"},
+        "frontend_lint": {"status": "passed"},
+        "frontend_unit": {"status": "passed"},
+        "frontend_build": {"status": "passed"},
+        "e2e": {"status": "passed"},
+    }
+    if security is not None:
+        checks["security"] = {"status": security}
+    if reconcile is not None:
+        checks["reconcile"] = {"status": reconcile}
+    return checks
+
+
 def test_release_checklist_ready_when_uat_and_drill_passed():
     checklist = build_release_checklist(
         uat_summary_path="/tmp/uat-summary.json",
         uat_summary={
             "result": "passed",
-            "checks": {
-                "backend_pytest": {"status": "passed"},
-                "frontend_lint": {"status": "passed"},
-                "frontend_unit": {"status": "passed"},
-                "frontend_build": {"status": "passed"},
-                "e2e": {"status": "passed"},
-            },
+            "checks": _uat_checks_with_gate_extensions(),
         },
         release_drill_report_path="/tmp/release-drill-report.json",
         release_drill_report={
@@ -38,11 +47,8 @@ def test_release_checklist_blocked_when_required_check_fails():
         uat_summary={
             "result": "failed",
             "checks": {
-                "backend_pytest": {"status": "passed"},
+                **_uat_checks_with_gate_extensions(),
                 "frontend_lint": {"status": "failed"},
-                "frontend_unit": {"status": "passed"},
-                "frontend_build": {"status": "passed"},
-                "e2e": {"status": "passed"},
             },
         },
         release_drill_report_path="/tmp/release-drill-report.json",
@@ -66,13 +72,7 @@ def test_release_checklist_allow_without_release_drill():
         uat_summary_path="/tmp/uat-summary.json",
         uat_summary={
             "result": "passed",
-            "checks": {
-                "backend_pytest": {"status": "passed"},
-                "frontend_lint": {"status": "passed"},
-                "frontend_unit": {"status": "passed"},
-                "frontend_build": {"status": "passed"},
-                "e2e": {"status": "passed"},
-            },
+            "checks": _uat_checks_with_gate_extensions(),
         },
         allow_without_release_drill=True,
     )
@@ -88,13 +88,7 @@ def test_release_checklist_markdown_contains_sections():
         uat_summary_path="/tmp/uat-summary.json",
         uat_summary={
             "result": "passed",
-            "checks": {
-                "backend_pytest": {"status": "passed"},
-                "frontend_lint": {"status": "passed"},
-                "frontend_unit": {"status": "passed"},
-                "frontend_build": {"status": "passed"},
-                "e2e": {"status": "passed"},
-            },
+            "checks": _uat_checks_with_gate_extensions(),
         },
         allow_without_release_drill=True,
     )
@@ -110,13 +104,7 @@ def test_release_checklist_blocks_when_backfill_apply_is_required_but_dry_run():
         uat_summary_path="/tmp/uat-summary.json",
         uat_summary={
             "result": "passed",
-            "checks": {
-                "backend_pytest": {"status": "passed"},
-                "frontend_lint": {"status": "passed"},
-                "frontend_unit": {"status": "passed"},
-                "frontend_build": {"status": "passed"},
-                "e2e": {"status": "passed"},
-            },
+            "checks": _uat_checks_with_gate_extensions(),
         },
         release_drill_report_path="/tmp/release-drill-report.json",
         release_drill_report={
@@ -131,3 +119,46 @@ def test_release_checklist_blocks_when_backfill_apply_is_required_but_dry_run():
 
     assert checklist.ready_to_release is False
     assert any("dry-run" in item for item in checklist.blockers)
+
+
+def test_release_checklist_blocks_when_security_check_missing():
+    checklist = build_release_checklist(
+        uat_summary_path="/tmp/uat-summary.json",
+        uat_summary={
+            "result": "passed",
+            "checks": _uat_checks_with_gate_extensions(security=None),
+        },
+        allow_without_release_drill=True,
+    )
+
+    assert checklist.ready_to_release is False
+    assert any("`security` is missing" in item for item in checklist.blockers)
+
+
+def test_release_checklist_blocks_when_reconcile_check_failed():
+    checklist = build_release_checklist(
+        uat_summary_path="/tmp/uat-summary.json",
+        uat_summary={
+            "result": "passed",
+            "checks": _uat_checks_with_gate_extensions(reconcile="failed"),
+        },
+        allow_without_release_drill=True,
+    )
+
+    assert checklist.ready_to_release is False
+    assert any("`reconcile` is failed" in item for item in checklist.blockers)
+
+
+def test_release_checklist_markdown_contains_new_gate_checks():
+    checklist = build_release_checklist(
+        uat_summary_path="/tmp/uat-summary.json",
+        uat_summary={
+            "result": "passed",
+            "checks": _uat_checks_with_gate_extensions(),
+        },
+        allow_without_release_drill=True,
+    )
+
+    markdown = render_release_checklist_markdown(checklist)
+    assert "| security | passed |" in markdown
+    assert "| reconcile | passed |" in markdown

@@ -4,9 +4,7 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 require_cmd python3
-require_cmd find
-require_cmd sort
-require_cmd head
+require_cmd date
 
 UAT_SUMMARY_PATH="${V2_RELEASE_CHECKLIST_UAT_SUMMARY_PATH:-}"
 RELEASE_DRILL_REPORT_PATH="${V2_RELEASE_CHECKLIST_DRILL_REPORT_PATH:-}"
@@ -27,15 +25,6 @@ Options:
   --output-dir <dir>              Output directory (default: data/release-checklists/<timestamp>)
   --help                          Show this message
 EOF
-}
-
-find_latest_file() {
-  local root="$1"
-  local filename="$2"
-  if [[ ! -d "${root}" ]]; then
-    return 1
-  fi
-  find "${root}" -type f -name "${filename}" -print 2>/dev/null | sort | tail -1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -72,19 +61,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${UAT_SUMMARY_PATH}" ]]; then
-  UAT_SUMMARY_PATH="$(find_latest_file "${ROOT_DIR}/data/uat-logs" "summary.json" || true)"
-fi
-if [[ -z "${RELEASE_DRILL_REPORT_PATH}" ]]; then
-  RELEASE_DRILL_REPORT_PATH="$(find_latest_file "${ROOT_DIR}/data/release-drill-logs" "release-drill-report.json" || true)"
-fi
-
-if [[ -z "${UAT_SUMMARY_PATH}" ]]; then
-  echo "[v2-release-checklist] UAT summary not found, pass --uat-summary or run make v2-uat" >&2
+  echo "[v2-release-checklist] UAT summary is required, pass --uat-summary explicitly" >&2
   exit 2
 fi
 if [[ -z "${RELEASE_DRILL_REPORT_PATH}" && "${ALLOW_WITHOUT_RELEASE_DRILL}" != "true" ]]; then
-  echo "[v2-release-checklist] release drill report not found, pass --release-drill-report or run make v2-release-drill" >&2
+  echo "[v2-release-checklist] release drill report is required unless --allow-without-release-drill is set" >&2
   exit 2
+fi
+require_readable_file "${UAT_SUMMARY_PATH}" "UAT summary"
+if [[ -n "${RELEASE_DRILL_REPORT_PATH}" ]]; then
+  require_readable_file "${RELEASE_DRILL_REPORT_PATH}" "release drill report"
 fi
 
 timestamp="$(date +%Y%m%d-%H%M%S)"

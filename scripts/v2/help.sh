@@ -23,6 +23,8 @@ Smart Inspection V2 local commands:
   make v2-eval         # run model evaluation dataset against provider adapters
   make v2-camera-check # run deep RTSP/mock camera diagnostic
   make v2-camera-validate # validate a whitelist manifest and export reports
+  make v2-security    # run dependency/security regression gate
+  make v2-reconcile   # run legacy backfill dry-run reconcile summary
   make v2-release-drill # run cutover drill (preflight + backfill + rollback-ready report)
   make v2-uat          # run UAT baseline (pytest + lint + vitest + build + e2e) and export summary
   make v2-release-checklist # build final release checklist from UAT + release drill artifacts
@@ -42,6 +44,8 @@ Recommended flow:
 Verification examples:
   make v2-backend-test
   make v2-frontend-test
+  make v2-security
+  make v2-reconcile
   make v2-uat
   make v2-verify
 
@@ -74,13 +78,13 @@ UAT examples:
   ./scripts/v2/uat.sh --with-release-drill --release-drill-apply-backfill
 
 Release checklist examples:
-  make v2-release-checklist
-  ./scripts/v2/release-checklist.sh --allow-without-release-drill
-  ./scripts/v2/release-checklist.sh --require-drill-apply-backfill
+  ./scripts/v2/release-checklist.sh --uat-summary /path/to/uat/summary.json --release-drill-report /path/to/release-drill-report.json
+  ./scripts/v2/release-checklist.sh --uat-summary /path/to/uat/summary.json --allow-without-release-drill
+  ./scripts/v2/release-checklist.sh --uat-summary /path/to/uat/summary.json --release-drill-report /path/to/release-drill-report.json --require-drill-apply-backfill
 
 Release gate examples:
   make v2-release-gate
   make v2-release-gate-final
-  ./scripts/v2/release-gate.sh --skip-uat --uat-summary /path/to/summary.json --release-drill-report /path/to/release-drill-report.json
+  ./scripts/v2/release-gate.sh --skip-uat --uat-summary /path/to/summary.json --release-drill-report /path/to/release-drill-report.json --override-reason "manual audit trail"
   ./scripts/v2/release-gate.sh --release-drill-apply-backfill --require-drill-apply-backfill
 EOF

@@ -6,9 +6,6 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 require_cmd python3
 require_cmd date
 require_cmd tee
-require_cmd grep
-require_cmd tail
-require_cmd sed
 ensure_backend_env
 
 RUN_PRECHECK="true"
@@ -27,7 +24,7 @@ Options:
   --skip-preflight         Skip integration preflight stage
   --skip-uat               Skip final UAT stage
   --preflight-with-e2e     Include E2E in preflight stage
-  --output-dir <dir>       Output directory (default: data/verify-logs/<timestamp>)
+  --output-dir <dir>       Output directory (default: data/verify-logs/<run_id>)
   --help                   Show this message
 EOF
 }
@@ -66,10 +63,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 timestamp="$(date +%Y%m%d-%H%M%S)"
+run_id="${V2_RUN_ID:-$(build_run_id "verify" "${timestamp}")}"
+git_sha="$(git_current_sha)"
+branch="$(git_current_branch)"
+git_dirty="$(git_is_dirty)"
+environment="$(resolve_v2_environment)"
 if [[ -z "${OUTPUT_DIR}" ]]; then
-  OUTPUT_DIR="${ROOT_DIR}/data/verify-logs/${timestamp}"
+  OUTPUT_DIR="${ROOT_DIR}/data/verify-logs/${run_id}"
 fi
 mkdir -p "${OUTPUT_DIR}"
+started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 precheck_backend_status="skipped"
 precheck_frontend_status="skipped"
@@ -86,6 +89,8 @@ summary_md="${OUTPUT_DIR}/summary.md"
 
 preflight_summary_path=""
 uat_summary_path=""
+preflight_output_dir="${OUTPUT_DIR}/preflight"
+uat_output_dir="${OUTPUT_DIR}/uat"
 
 if [[ "${RUN_PRECHECK}" == "true" ]]; then
   echo "[v2-verify] stage 1/3: precheck (backend unit tests)"
@@ -111,33 +116,57 @@ if [[ "${RUN_PREFLIGHT}" == "true" ]]; then
   if [[ "${PREFLIGHT_WITH_E2E}" == "true" ]]; then
     preflight_args+=(--with-e2e)
   fi
+  preflight_args+=(--output-dir "${preflight_output_dir}")
   if ./scripts/v2/preflight.sh "${preflight_args[@]}" | tee "${preflight_log}"; then
     preflight_status="passed"
   else
     preflight_status="failed"
     overall_status="failed"
   fi
-  preflight_summary_path="$(grep -E '^\[v2-preflight\] summary:' "${preflight_log}" | tail -1 | sed 's/^\[v2-preflight\] summary: //')"
+  preflight_summary_path="${preflight_output_dir}/summary.json"
+  if ! require_readable_file "${preflight_summary_path}" "preflight summary"; then
+    preflight_status="failed"
+    overall_status="failed"
+  fi
 fi
 
 if [[ "${RUN_UAT}" == "true" ]]; then
   echo "[v2-verify] stage 3/3: final UAT"
-  if ./scripts/v2/uat.sh --output-dir "${OUTPUT_DIR}/uat" | tee "${uat_log}"; then
+  if ./scripts/v2/uat.sh --output-dir "${uat_output_dir}" | tee "${uat_log}"; then
     uat_status="passed"
   else
     uat_status="failed"
     overall_status="failed"
   fi
-  uat_summary_path="$(grep -E '^\[v2-uat\] summary:' "${uat_log}" | tail -1 | sed 's/^\[v2-uat\] summary: //')"
+  uat_summary_path="${uat_output_dir}/summary.json"
+  if ! require_readable_file "${uat_summary_path}" "uat summary"; then
+    uat_status="failed"
+    overall_status="failed"
+  fi
 fi
+
+finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 python3 - <<PY
 import json
 from pathlib import Path
 
 summary = {
+    "run_id": "${run_id}",
+    "git_sha": "${git_sha}",
+    "branch": "${branch}",
+    "git_dirty": "${git_dirty}" == "true",
+    "started_at": "${started_at}",
+    "finished_at": "${finished_at}",
+    "environment": "${environment}",
     "result": "${overall_status}",
     "output_dir": "${OUTPUT_DIR}",
+    "parameter_summary": {
+        "run_precheck": "${RUN_PRECHECK}" == "true",
+        "run_preflight": "${RUN_PREFLIGHT}" == "true",
+        "run_uat": "${RUN_UAT}" == "true",
+        "preflight_with_e2e": "${PREFLIGHT_WITH_E2E}" == "true",
+    },
     "stages": {
         "precheck_backend_unit": {
             "status": "${precheck_backend_status}",
