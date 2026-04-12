@@ -120,6 +120,7 @@ data/uat-logs/
 data/release-checklists/
 data/release-gates/
 data/verify-logs/
+data/real-async-tests/
 data/manual_captures/
 data/terminal_captures/
 data/hik_verify_*/
