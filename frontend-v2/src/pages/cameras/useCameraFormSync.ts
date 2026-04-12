@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect -- camera form sync intentionally resets the form when the active camera changes. */
 import { useEffect } from 'react';
 import type { FormInstance } from 'antd';
 import type { Camera } from '@/shared/api/configCenter';

@@ -1,6 +1,7 @@
 import json
-
 import httpx
+import pytest
+from datetime import datetime, timezone
 
 from app.services.model_provider_service import ModelProviderRuntimeConfig
 from app.services.providers.base import ProviderRequest
@@ -187,6 +188,177 @@ def test_openai_adapter_accepts_v1_base_url_and_appends_responses(monkeypatch, t
 
     assert response.success is True
     assert captured["url"] == "https://api.openai.com/v1/responses"
+
+
+def test_openai_adapter_retries_429_then_succeeds(monkeypatch, tmp_path):
+    image_path = tmp_path / "retry.jpg"
+    image_path.write_bytes(b"fake-image")
+    state = {"count": 0}
+
+    monkeypatch.setattr(
+        "app.services.providers.openai_adapter.load_model_provider_runtime",
+        lambda _provider: ModelProviderRuntimeConfig(
+            provider="openai",
+            display_name="OpenAI",
+            base_url="https://api.openai.com/v1/responses",
+            api_key="sk-test",
+            default_model="gpt-5-mini",
+            timeout_seconds=60,
+            status="active",
+        ),
+    )
+
+    class FakeResponse:
+        status_code = 200
+        headers = {}
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": json.dumps({"summary": "ok"}, ensure_ascii=False)}],
+                    }
+                ]
+            }
+
+    class Retryable429Response:
+        status_code = 429
+        headers = {"retry-after": "0"}
+
+        def raise_for_status(self):
+            request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+            raise httpx.HTTPStatusError("Too Many Requests", request=request, response=self)
+
+        def json(self):
+            return {}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, headers=None, json=None):
+            state["count"] += 1
+            if state["count"] < 3:
+                return Retryable429Response()
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.providers.openai_adapter.httpx.Client", FakeClient)
+    monkeypatch.setattr("app.services.providers.openai_adapter.time.sleep", lambda *_args, **_kwargs: None)
+
+    response = OpenAIAdapter().analyze(
+        ProviderRequest(
+            model="gpt-5-mini",
+            prompt="请返回 JSON",
+            image_paths=[str(image_path)],
+            response_schema={"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]},
+        )
+    )
+
+    assert state["count"] == 3
+    assert response.success is True
+    assert response.normalized_json == {"summary": "ok"}
+
+
+def test_openai_adapter_respects_http_date_retry_after(monkeypatch, tmp_path):
+    image_path = tmp_path / "retry-date.jpg"
+    image_path.write_bytes(b"fake-image")
+    sleep_calls: list[float] = []
+
+    retry_after_datetime = datetime(2030, 1, 1, 0, 0, 10, tzinfo=timezone.utc)
+    fixed_now = datetime(2030, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    class DummyDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now
+
+    monkeypatch.setattr(
+        "app.services.providers.openai_adapter.load_model_provider_runtime",
+        lambda _provider: ModelProviderRuntimeConfig(
+            provider="openai",
+            display_name="OpenAI",
+            base_url="https://api.openai.com/v1/responses",
+            api_key="sk-test",
+            default_model="gpt-5-mini",
+            timeout_seconds=60,
+            status="active",
+        ),
+    )
+
+    class FakeResponse:
+        status_code = 200
+        headers = {}
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {"type": "output_text", "text": json.dumps({"summary": "ok"}, ensure_ascii=False)}
+                        ],
+                    }
+                ]
+            }
+
+    class RetryableDateResponse:
+        status_code = 429
+        headers = {"retry-after": "Thu, 01 Jan 2030 00:00:10 GMT"}
+
+        def raise_for_status(self):
+            request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+            raise httpx.HTTPStatusError("Too Many Requests", request=request, response=self)
+
+        def json(self):
+            return {}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, headers=None, json=None):
+            state = getattr(self, "state", {"count": 0})
+            state["count"] += 1
+            self.state = state
+            if state["count"] == 1:
+                return RetryableDateResponse()
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.providers.openai_adapter.httpx.Client", FakeClient)
+    monkeypatch.setattr("app.services.providers.openai_adapter.time.sleep", lambda seconds: sleep_calls.append(seconds))
+    monkeypatch.setattr("app.services.providers.openai_adapter.datetime", DummyDateTime)
+
+    response = OpenAIAdapter().analyze(
+        ProviderRequest(
+            model="gpt-5-mini",
+            prompt="请返回 JSON",
+            image_paths=[str(image_path)],
+            response_schema={"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]},
+        )
+    )
+
+    assert sleep_calls == [pytest.approx(10.0)]
+    assert response.success is True
+    assert response.normalized_json == {"summary": "ok"}
 
 
 def test_zhipu_adapter_calls_chat_completions_and_parses_json(monkeypatch, tmp_path):

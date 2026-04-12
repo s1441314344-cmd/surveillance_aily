@@ -28,22 +28,6 @@ type UseCameraMonitoringRuleStateParams = {
 const DEFAULT_DEBUG_SIGNALS_JSON = '{"person": 0.82, "fire": 0.05, "leak": 0.04}';
 const DEFAULT_DEBUG_CONSECUTIVE_JSON = '{"person": 2, "fire": 1, "leak": 1}';
 
-function createDeleteTriggerRuleHandler(
-  cameraId: string | null,
-  deleteTriggerRuleMutation: ReturnType<typeof useCameraMonitorMutations>['deleteTriggerRuleMutation'],
-) {
-  return (ruleId: string) => {
-    if (!cameraId) {
-      return;
-    }
-
-    deleteTriggerRuleMutation.mutate({
-      targetCameraId: cameraId,
-      ruleId,
-    });
-  };
-}
-
 function buildLoadingState(params: {
   createTriggerRuleMutation: ReturnType<typeof useCameraMonitorMutations>['createTriggerRuleMutation'];
   updateTriggerRuleMutation: ReturnType<typeof useCameraMonitorMutations>['updateTriggerRuleMutation'];
@@ -146,10 +130,15 @@ export function useCameraMonitoringRuleState({
     liveDebugMutation,
   });
 
-  const deleteTriggerRule = useCallback(
-    createDeleteTriggerRuleHandler(cameraId, deleteTriggerRuleMutation),
-    [cameraId, deleteTriggerRuleMutation],
-  );
+  const deleteTriggerRule = useCallback((ruleId: string) => {
+    if (!cameraId) {
+      return;
+    }
+    deleteTriggerRuleMutation.mutate({
+      targetCameraId: cameraId,
+      ruleId,
+    });
+  }, [cameraId, deleteTriggerRuleMutation]);
 
   const { submitMonitorConfig, toggleMonitorEnabled } = createMonitorConfigActions({
     cameraId,

@@ -19,6 +19,7 @@ from app.api.routes import (
     training,
     task_records,
     users,
+    version_recognition,
 )
 
 api_router = APIRouter()
@@ -44,3 +45,5 @@ api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"]
 api_router.include_router(training.router, prefix="/training", tags=["training"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(dashboards.router, prefix="/dashboards", tags=["dashboards"])
+
+api_router.include_router(version_recognition.router, prefix="/version-recognition", tags=["version-recognition"])

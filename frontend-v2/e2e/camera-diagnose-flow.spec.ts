@@ -86,5 +86,5 @@ test('camera diagnose action shows diagnostic modal', async ({ page, request }) 
   await expect(diagnosticDialog).toContainText('诊断状态');
   await expect(diagnosticDialog).toContainText('成功');
   await expect(diagnosticDialog).toContainText('mock');
-  await expect(page.locator('.ant-card').filter({ hasText: '状态日志' }).first()).toContainText('online');
+  await expect(page.locator('.ant-card').filter({ hasText: '状态日志' }).first()).toContainText('在线');
 });

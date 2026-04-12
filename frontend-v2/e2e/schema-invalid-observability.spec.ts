@@ -170,7 +170,7 @@ test('schema invalid record is visible in records and dashboard metrics', async 
   await page.goto(`/records?recordId=${targetRecordId}`);
   await expect(page.getByRole('heading', { name: '任务记录' })).toBeVisible();
   await expect(page.getByTestId('record-detail-summary')).toContainText(`记录 ID：${targetRecordId}`);
-  await expect(page.getByTestId('record-detail-summary')).toContainText('结果状态：schema_invalid');
+  await expect(page.getByTestId('record-detail-summary')).toContainText('结果状态：结构化异常');
 
   await page.goto('/dashboard');
   const strategyFilter = page.getByTestId('dashboard-filter-strategy');
@@ -180,13 +180,8 @@ test('schema invalid record is visible in records and dashboard metrics', async 
     .filter({ hasText: strategyName })
     .first()
     .click();
-  const schemaInvalidCard = page
-    .locator('.ant-card')
-    .filter({
-      has: page.locator('.ant-statistic-title').filter({ hasText: /^结构化异常数$/ }),
-    })
-    .first();
-  await expect(schemaInvalidCard.locator('.ant-statistic-content-value')).toContainText('1');
+  const schemaInvalidCard = page.locator('.metric-card').filter({ hasText: '结构化异常数' }).first();
+  await expect(schemaInvalidCard).toContainText('1');
 
   const anomalyCard = page
     .locator('.section-card')

@@ -71,12 +71,12 @@ test('bulk camera status check updates status summary and cards', async ({ page,
   const normalCameraName = `E2E-Bulk-OK-${suffix}`;
   const abnormalCameraName = `E2E-Bulk-BAD-${suffix}`;
 
-  await seedCamera(request, token, {
+  const normalCamera = await seedCamera(request, token, {
     name: normalCameraName,
     location: 'E2E 批量巡检正常点位',
     rtsp_url: 'rtsp://mock/e2e-bulk-ok',
   });
-  await seedCamera(request, token, {
+  const abnormalCamera = await seedCamera(request, token, {
     name: abnormalCameraName,
     location: 'E2E 批量巡检异常点位',
     rtsp_url: 'bad-rtsp-url',
@@ -86,8 +86,10 @@ test('bulk camera status check updates status summary and cards', async ({ page,
   await page.getByRole('menuitem', { name: '摄像头中心' }).click();
   await expect(page).toHaveURL(/\/cameras(?:\/devices)?(?:\?.*)?$/);
   await expect(page.getByRole('heading', { name: '摄像头中心' })).toBeVisible();
-  await expect(page.locator('.ant-card').filter({ hasText: normalCameraName }).first()).toBeVisible();
-  await expect(page.locator('.ant-card').filter({ hasText: abnormalCameraName }).first()).toBeVisible();
+  const okCard = page.getByTestId(`camera-card-${normalCamera.id}`);
+  const badCard = page.getByTestId(`camera-card-${abnormalCamera.id}`);
+  await expect(okCard).toBeVisible();
+  await expect(badCard).toBeVisible();
 
   const bulkCheckButton = page.getByTestId('cameras-bulk-check-btn');
   await expect(bulkCheckButton).toBeEnabled();
@@ -109,15 +111,12 @@ test('bulk camera status check updates status summary and cards', async ({ page,
   expect(summary.checked_count).toBeGreaterThanOrEqual(2);
   expect(summary.failed_count).toBe(0);
 
-  const okCard = page.locator('.ant-card').filter({ hasText: normalCameraName }).first();
-  await expect(okCard).toContainText('online');
-
-  const badCard = page.locator('.ant-card').filter({ hasText: abnormalCameraName }).first();
-  await expect(badCard).toContainText('offline');
+  await expect(okCard).toContainText('在线');
+  await expect(badCard).toContainText('离线');
 
   await page.getByTestId('cameras-alert-only-switch').click();
-  await expect(page.locator('.ant-card').filter({ hasText: abnormalCameraName }).first()).toBeVisible();
-  await expect(page.locator('.ant-card').filter({ hasText: normalCameraName }).first()).toHaveCount(0);
+  await expect(badCard).toBeVisible();
+  await expect(okCard).toHaveCount(0);
 
   await expect(page.getByText(/在线\s+\d+/)).toBeVisible();
   await expect(page.getByText(/告警\s+\d+/)).toBeVisible();

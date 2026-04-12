@@ -153,10 +153,6 @@ export function useJobsFormActionState({
 }: UseJobsFormActionStateParams) {
   const { message } = App.useApp();
   const {
-    uploadMutation,
-    cameraOnceMutation,
-    cameraSnapshotUploadMutation,
-    scheduleMutation,
     updateScheduleMutation,
   } = mutations;
 

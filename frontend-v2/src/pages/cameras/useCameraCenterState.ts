@@ -4,8 +4,6 @@ import { getApiErrorMessage } from '@/shared/api/errors';
 import type { CameraDiagnostic } from '@/shared/api/configCenter';
 import type {
   CameraFormValues,
-  MonitorConfigFormValues,
-  TriggerRuleFormValues,
 } from '@/pages/cameras/cameraCenterConfig';
 import type { CameraCenterState, CameraListContext } from '@/pages/cameras/cameraCenterTypes';
 import { useCameraCenterQueryState } from '@/pages/cameras/useCameraCenterQueryState';
@@ -68,13 +66,10 @@ export function useCameraCenterState(initialSelectedCameraId?: string | null): C
     },
     [message],
   );
-  const handleDiagnosticResult = useCallback(
-    (diagnostic: CameraDiagnostic) => {
-      localState.setLastDiagnostic(diagnostic);
-      localState.setDiagnosticModalOpen(true);
-    },
-    [localState.setDiagnosticModalOpen, localState.setLastDiagnostic],
-  );
+  const handleDiagnosticResult = (diagnostic: CameraDiagnostic) => {
+    localState.setLastDiagnostic(diagnostic);
+    localState.setDiagnosticModalOpen(true);
+  };
 
   const queryState = useCameraCenterQueryState({
     selectedCameraId: localState.selectedCameraId,

@@ -107,9 +107,9 @@ test('camera once job is queued and can be cancelled in job center', async ({ pa
     await cancelButton.click();
     const cancelResponse = await cancelResponsePromise;
     expect(cancelResponse.ok()).toBeTruthy();
-    await expect(jobRow).toContainText('cancelled');
+    await expect(jobRow).toContainText('已取消');
   } else {
-    await expect(jobRow).toContainText(/queued|running|completed|failed|cancelled/);
+    await expect(jobRow).toContainText(/等待中|处理中|已完成|失败|已取消/);
   }
 
   const detailDrawer = page.getByRole('dialog', { name: /任务详情/ });
@@ -117,6 +117,6 @@ test('camera once job is queued and can be cancelled in job center', async ({ pa
     await jobRow.click();
   }
   await expect(detailDrawer).toBeVisible();
-  await expect(detailDrawer).toContainText('camera_once');
-  await expect(detailDrawer).toContainText(/queued|running|completed|failed|cancelled/);
+  await expect(detailDrawer).toContainText('摄像头单次');
+  await expect(detailDrawer).toContainText(/等待中|处理中|已完成|失败|已取消/);
 });

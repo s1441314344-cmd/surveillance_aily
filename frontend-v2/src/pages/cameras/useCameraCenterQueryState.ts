@@ -38,14 +38,6 @@ function getCameraIdentifiers(cameras: Camera[]) {
   };
 }
 
-function getCameraMemoKey(cameras: Camera[]) {
-  return cameras.map((camera) => camera.id).join(',');
-}
-
-function getCameraQueryResult<T>(query: { data?: T[] }) {
-  return getQueryArrayData(query.data);
-}
-
 function getQueryLoadingState(params: {
   monitorConfigLoading: boolean;
   mediaLoading: boolean;
@@ -77,9 +69,8 @@ export function useCameraCenterQueryState({
     queryFn: listCameras,
   });
 
-  const cameras = useMemo(() => getQueryArrayData(cameraQuery.data), [cameraQuery.data]);
-  const camerasMemoKey = useMemo(() => getCameraMemoKey(cameras), [cameras]);
-  const { cameraIds, cameraIdsKey } = useMemo(() => getCameraIdentifiers(cameras), [camerasMemoKey]);
+  const cameras = getQueryArrayData(cameraQuery.data);
+  const { cameraIds, cameraIdsKey } = useMemo(() => getCameraIdentifiers(cameras), [cameras]);
 
   const effectiveSelectedCameraId = useMemo(
     () =>
@@ -149,11 +140,8 @@ export function useCameraCenterQueryState({
     [selectedCameraStatusLogs, statusLogsPage, statusLogsPageSize],
   );
 
-  const selectedCameraMedia = useMemo(() => getCameraQueryResult(mediaQuery), [mediaQuery.data]);
-  const selectedCameraTriggerRules = useMemo(
-    () => getCameraQueryResult(triggerRulesQuery),
-    [triggerRulesQuery.data],
-  );
+  const selectedCameraMedia = getQueryArrayData(mediaQuery.data);
+  const selectedCameraTriggerRules = getQueryArrayData(triggerRulesQuery.data);
   const activeRecordingMedia = useMemo(
     () => getActiveRecordingMedia(selectedCameraMedia),
     [selectedCameraMedia],

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 import httpx
 
@@ -17,6 +20,8 @@ from app.services.providers.utils import (
 )
 
 settings = get_settings()
+MAX_RETRY_ATTEMPTS = 8
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class OpenAIAdapter(ModelProviderAdapter):
@@ -39,11 +44,14 @@ class OpenAIAdapter(ModelProviderAdapter):
             "Content-Type": "application/json",
         }
 
+        body: dict
         try:
-            with httpx.Client(timeout=runtime.timeout_seconds) as client:
-                response = client.post(endpoint, headers=headers, json=payload)
-                response.raise_for_status()
-                body = response.json()
+            body = self._post_with_retry(
+                endpoint=endpoint,
+                headers=headers,
+                payload=payload,
+                timeout_seconds=runtime.timeout_seconds,
+            )
         except httpx.HTTPError as exc:
             return ProviderResponse(
                 success=False,
@@ -105,6 +113,46 @@ class OpenAIAdapter(ModelProviderAdapter):
             }
         return payload
 
+    def _post_with_retry(
+        self,
+        *,
+        endpoint: str,
+        headers: dict,
+        payload: dict,
+        timeout_seconds: int,
+    ) -> dict:
+        last_exc: httpx.HTTPError | None = None
+
+        with httpx.Client(timeout=timeout_seconds) as client:
+            for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
+                try:
+                    response = client.post(endpoint, headers=headers, json=payload)
+                    response.raise_for_status()
+                    return response.json()
+                except httpx.HTTPStatusError as exc:
+                    status_code = exc.response.status_code if exc.response is not None else None
+                    if status_code not in RETRYABLE_STATUS_CODES or attempt >= MAX_RETRY_ATTEMPTS:
+                        raise
+                    last_exc = exc
+                    time.sleep(self._retry_delay_seconds(exc, attempt))
+                except httpx.HTTPError as exc:
+                    if attempt >= MAX_RETRY_ATTEMPTS:
+                        raise
+                    last_exc = exc
+                    time.sleep(min(2 ** (attempt - 1), 120))
+
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("OpenAI request failed without an exception")
+
+    def _retry_delay_seconds(self, exc: httpx.HTTPStatusError, attempt: int) -> float:
+        retry_after = exc.response.headers.get("retry-after") if exc.response is not None else None
+        if retry_after:
+            retry_after_seconds = _parse_retry_after_seconds(retry_after)
+            if retry_after_seconds is not None and retry_after_seconds > 0:
+                return min(retry_after_seconds, 300.0)
+        return min(2 ** (attempt - 1), 120.0)
+
     def _build_endpoint(self, base_url: str) -> str:
         normalized = (base_url or "").rstrip("/")
         if normalized.endswith("/responses"):
@@ -136,6 +184,26 @@ def _extract_output_text(body: dict) -> str:
     if texts:
         return "\n".join(texts).strip()
     return ""
+
+
+def _parse_retry_after_seconds(retry_after: str) -> float | None:
+    try:
+        return float(retry_after)
+    except ValueError:
+        pass
+
+    try:
+        retry_after_datetime = parsedate_to_datetime(retry_after)
+    except (TypeError, ValueError):
+        return None
+
+    if retry_after_datetime is None:
+        return None
+    if retry_after_datetime.tzinfo is None:
+        retry_after_datetime = retry_after_datetime.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    return max((retry_after_datetime - now).total_seconds(), 0.0)
 
 
 def _extract_refusal_message(body: dict) -> str | None:
