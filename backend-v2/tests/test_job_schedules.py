@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from app.services import scheduler_service
+from app.services import schedule_dispatch_service
 from app.services.local_detector_service import LocalDetectorError, LocalDetectorResult
 from app.services.scheduler_service import run_due_job_schedules_once
 from app.workers.tasks import process_job
@@ -331,7 +331,7 @@ def test_scheduler_precheck_not_matched_will_skip_job_creation(client, monkeypat
     original_next_run_at = schedule["next_run_at"]
 
     monkeypatch.setattr(
-        scheduler_service,
+        schedule_dispatch_service,
         "_run_schedule_precheck_if_needed",
         lambda db, schedule, now=None: (False, "Precheck not matched (test)"),
     )
@@ -398,9 +398,9 @@ def test_scheduler_precheck_person_hard_gate_skips_model_call(client, monkeypatc
     def _fail_if_model_called(*args, **kwargs):
         raise AssertionError("model adapter should not be called when person hard gate blocks precheck")
 
-    monkeypatch.setattr(scheduler_service, "get_provider_adapter", _fail_if_model_called)
+    monkeypatch.setattr(schedule_dispatch_service, "get_provider_adapter", _fail_if_model_called)
     monkeypatch.setattr(
-        scheduler_service,
+        schedule_dispatch_service,
         "detect_with_local_detector",
         lambda **kwargs: LocalDetectorResult(
             passed=False,
@@ -476,9 +476,9 @@ def test_scheduler_precheck_detector_unavailable_strict_block(client, monkeypatc
     def _raise_detector_unavailable(**kwargs):
         raise LocalDetectorError("connection refused")
 
-    monkeypatch.setattr(scheduler_service, "get_provider_adapter", _fail_if_model_called)
+    monkeypatch.setattr(schedule_dispatch_service, "get_provider_adapter", _fail_if_model_called)
     monkeypatch.setattr(
-        scheduler_service,
+        schedule_dispatch_service,
         "detect_with_local_detector",
         _raise_detector_unavailable,
     )

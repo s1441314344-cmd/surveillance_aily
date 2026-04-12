@@ -221,6 +221,11 @@ summary = {
         "flags": [item for item in "${override_flags_csv}".split() if item],
         "reason": "${OVERRIDE_REASON}" or None,
     },
+    "release_policy": {
+        "default_entrypoint": "make v2-release-gate-final",
+        "bypass_run": "${override_active}" == "true",
+        "override_reason_required": True,
+    },
     "uat_summary_path": "${UAT_SUMMARY_PATH}",
     "release_drill_report_path": "${RELEASE_DRILL_REPORT_PATH}" or None,
     "checklist_path": str(checklist_path),

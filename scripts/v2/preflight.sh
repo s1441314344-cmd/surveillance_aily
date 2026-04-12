@@ -15,7 +15,7 @@ API_PORT="${V2_PREFLIGHT_API_PORT:-5810}"
 WITH_E2E="false"
 PERF_ARGS_RAW="${V2_PREFLIGHT_PERF_ARGS:-}"
 SOAK_ARGS_RAW="${V2_PREFLIGHT_SOAK_ARGS:-}"
-SMOKE_SCHEDULE_WAIT_SECONDS="${V2_SMOKE_SCHEDULE_WAIT_SECONDS:-95}"
+SMOKE_SCHEDULE_WAIT_SECONDS="${V2_SMOKE_SCHEDULE_WAIT_SECONDS:-125}"
 OUTPUT_DIR="${V2_PREFLIGHT_OUTPUT_DIR:-}"
 
 while [[ $# -gt 0 ]]; do
@@ -90,6 +90,7 @@ summary_json_path="${log_dir}/summary.json"
 api_pid=""
 worker_pid=""
 scheduler_pid=""
+celery_pool="$(resolve_celery_pool)"
 
 wait_for_http_health() {
   local url="$1"
@@ -223,18 +224,12 @@ cleanup() {
   local exit_code="$?"
   write_summary "${exit_code}"
   set +e
-  if [[ -n "${scheduler_pid}" ]] && kill -0 "${scheduler_pid}" >/dev/null 2>&1; then
-    kill "${scheduler_pid}" >/dev/null 2>&1
-    wait "${scheduler_pid}" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "${worker_pid}" ]] && kill -0 "${worker_pid}" >/dev/null 2>&1; then
-    kill "${worker_pid}" >/dev/null 2>&1
-    wait "${worker_pid}" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "${api_pid}" ]] && kill -0 "${api_pid}" >/dev/null 2>&1; then
-    kill "${api_pid}" >/dev/null 2>&1
-    wait "${api_pid}" >/dev/null 2>&1 || true
-  fi
+  kill_process_tree "${scheduler_pid}"
+  kill_process_tree "${worker_pid}"
+  kill_process_tree "${api_pid}"
+  [[ -n "${scheduler_pid}" ]] && wait "${scheduler_pid}" >/dev/null 2>&1 || true
+  [[ -n "${worker_pid}" ]] && wait "${worker_pid}" >/dev/null 2>&1 || true
+  [[ -n "${api_pid}" ]] && wait "${api_pid}" >/dev/null 2>&1 || true
   make v2-deps-down >/dev/null 2>&1 || true
 }
 
@@ -254,8 +249,11 @@ api_pid="$!"
 
 echo "[v2-preflight] starting worker"
 (
-  cd "${BACKEND_DIR}"
-  python3 -m celery -A app.core.celery_app.celery_app worker --loglevel="${V2_CELERY_LOGLEVEL:-warning}" >"${log_dir}/worker.log" 2>&1
+  V2_CELERY_LOGLEVEL="${V2_CELERY_LOGLEVEL:-warning}" \
+  V2_CELERY_POOL="${celery_pool}" \
+  V2_CELERY_CONCURRENCY="${V2_CELERY_CONCURRENCY:-1}" \
+  V2_CELERY_PREFETCH_MULTIPLIER="${V2_CELERY_PREFETCH_MULTIPLIER:-1}" \
+  ./scripts/v2/worker.sh >"${log_dir}/worker.log" 2>&1
 ) &
 worker_pid="$!"
 

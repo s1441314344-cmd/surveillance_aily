@@ -8,4 +8,10 @@ require_python_module celery
 ensure_backend_env
 
 cd "${BACKEND_DIR}"
-exec python3 -m celery -A app.core.celery_app.celery_app worker --loglevel="${V2_CELERY_LOGLEVEL:-info}"
+celery_pool="$(resolve_celery_pool)"
+exec python3 -m celery -A app.core.celery_app.celery_app worker \
+  --loglevel="${V2_CELERY_LOGLEVEL:-info}" \
+  --pool="${celery_pool}" \
+  --concurrency="${V2_CELERY_CONCURRENCY:-1}" \
+  --prefetch-multiplier="${V2_CELERY_PREFETCH_MULTIPLIER:-1}" \
+  -Ofair

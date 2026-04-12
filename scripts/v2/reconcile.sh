@@ -11,6 +11,7 @@ SOURCE_PATH="${V2_RECONCILE_SOURCE_PATH:-${ROOT_DIR}/data/surveillance.db}"
 SOURCE_ROOT="${V2_RECONCILE_SOURCE_ROOT:-${ROOT_DIR}}"
 APPLY_MODE="false"
 OUTPUT_DIR="${V2_RECONCILE_OUTPUT_DIR:-}"
+deps_started="false"
 
 print_usage() {
   cat <<'EOF'
@@ -25,6 +26,15 @@ Options:
   --help               Show this message
 EOF
 }
+
+cleanup() {
+  set +e
+  if [[ "${deps_started}" == "true" ]]; then
+    make v2-deps-down >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup EXIT
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -78,37 +88,55 @@ fi
 
 echo "[v2-reconcile] output dir: ${OUTPUT_DIR}"
 echo "[v2-reconcile] run_id: ${run_id}"
+make v2-deps-up >/dev/null
+deps_started="true"
 ./scripts/v2/backfill.sh "${backfill_args[@]}" >"${backfill_json}"
 require_readable_file "${backfill_json}" "reconcile backfill report"
 finished_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-python3 - <<PY
+RUN_ID="${run_id}" \
+GIT_SHA="${git_sha}" \
+BRANCH="${branch}" \
+GIT_DIRTY="${git_dirty}" \
+STARTED_AT="${started_at}" \
+FINISHED_AT="${finished_at}" \
+ENVIRONMENT="${environment}" \
+SOURCE_PATH_VALUE="${SOURCE_PATH}" \
+SOURCE_ROOT_VALUE="${SOURCE_ROOT}" \
+APPLY_MODE_VALUE="${APPLY_MODE}" \
+BACKFILL_JSON="${backfill_json}" \
+SUMMARY_JSON="${summary_json}" \
+SUMMARY_MD="${summary_md}" \
+python3 - <<'PY'
 import json
+import os
 import sys
 from pathlib import Path
 
-report = json.loads(Path("${backfill_json}").read_text(encoding="utf-8"))
+backfill_json = Path(os.environ["BACKFILL_JSON"])
+summary_json = Path(os.environ["SUMMARY_JSON"])
+summary_md = Path(os.environ["SUMMARY_MD"])
+
+report = json.loads(backfill_json.read_text(encoding="utf-8"))
 missing_files = report.get("missing_files") or []
 warnings = report.get("warnings") or []
-result = "passed"
-if missing_files:
-    result = "failed"
+result = "failed" if missing_files else "passed"
 
 summary = {
-    "run_id": "${run_id}",
-    "git_sha": "${git_sha}",
-    "branch": "${branch}",
-    "git_dirty": "${git_dirty}" == "true",
-    "started_at": "${started_at}",
-    "finished_at": "${finished_at}",
-    "environment": "${environment}",
+    "run_id": os.environ["RUN_ID"],
+    "git_sha": os.environ["GIT_SHA"],
+    "branch": os.environ["BRANCH"],
+    "git_dirty": os.environ["GIT_DIRTY"] == "true",
+    "started_at": os.environ["STARTED_AT"],
+    "finished_at": os.environ["FINISHED_AT"],
+    "environment": os.environ["ENVIRONMENT"],
     "result": result,
     "parameter_summary": {
-        "source": "${SOURCE_PATH}",
-        "source_root": "${SOURCE_ROOT}",
-        "apply_mode": "${APPLY_MODE}" == "true",
+        "source": os.environ["SOURCE_PATH_VALUE"],
+        "source_root": os.environ["SOURCE_ROOT_VALUE"],
+        "apply_mode": os.environ["APPLY_MODE_VALUE"] == "true",
     },
-    "backfill_report_path": "${backfill_json}",
+    "backfill_report_path": str(backfill_json),
     "dry_run": bool(report.get("dry_run", True)),
     "warning_count": len(warnings),
     "missing_file_count": len(missing_files),
@@ -118,22 +146,22 @@ summary = {
     "warnings": warnings,
     "missing_files": missing_files,
 }
-Path("${summary_json}").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+summary_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
 lines = [
     "# 智能巡检系统 V2 对账摘要",
     "",
     f"- 结果: **{summary['result'].upper()}**",
-    f"- run_id: `{summary['run_id']}`",
-    f"- 干跑模式: `{summary['dry_run']}`",
-    f"- 缺失文件数: `{summary['missing_file_count']}`",
-    f"- warning 数: `{summary['warning_count']}`",
+    f"- run_id: {summary['run_id']}",
+    f"- 干跑模式: {summary['dry_run']}",
+    f"- 缺失文件数: {summary['missing_file_count']}",
+    f"- warning 数: {summary['warning_count']}",
     "",
-    f"- backfill report: `{summary['backfill_report_path']}`",
+    f"- backfill report: {summary['backfill_report_path']}",
 ]
-Path("${summary_md}").write_text("\\n".join(lines), encoding="utf-8")
-print(f"[v2-reconcile] summary: ${summary_json}")
-print(f"[v2-reconcile] markdown: ${summary_md}")
+summary_md.write_text("\n".join(lines), encoding="utf-8")
+print(f"[v2-reconcile] summary: {summary_json}")
+print(f"[v2-reconcile] markdown: {summary_md}")
 if result != "passed":
     print("[v2-reconcile] failed due to missing files:")
     for path in missing_files:

@@ -19,6 +19,7 @@ Smart Inspection V2 local commands:
   make v2-perf         # run upload-job performance probe and print latency/throughput summary
   make v2-soak         # run multi-round async queue soak test and detect unresolved jobs
   make v2-preflight    # run smoke + perf + soak in one command with managed local processes
+  make v2-real-async-test # explicit real stack verification (API + worker + scheduler + deps)
   make v2-backfill     # dry-run legacy SQLite -> V2 backfill report
   make v2-eval         # run model evaluation dataset against provider adapters
   make v2-camera-check # run deep RTSP/mock camera diagnostic
@@ -28,8 +29,8 @@ Smart Inspection V2 local commands:
   make v2-release-drill # run cutover drill (preflight + backfill + rollback-ready report)
   make v2-uat          # run UAT baseline (pytest + lint + vitest + build + e2e) and export summary
   make v2-release-checklist # build final release checklist from UAT + release drill artifacts
-  make v2-release-gate # run one-command release gate (UAT + checklist + final verdict)
-  make v2-release-gate-final # final release gate (enforce drill apply-backfill, no dry-run)
+  make v2-release-gate # run release gate with optional overrides, marked as bypass when used
+  make v2-release-gate-final # default production release gate (enforce drill apply-backfill, no dry-run)
   make v2-deps-down    # stop postgres + redis + local-detector
 
 Recommended flow:
@@ -46,6 +47,7 @@ Verification examples:
   make v2-frontend-test
   make v2-security
   make v2-reconcile
+  make v2-real-async-test
   make v2-uat
   make v2-verify
 
@@ -83,8 +85,8 @@ Release checklist examples:
   ./scripts/v2/release-checklist.sh --uat-summary /path/to/uat/summary.json --release-drill-report /path/to/release-drill-report.json --require-drill-apply-backfill
 
 Release gate examples:
-  make v2-release-gate
   make v2-release-gate-final
+  make v2-release-gate
   ./scripts/v2/release-gate.sh --skip-uat --uat-summary /path/to/summary.json --release-drill-report /path/to/release-drill-report.json --override-reason "manual audit trail"
   ./scripts/v2/release-gate.sh --release-drill-apply-backfill --require-drill-apply-backfill
 EOF

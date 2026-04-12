@@ -46,6 +46,21 @@ build_run_id() {
   echo "${prefix}-${timestamp}-${git_sha:0:8}"
 }
 
+resolve_celery_pool() {
+  if [[ -n "${V2_CELERY_POOL:-}" ]]; then
+    echo "${V2_CELERY_POOL}"
+    return
+  fi
+  case "${OSTYPE:-}" in
+    darwin*)
+      echo "solo"
+      ;;
+    *)
+      echo "prefork"
+      ;;
+  esac
+}
+
 require_readable_file() {
   local path="$1"
   local label="${2:-file}"
@@ -57,6 +72,24 @@ require_readable_file() {
     echo "[v2] ${label} is not readable: ${path}" >&2
     return 1
   fi
+}
+
+kill_process_tree() {
+  local pid="${1:-}"
+  if [[ -z "${pid}" ]]; then
+    return 0
+  fi
+  if ! kill -0 "${pid}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local child
+  while IFS= read -r child; do
+    [[ -n "${child}" ]] || continue
+    kill_process_tree "${child}"
+  done < <(ps -o pid= --ppid "${pid}" 2>/dev/null | tr -d ' ')
+
+  kill "${pid}" >/dev/null 2>&1 || true
 }
 
 load_backend_runtime_flags() {
