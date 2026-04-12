@@ -4,6 +4,8 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from zipfile import ZipFile
 
+from PIL import Image
+
 from app.core.database import SessionLocal
 from app.models.job import Job
 from app.models.task_record import TaskRecord
@@ -114,6 +116,34 @@ def test_upload_job_rejects_unsupported_file_extension(client):
     )
     assert create_job_response.status_code == 400
     assert "Unsupported file format" in create_job_response.json()["detail"]
+
+
+def test_upload_job_converts_input_image_to_png_for_model(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    bmp_buffer = BytesIO()
+    image = Image.new("RGB", (8, 8), color=(10, 20, 30))
+    image.save(bmp_buffer, format="BMP")
+    bmp_bytes = bmp_buffer.getvalue()
+
+    create_job_response = client.post(
+        "/api/jobs/uploads",
+        headers=headers,
+        data={"strategy_id": "preset-helmet"},
+        files=[("files", ("helmet.bmp", bmp_bytes, "image/bmp"))],
+    )
+    assert create_job_response.status_code == 200
+    job = create_job_response.json()
+
+    process_result = process_job(job["id"])
+    assert process_result["status"] == "completed"
+
+    records_response = client.get(f"/api/task-records?job_id={job['id']}", headers=headers)
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["input_image_path"].lower().endswith(".png")
 
 
 def test_run_job_inline_endpoint_processes_queued_job(client):

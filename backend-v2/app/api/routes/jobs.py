@@ -8,13 +8,13 @@ from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
 from app.schemas.job import JobCameraOnceCreate, JobCameraSnapshotUploadCreate, JobRead
-from app.services.job_service import cancel_job as cancel_job_record
-from app.services.job_service import create_camera_once_job as create_camera_once_job_record
-from app.services.job_service import create_camera_snapshot_upload_job as create_camera_snapshot_upload_job_record
-from app.services.job_service import create_upload_job as create_upload_job_record
-from app.services.job_service import get_job_or_404, list_jobs as list_job_records, serialize_job
-from app.services.job_service import run_job_inline as run_job_inline_record
-from app.services.job_service import retry_job as retry_job_record
+from app.services.job_command_service import cancel_job as cancel_job_record
+from app.services.job_command_service import retry_job as retry_job_record
+from app.services.job_command_service import run_job_inline as run_job_inline_record
+from app.services.job_creation_service import create_camera_once_job as create_camera_once_job_record
+from app.services.job_creation_service import create_camera_snapshot_upload_job as create_camera_snapshot_upload_job_record
+from app.services.job_creation_service import create_upload_job as create_upload_job_record
+from app.services.job_queries import get_job_or_404, list_jobs as list_job_records, serialize_job
 from app.services.rbac import ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR
 
 router = APIRouter()
