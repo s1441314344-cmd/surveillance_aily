@@ -54,10 +54,10 @@ export function DiagnosticsStatusLogs({
 
   return (
     <SectionCard title="状态日志">
-      <Space direction="vertical" size={8} className="stack-full">
+      <Space orientation="vertical" size={8} className="stack-full">
         {pagedLogs.map((item) => (
           <div key={item.id} className="console-block camera-log-item">
-            <Space direction="vertical" size={2} className="stack-full">
+            <Space orientation="vertical" size={2} className="stack-full">
               <Space wrap>
                 <StatusBadge
                   namespace="cameraConnection"

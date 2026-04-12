@@ -64,7 +64,7 @@ export function MonitoringRulesSection({
       }
     >
       {effectiveSelectedCameraId ? (
-        <Space direction="vertical" size={12} className="stack-full">
+        <Space orientation="vertical" size={12} className="stack-full">
           <DebugControls
             triggerDebugDryRun={triggerDebugDryRun}
             triggerDebugCaptureOnMatch={triggerDebugCaptureOnMatch}

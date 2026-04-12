@@ -37,7 +37,7 @@ export function useUsersFormActionState({
         title: '用户',
         key: 'user',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text strong>{record.display_name}</Text>
             <Text type="secondary">{record.username}</Text>
           </Space>

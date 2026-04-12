@@ -138,6 +138,5 @@ export function useJobsWorkspaceHandlers({
     setStatusFilter,
     setStrategyFilter,
     setTriggerModeFilter,
-    setWorkspaceTab,
   ]);
 }

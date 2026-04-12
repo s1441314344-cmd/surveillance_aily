@@ -227,7 +227,6 @@ export function MonitoringConfigSection({
   const [draftStart, setDraftStart] = useState<{ x: number; y: number } | null>(null);
   const [draftCurrent, setDraftCurrent] = useState<{ x: number; y: number } | null>(null);
   const [polygonDraftPoints, setPolygonDraftPoints] = useState<RoiPoint[]>([]);
-  const [isPolygonDrawing, setIsPolygonDrawing] = useState(false);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const polygonDraftPointsRef = useRef<RoiPoint[]>([]);
   const isPolygonDrawingRef = useRef(false);
@@ -264,6 +263,7 @@ export function MonitoringConfigSection({
     };
   }, [snapshotUrl]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- reset ephemeral ROI preview state when the selected camera changes. */
   useEffect(() => {
     setSnapshotUrl((prev) => {
       if (prev) {
@@ -276,16 +276,16 @@ export function MonitoringConfigSection({
     polygonDraftPointsRef.current = [];
     setPolygonDraftPoints([]);
     isPolygonDrawingRef.current = false;
-    setIsPolygonDrawing(false);
   }, [effectiveSelectedCameraId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
+  /* eslint-disable react-hooks/set-state-in-effect -- switching ROI mode must clear in-progress drawing state immediately. */
   useEffect(() => {
     setDraftStart(null);
     setDraftCurrent(null);
     polygonDraftPointsRef.current = [];
     setPolygonDraftPoints([]);
     isPolygonDrawingRef.current = false;
-    setIsPolygonDrawing(false);
     if (!roiEnabled) {
       return;
     }
@@ -302,6 +302,7 @@ export function MonitoringConfigSection({
       roi_points: undefined,
     });
   }, [form, roiEnabled, roiShape]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const persistedRoi = useMemo<RoiRect | null>(() => {
     if (!roiEnabled || roiShape !== 'rect') {
@@ -453,7 +454,6 @@ export function MonitoringConfigSection({
     setPolygonDraftPoints([]);
     polygonDraftPointsRef.current = [];
     isPolygonDrawingRef.current = false;
-    setIsPolygonDrawing(false);
   };
 
   const pushPolygonPoint = (point: RoiPoint, force = false) => {
@@ -485,7 +485,6 @@ export function MonitoringConfigSection({
       return;
     }
     event.preventDefault();
-    setIsPolygonDrawing(true);
     isPolygonDrawingRef.current = true;
     const normalized = [normalizePoint(point)];
     polygonDraftPointsRef.current = normalized;
@@ -507,7 +506,6 @@ export function MonitoringConfigSection({
     polygonDraftPointsRef.current = [];
     setPolygonDraftPoints([]);
     isPolygonDrawingRef.current = false;
-    setIsPolygonDrawing(false);
   };
 
   const finishPolygonDrawing = (event?: React.MouseEvent<HTMLDivElement>) => {
@@ -521,7 +519,6 @@ export function MonitoringConfigSection({
       }
     }
     isPolygonDrawingRef.current = false;
-    setIsPolygonDrawing(false);
     const normalized = normalizePolygonPoints(polygonDraftPointsRef.current);
     if (normalized.length < 3) {
       message.warning('圈选区域过小，请按住鼠标重新圈选');
@@ -554,7 +551,6 @@ export function MonitoringConfigSection({
     event.preventDefault();
     polygonPointerIdRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
-    setIsPolygonDrawing(true);
     isPolygonDrawingRef.current = true;
     const normalized = [normalizePoint(point)];
     polygonDraftPointsRef.current = normalized;
@@ -606,7 +602,7 @@ export function MonitoringConfigSection({
   return (
     <SectionCard title="监测配置">
       {effectiveSelectedCameraId ? (
-        <Space direction="vertical" size={12} className="stack-full">
+        <Space orientation="vertical" size={12} className="stack-full">
           <Alert
             type="info"
             showIcon
@@ -868,7 +864,7 @@ export function MonitoringConfigSection({
                 ? summaryRoiShape === 'polygon'
                   ? summaryPolygonPoints.length >= 3
                     ? (
-                      <Space direction="vertical" size={2}>
+                      <Space orientation="vertical" size={2}>
                         <Text>多边形（点数 {summaryPolygonPoints.length}）</Text>
                         <Text type="secondary">
                           外接矩形：{formatRect(computePolygonBounds(summaryPolygonPoints))}
@@ -899,7 +895,7 @@ export function MonitoringConfigSection({
                     : '多边形（点位不足，请重新圈选）'
                   : summaryRect
                     ? (
-                      <Space direction="vertical" size={2}>
+                      <Space orientation="vertical" size={2}>
                         <Text>矩形 {formatRect(summaryRect)}</Text>
                         {summaryPreviewUrl ? (
                           <div className="camera-roi-summary-preview">

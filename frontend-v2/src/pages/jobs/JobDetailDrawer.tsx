@@ -1,5 +1,5 @@
 import { Button, Drawer, Image, Space, Typography } from 'antd';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   DetailPanel,
@@ -27,8 +27,6 @@ export type JobDetailDrawerProps = {
 };
 
 export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
-  const [recordImageUrl, setRecordImageUrl] = useState<string | null>(null);
-
   const recordsQuery = useQuery({
     queryKey: ['jobs', 'detail', job?.id, 'task-records'],
     queryFn: async () => listTaskRecords({ jobId: job?.id }),
@@ -58,15 +56,20 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
     enabled: Boolean(open && latestRecord?.id),
   });
 
-  useEffect(() => {
+  const recordImageUrl = useMemo(() => {
     if (!recordImageQuery.data) {
-      setRecordImageUrl(null);
-      return;
+      return null;
     }
-    const objectUrl = URL.createObjectURL(recordImageQuery.data);
-    setRecordImageUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
+    return URL.createObjectURL(recordImageQuery.data);
   }, [recordImageQuery.data]);
+
+  useEffect(() => {
+    return () => {
+      if (recordImageUrl) {
+        URL.revokeObjectURL(recordImageUrl);
+      }
+    };
+  }, [recordImageUrl]);
 
   const resultStatusValue = job?.result_status ?? latestRecord?.result_status;
   const feedbackStatusValue = job?.feedback_status ?? latestRecord?.feedback_status;
@@ -90,9 +93,9 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
       onClose={onClose}
       destroyOnHidden
     >
-      <Space direction="vertical" size={16} className="stack-full">
+      <Space orientation="vertical" size={16} className="stack-full">
         <DetailPanel title="基础信息">
-          <Space direction="vertical" size={4} className="stack-full">
+          <Space orientation="vertical" size={4} className="stack-full">
             <Text strong>状态</Text>
             <StatusBadge namespace="job" value={job.status} label={JOB_STATUS_LABELS[job.status] ?? UNKNOWN_LABELS.generic} />
             <Text strong>策略</Text>
@@ -119,7 +122,7 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
         </DetailPanel>
 
         <DetailPanel title="执行时间">
-          <Space direction="vertical" size={4} className="stack-full">
+          <Space orientation="vertical" size={4} className="stack-full">
             <Text>创建时间：{formatDateTime(job.created_at)}</Text>
             <Text>开始时间：{formatDateTime(job.triggered_at)}</Text>
             <Text>完成时间：{formatDateTime(job.finished_at)}</Text>
@@ -132,7 +135,7 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
         </DetailPanel>
 
         <DetailPanel title="结果概览">
-          <Space direction="vertical" size={4} className="stack-full">
+          <Space orientation="vertical" size={4} className="stack-full">
             <Text>关联记录：{recordsQuery.isLoading ? '加载中...' : `${recordsQuery.data?.length ?? 0} 条`}</Text>
             <Space size={8} wrap>
               <Text>结果：</Text>
@@ -168,7 +171,7 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
           ) : recordImageQuery.isLoading ? (
             <Text type="secondary">图片加载中...</Text>
           ) : recordImageUrl ? (
-            <Space direction="vertical" size={8} className="stack-full">
+            <Space orientation="vertical" size={8} className="stack-full">
               <Image
                 src={recordImageUrl}
                 alt={latestRecord.input_filename}

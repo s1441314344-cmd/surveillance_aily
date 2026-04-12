@@ -35,7 +35,7 @@ export function LoginPage() {
   return (
     <div className="login-shell">
       <Card className="login-card">
-        <Space direction="vertical" size={20} className="login-card__stack">
+        <Space orientation="vertical" size={20} className="login-card__stack">
           <PageHeader
             eyebrow="统一入口"
             title="智能巡检系统 V2"

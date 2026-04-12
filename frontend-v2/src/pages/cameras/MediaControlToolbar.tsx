@@ -31,7 +31,7 @@ export function MediaControlToolbar({
   }
 
   return (
-    <Space direction="vertical" size={12} className="stack-full">
+    <Space orientation="vertical" size={12} className="stack-full">
       <Alert
         type="info"
         showIcon

@@ -32,7 +32,7 @@ export function DebugControls({
   onRunLiveDebug,
 }: DebugControlsProps) {
   return (
-    <Space direction="vertical" size={12} className="stack-full">
+    <Space orientation="vertical" size={12} className="stack-full">
       <Alert
         type="info"
         showIcon
@@ -67,7 +67,7 @@ export function DebugControls({
             key: 'advanced-debug',
             label: '高级调试输入',
             children: (
-              <Space direction="vertical" size={12} className="stack-full">
+              <Space orientation="vertical" size={12} className="stack-full">
                 <Input.TextArea
                   value={debugSignalsJson}
                   onChange={(event) => onSetDebugSignalsJson(event.target.value)}

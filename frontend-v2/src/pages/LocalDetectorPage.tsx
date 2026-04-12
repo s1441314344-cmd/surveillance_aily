@@ -72,19 +72,23 @@ export function LocalDetectorPage() {
   const [configForm] = Form.useForm<LocalDetectorConfigFormValues>();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileSource, setSelectedFileSource] = useState<'upload' | 'camera'>('upload');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [latestResult, setLatestResult] = useState<LocalDetectorDetectResult | null>(null);
   const [records, setRecords] = useState<DetectionRecord[]>([]);
 
-  useEffect(() => {
+  const previewUrl = useMemo(() => {
     if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
+      return null;
     }
-    const objectUrl = URL.createObjectURL(selectedFile);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
+    return URL.createObjectURL(selectedFile);
   }, [selectedFile]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const healthQuery = useQuery({
     queryKey: ['local-detector', 'health'],
@@ -508,7 +512,7 @@ export function LocalDetectorPage() {
               </Form.Item>
               <Form.List name="rules">
                 {(fields, { add, remove }) => (
-                  <Space direction="vertical" className="stack-full">
+                  <Space orientation="vertical" className="stack-full">
                     {fields.map((field) => (
                       <div key={field.key} className="call-log-detail-grid">
                         <Form.Item
@@ -579,7 +583,7 @@ export function LocalDetectorPage() {
           {!latestResult ? (
             <DataStateBlock empty emptyDescription="执行一次本地检测后，这里会展示结果。" minHeight={220} />
           ) : (
-            <Space direction="vertical" className="stack-full" size={12}>
+            <Space orientation="vertical" className="stack-full" size={12}>
               <Descriptions size="small" column={1} bordered>
                 <Descriptions.Item label="门控判定">
                   <Tag color={latestResult.decision.pass ? 'success' : 'error'}>

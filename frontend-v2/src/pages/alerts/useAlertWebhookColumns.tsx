@@ -30,7 +30,7 @@ export function useAlertWebhookColumns({
         title: 'Webhook',
         key: 'webhook',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text strong>{record.name}</Text>
             <Text type="secondary">{record.endpoint}</Text>
           </Space>
@@ -72,7 +72,7 @@ export function useAlertWebhookColumns({
         title: '投递情况',
         key: 'delivery',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text type="secondary">
               {record.last_delivered_at
                 ? `最近成功: ${new Date(record.last_delivered_at).toLocaleString()}`

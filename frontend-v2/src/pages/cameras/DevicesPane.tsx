@@ -35,7 +35,7 @@ export function DevicesPane() {
   };
 
   return (
-    <Space direction="vertical" size={16} className="stack-full">
+    <Space orientation="vertical" size={16} className="stack-full">
       <CameraPaneHeader
         title="设备台账与连接参数"
         description="维护摄像头基础信息、连接参数和抽帧参数。规则、媒体和诊断能力已拆分到独立子页。"
@@ -154,7 +154,7 @@ export function DevicesPane() {
       ) : null}
 
       <SectionCard title="配置提示">
-        <Space direction="vertical" size={4}>
+        <Space orientation="vertical" size={4}>
           {DEVICE_HINTS.map((hint, index) => (
             <Text key={hint}>{`${index + 1}. ${hint}`}</Text>
           ))}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -122,13 +122,9 @@ export function TrainingFeedbackPanel({
   const [draftMinSamples, setDraftMinSamples] = useState<number | null>(null);
   const [isMinSamplesDirty, setIsMinSamplesDirty] = useState(false);
 
-  const effectiveMinSamples = draftMinSamples ?? config?.min_samples ?? 30;
-
-  useEffect(() => {
-    if (!isMinSamplesDirty) {
-      setDraftMinSamples(config?.min_samples ?? null);
-    }
-  }, [config?.min_samples, isMinSamplesDirty]);
+  const effectiveMinSamples = isMinSamplesDirty
+    ? draftMinSamples ?? config?.min_samples ?? 30
+    : config?.min_samples ?? 30;
 
   const refreshTrainingQueries = () => {
     void queryClient.invalidateQueries({ queryKey: ['training-overview'] });
@@ -469,7 +465,7 @@ export function TrainingFeedbackPanel({
       <Alert
         type="info"
         showIcon
-        message={`当前触发范围：${selectedStrategyLabel ? `单策略（${selectedStrategyLabel}）` : '全部策略'} · 当前门槛：${config?.min_samples ?? '-'}`}
+        title={`当前触发范围：${selectedStrategyLabel ? `单策略（${selectedStrategyLabel}）` : '全部策略'} · 当前门槛：${config?.min_samples ?? '-'}`}
         description={
           latestDataset
             ? `最新数据集：${latestDataset.id} · 样本 ${latestDataset.sample_count}（incorrect ${latestDataset.incorrect_count} / correct ${latestDataset.correct_count}）`
@@ -482,7 +478,7 @@ export function TrainingFeedbackPanel({
       <Alert
         type="info"
         showIcon
-        message={`最近运行：${latestRun ? `${latestRun.strategy_name} (${latestRun.status})` : '暂无'} · ${formatDate(latestRun?.created_at ?? null)}`}
+        title={`最近运行：${latestRun ? `${latestRun.strategy_name} (${latestRun.status})` : '暂无'} · ${formatDate(latestRun?.created_at ?? null)}`}
       />
 
       {lastPipelineResult ? (
@@ -492,9 +488,9 @@ export function TrainingFeedbackPanel({
             <Alert
               type={result.run_ids.length > 0 ? 'success' : 'warning'}
               showIcon
-              message={`本次触发结果：新建运行 ${result.run_ids.length} 条，跳过 ${result.skipped.length} 条`}
+              title={`本次触发结果：新建运行 ${result.run_ids.length} 条，跳过 ${result.skipped.length} 条`}
               description={
-                <Space direction="vertical" size={4}>
+                <Space orientation="vertical" size={4}>
                   <Text>
                     run_ids：{result.run_ids.length ? result.run_ids.join(', ') : '无'}
                   </Text>
@@ -506,7 +502,7 @@ export function TrainingFeedbackPanel({
                           key: 'skipped',
                           label: `查看跳过详情（${skipItems.length}）`,
                           children: (
-                            <Space direction="vertical" size={6}>
+                            <Space orientation="vertical" size={6}>
                               {skipItems.map((raw, index) => {
                                 const item = parseSkippedItem(raw);
                                 return (

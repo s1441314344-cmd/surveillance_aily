@@ -37,7 +37,7 @@ export function useAlertRecordColumns({ ackMutation, resolveMutation }: AlertCol
         title: '来源',
         key: 'camera',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text>{record.camera_name || UNKNOWN_LABELS.camera}</Text>
             <Text type="secondary">{record.camera_id || '-'}</Text>
           </Space>
@@ -67,7 +67,7 @@ export function useAlertRecordColumns({ ackMutation, resolveMutation }: AlertCol
         title: '告警内容',
         key: 'message',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text strong>{record.title}</Text>
             <Text type="secondary">{record.message || '无详情'}</Text>
             {record.matched_count !== null ? (

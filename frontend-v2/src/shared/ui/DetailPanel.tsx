@@ -14,7 +14,7 @@ export function DetailPanel({
           {subtitle ? <div className="detail-panel__subtitle">{subtitle}</div> : null}
         </div>
       ) : null}
-      <Space direction="vertical" size={16} className="stack-full">
+      <Space orientation="vertical" size={16} className="stack-full">
         {children}
       </Space>
     </div>

@@ -70,10 +70,14 @@ export function FeishuRecipientSelect({
   onChange,
   disabled,
 }: FeishuRecipientSelectProps) {
-  const [keyword, setKeyword] = useState('');
-  useEffect(() => {
-    setKeyword('');
-  }, [recipientType]);
+  const [searchState, setSearchState] = useState<{
+    recipientType: FeishuRecipientSelectProps['recipientType'];
+    keyword: string;
+  }>({
+    recipientType,
+    keyword: '',
+  });
+  const keyword = searchState.recipientType === recipientType ? searchState.keyword : '';
   const debouncedKeyword = useDebouncedKeyword(keyword, 250).trim();
   const canSearchUser = recipientType === 'user' && debouncedKeyword.length > 0;
   const userQuery = useQuery({
@@ -163,7 +167,12 @@ export function FeishuRecipientSelect({
       placeholder={placeholder}
       options={mergedOptions}
       filterOption={false}
-      onSearch={setKeyword}
+      onSearch={(nextKeyword) => {
+        setSearchState({
+          recipientType,
+          keyword: nextKeyword,
+        });
+      }}
       onChange={(nextValue) => onChange?.(nextValue)}
       notFoundContent={notFoundContent}
       optionLabelProp="label"

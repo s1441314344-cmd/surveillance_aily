@@ -45,7 +45,7 @@ export function RecordsListSection({
           {
             title: '摄像头',
             render: (_, record) => (
-              <Space direction="vertical" size={0}>
+              <Space orientation="vertical" size={0}>
                 <Text strong>{record.camera_id ? '摄像头任务' : '上传任务'}</Text>
                 <Text type="secondary">{record.camera_id || '无'}</Text>
               </Space>

@@ -4,7 +4,9 @@ from types import SimpleNamespace
 from app.core.database import SessionLocal
 from app.models.camera_signal import CameraSignalMonitorConfig
 from app.models.job import Job
-from app.services import job_service, scheduler_service, scheduler_signal_monitor_sweep_service, task_dispatcher
+from app.services import scheduler_signal_monitor_sweep_service, task_dispatcher
+from app.services import job_creation_service, signal_monitor_orchestrator
+from app.services import job_service_support
 
 
 def test_queue_job_processing_delegates_to_task_dispatcher(monkeypatch):
@@ -14,9 +16,9 @@ def test_queue_job_processing_delegates_to_task_dispatcher(monkeypatch):
         dispatched_job_ids.append(job_id)
         return "celery-task-123"
 
-    monkeypatch.setattr(job_service.settings, "celery_enabled", True)
+    monkeypatch.setattr(job_service_support.settings, "celery_enabled", True)
     monkeypatch.setattr("app.workers.tasks.process_job.delay", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(job_service, "dispatch_job_processing", fake_dispatch_job_processing, raising=False)
+    monkeypatch.setattr(job_service_support, "dispatch_job_processing", fake_dispatch_job_processing, raising=False)
 
     with SessionLocal() as db:
         job = Job(
@@ -40,7 +42,7 @@ def test_queue_job_processing_delegates_to_task_dispatcher(monkeypatch):
         db.commit()
         db.refresh(job)
 
-        job_service._queue_job_processing(db, job, dispatch=True)
+        job_creation_service._queue_job_processing(db, job, dispatch=True)
         db.refresh(job)
 
     assert dispatched_job_ids == ["job-dispatch-1"]
@@ -59,27 +61,27 @@ def test_signal_monitor_sweep_delegates_dispatch_to_task_dispatcher(monkeypatch)
     def fake_dispatch_signal_monitor_cycle(*, db, camera_id: str, dispatch: bool) -> None:
         dispatched_cycles.append((camera_id, dispatch))
 
-    monkeypatch.setattr(scheduler_service.settings, "celery_enabled", True)
+    monkeypatch.setattr(signal_monitor_orchestrator.settings, "celery_enabled", True)
     monkeypatch.setattr("app.workers.tasks.process_camera_cycle.delay", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
-        scheduler_service,
+        signal_monitor_orchestrator,
         "list_due_monitor_configs",
         lambda db, now: [monitor_config],
     )
     monkeypatch.setattr(
-        scheduler_service,
+        signal_monitor_orchestrator,
         "advance_monitor_schedule",
         lambda config, now: None,
     )
     monkeypatch.setattr(
-        scheduler_service,
+        signal_monitor_orchestrator,
         "dispatch_signal_monitor_cycle",
         fake_dispatch_signal_monitor_cycle,
         raising=False,
     )
 
     with SessionLocal() as db:
-        processed_camera_ids = scheduler_service.run_due_signal_monitors_once_with_db(
+        processed_camera_ids = signal_monitor_orchestrator.run_due_signal_monitors_once_with_db(
             db,
             now=datetime.now(timezone.utc),
             dispatch_jobs=True,

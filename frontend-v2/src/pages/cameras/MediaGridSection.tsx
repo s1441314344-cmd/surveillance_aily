@@ -148,7 +148,7 @@ export function MediaGridSection({
                 }
               }}
             >
-              <Space direction="vertical" size={8} className="stack-full">
+              <Space orientation="vertical" size={8} className="stack-full">
                 {renderMediaThumbnail(item, thumbnailUrl)}
 
                 <Space wrap size={6}>

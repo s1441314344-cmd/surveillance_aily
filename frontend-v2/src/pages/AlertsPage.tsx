@@ -115,7 +115,6 @@ export function AlertsPage() {
       queries.notificationRoutes,
       queries.strategiesQuery.isLoading,
       queries.strategiesError,
-      queries.strategies,
       selectedAlertId,
       selectedWebhookId,
       selectedNotificationRouteId,
