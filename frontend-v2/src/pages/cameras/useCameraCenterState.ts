@@ -12,6 +12,7 @@ import { useCameraDeviceOpsState } from '@/pages/cameras/useCameraDeviceOpsState
 import { useCameraFormSync } from '@/pages/cameras/useCameraFormSync';
 import { useCameraMediaState } from '@/pages/cameras/useCameraMediaState';
 import { useCameraMonitoringRuleState } from '@/pages/cameras/useCameraMonitoringRuleState';
+import { useCameraSelectionState } from '@/pages/cameras/useCameraSelectionState';
 import {
   useClampStatusLogsPage,
   useResetStatusLogsPageOnCameraChange,
@@ -39,8 +40,9 @@ function buildCameraListContext(params: {
   queryState: ReturnType<typeof useCameraCenterQueryState>;
   localState: ReturnType<typeof useCameraCenterLocalState>;
   deviceOpsState: ReturnType<typeof useCameraDeviceOpsState>;
+  selectionState: ReturnType<typeof useCameraSelectionState>;
 }): CameraListContext {
-  const { queryState, localState, deviceOpsState } = params;
+  const { queryState, localState, deviceOpsState, selectionState } = params;
   return {
     cameras: queryState.cameras,
     visibleCameras: queryState.visibleCameras,
@@ -53,7 +55,7 @@ function buildCameraListContext(params: {
     camerasLoading: queryState.camerasLoading,
     sweepLoading: deviceOpsState.sweepLoading,
     runSweepAllCameras: deviceOpsState.runSweepAllCameras,
-    selectCamera: localState.setSelectedCameraId,
+    selectCamera: selectionState.selectCamera,
   };
 }
 
@@ -77,26 +79,31 @@ export function useCameraCenterState(initialSelectedCameraId?: string | null): C
     alertOnly: localState.alertOnly,
     statusLogsPage: localState.statusLogsPage,
   });
+  const selectionState = useCameraSelectionState({
+    selectedCameraId: localState.selectedCameraId,
+    effectiveSelectedCameraId: queryState.effectiveSelectedCameraId,
+    setSelectedCameraId: localState.setSelectedCameraId,
+  });
   const mediaState = useCameraMediaState({
-    cameraId: queryState.effectiveSelectedCameraId,
+    cameraId: selectionState.effectiveSelectedCameraId,
     mediaItems: queryState.selectedCameraMedia,
     activeRecordingMedia: queryState.activeRecordingMedia,
     onPreviewError: handlePreviewError,
   });
   const monitoringRuleState = useCameraMonitoringRuleState({
-    cameraId: queryState.effectiveSelectedCameraId,
+    cameraId: selectionState.effectiveSelectedCameraId,
     monitorConfig: queryState.monitorConfig,
     triggerRuleForm: localState.triggerRuleForm,
     monitorConfigForm: localState.monitorConfigForm,
   });
   const deviceOpsState = useCameraDeviceOpsState({
     activeCamera: queryState.activeCamera,
-    effectiveSelectedCameraId: queryState.effectiveSelectedCameraId,
+    effectiveSelectedCameraId: selectionState.effectiveSelectedCameraId,
     cameras: queryState.cameras,
     form: localState.form,
     recordDurationSeconds: localState.recordDurationSeconds,
     activeRecordingMedia: queryState.activeRecordingMedia,
-    onSelectCamera: localState.setSelectedCameraId,
+    onSelectCamera: selectionState.selectCamera,
     onDiagnosticResult: handleDiagnosticResult,
   });
 
@@ -106,7 +113,7 @@ export function useCameraCenterState(initialSelectedCameraId?: string | null): C
   });
 
   useResetStatusLogsPageOnCameraChange(
-    queryState.effectiveSelectedCameraId,
+    selectionState.effectiveSelectedCameraId,
     localState.setStatusLogsPage,
   );
   useClampStatusLogsPage(
@@ -117,18 +124,29 @@ export function useCameraCenterState(initialSelectedCameraId?: string | null): C
   );
 
   const handleSubmit = async (values: CameraFormValues) => {
-    await deviceOpsState.submitCamera(values, queryState.effectiveSelectedCameraId);
+    await deviceOpsState.submitCamera(values, selectionState.effectiveSelectedCameraId);
   };
 
   const cameraListContext = buildCameraListContext({
     queryState,
     localState,
     deviceOpsState,
+    selectionState,
   });
 
+  const localStateForAssembly = {
+    ...localState,
+    selectedCameraId: selectionState.selectedCameraId,
+    setSelectedCameraId: selectionState.selectCamera,
+  };
+  const queryStateForAssembly = {
+    ...queryState,
+    effectiveSelectedCameraId: selectionState.effectiveSelectedCameraId,
+  };
+
   return assembleCameraCenterState({
-    localState,
-    queryState,
+    localState: localStateForAssembly,
+    queryState: queryStateForAssembly,
     mediaState,
     monitoringRuleState,
     deviceOpsState,

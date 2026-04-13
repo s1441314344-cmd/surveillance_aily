@@ -11,7 +11,11 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed"
+    "e2e:headed": "playwright test --headed",
+    "e2e:grouped": "playwright test -c playwright.grouped.config.ts",
+    "e2e:mainline": "playwright test -c playwright.grouped.config.ts tests/e2e/mainline",
+    "e2e:observability": "playwright test -c playwright.grouped.config.ts tests/e2e/observability",
+    "e2e:regression": "playwright test -c playwright.grouped.config.ts tests/e2e/regression"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

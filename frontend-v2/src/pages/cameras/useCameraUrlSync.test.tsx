@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { SetURLSearchParams } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { CREATE_CAMERA_ID } from '@/pages/cameras/cameraCenterConfig';
+import {
+  getDesiredCameraIdForUrlSync,
+  shouldSelectCameraFromQuery,
+} from '@/pages/cameras/cameraUrlSyncUtils';
 import { useCameraUrlSync } from './useCameraUrlSync';
 
 function Harness({
@@ -52,5 +57,38 @@ describe('useCameraUrlSync', () => {
     await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
 
     expect(onSelect.mock.calls.map(([cameraId]) => cameraId)).toEqual(['camera-b']);
+  });
+
+  it('returns null desired camera id when selected id is create mode', () => {
+    expect(
+      getDesiredCameraIdForUrlSync({
+        selectedCameraId: CREATE_CAMERA_ID,
+        effectiveSelectedCameraId: 'camera-a',
+      }),
+    ).toBeNull();
+  });
+
+  it('only selects from query when query differs from both selected and effective ids', () => {
+    expect(
+      shouldSelectCameraFromQuery({
+        queryCameraId: 'camera-a',
+        selectedCameraId: 'camera-a',
+        effectiveSelectedCameraId: 'camera-b',
+      }),
+    ).toBe(false);
+    expect(
+      shouldSelectCameraFromQuery({
+        queryCameraId: 'camera-b',
+        selectedCameraId: 'camera-a',
+        effectiveSelectedCameraId: 'camera-b',
+      }),
+    ).toBe(false);
+    expect(
+      shouldSelectCameraFromQuery({
+        queryCameraId: 'camera-c',
+        selectedCameraId: 'camera-a',
+        effectiveSelectedCameraId: 'camera-b',
+      }),
+    ).toBe(true);
   });
 });

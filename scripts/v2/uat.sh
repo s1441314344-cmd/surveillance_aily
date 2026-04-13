@@ -135,7 +135,7 @@ else
   frontend_build_status="failed"
 fi
 
-if make v2-e2e | tee "${e2e_log}"; then
+if ./scripts/v2/e2e-entrypoint.sh | tee "${e2e_log}"; then
   e2e_status="passed"
 else
   e2e_status="failed"

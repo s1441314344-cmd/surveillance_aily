@@ -315,7 +315,7 @@ fi
 
 if [[ "${WITH_E2E}" == "true" ]]; then
   echo "[v2-preflight] running e2e"
-  if make v2-e2e; then
+  if ./scripts/v2/e2e-entrypoint.sh; then
     e2e_status="passed"
   else
     e2e_status="failed"

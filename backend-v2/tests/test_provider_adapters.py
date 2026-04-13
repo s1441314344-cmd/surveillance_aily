@@ -345,7 +345,7 @@ def test_openai_adapter_respects_http_date_retry_after(monkeypatch, tmp_path):
 
     monkeypatch.setattr("app.services.providers.openai_adapter.httpx.Client", FakeClient)
     monkeypatch.setattr("app.services.providers.openai_adapter.time.sleep", lambda seconds: sleep_calls.append(seconds))
-    monkeypatch.setattr("app.services.providers.openai_adapter.datetime", DummyDateTime)
+    monkeypatch.setattr("app.services.providers.retry_policy.datetime", DummyDateTime)
 
     response = OpenAIAdapter().analyze(
         ProviderRequest(

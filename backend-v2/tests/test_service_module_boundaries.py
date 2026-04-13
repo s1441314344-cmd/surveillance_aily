@@ -85,6 +85,28 @@ def test_service_layer_worker_dispatch_imports_only_exist_in_task_dispatcher():
     assert violating_files == []
 
 
+def test_job_execution_service_delegates_version_recognition_pipeline():
+    imported = _imported_modules("app", "services", "job_execution_service.py")
+    assert "app.services.version_recognition_pipeline_service" in imported
+
+    module_ast = _read_module_ast("app", "services", "job_execution_service.py")
+    target = next(
+        (
+            node
+            for node in module_ast.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_process_version_recognition_job"
+        ),
+        None,
+    )
+    assert target is not None
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "process_version_recognition_job"
+        for node in ast.walk(target)
+    )
+
+
 def test_jobs_route_imports_split_job_services_directly():
     imported = _imported_modules("app", "api", "routes", "jobs.py")
 
