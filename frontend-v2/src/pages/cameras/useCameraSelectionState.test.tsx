@@ -30,6 +30,9 @@ function Harness({
       <button type="button" onClick={() => selectionState.selectCamera('camera-next')}>
         select
       </button>
+      <button type="button" onClick={() => selectionState.selectCamera('  camera-with-space  ')}>
+        select-spaced
+      </button>
     </div>
   );
 }
@@ -64,5 +67,19 @@ describe('useCameraSelectionState', () => {
     );
 
     expect(getByTestId('desired-camera-id').textContent).toBe('null');
+  });
+
+  it('normalizes selected camera id before delegating to state setter', () => {
+    const onSelectCamera = vi.fn();
+    const { getByRole } = render(
+      <Harness
+        selectedCameraId="camera-a"
+        effectiveSelectedCameraId="camera-a"
+        onSelectCamera={onSelectCamera}
+      />,
+    );
+
+    fireEvent.click(getByRole('button', { name: 'select-spaced' }));
+    expect(onSelectCamera).toHaveBeenCalledWith('camera-with-space');
   });
 });

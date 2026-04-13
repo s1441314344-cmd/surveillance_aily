@@ -439,6 +439,86 @@ def test_zhipu_adapter_calls_chat_completions_and_parses_json(monkeypatch, tmp_p
     assert isinstance(captured["json"]["messages"][1]["content"][1]["image_url"]["url"], str)
 
 
+def test_zhipu_adapter_retries_429_then_succeeds(monkeypatch, tmp_path):
+    image_path = tmp_path / "zhipu-retry.jpg"
+    image_path.write_bytes(b"fake-image")
+    state = {"count": 0}
+
+    monkeypatch.setattr(
+        "app.services.providers.zhipu_adapter.load_model_provider_runtime",
+        lambda _provider: ModelProviderRuntimeConfig(
+            provider="zhipu",
+            display_name="智谱",
+            base_url="https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            api_key="zhipu-key",
+            default_model="glm-4v-plus",
+            timeout_seconds=60,
+            status="active",
+        ),
+    )
+
+    class FakeResponse:
+        status_code = 200
+        headers = {}
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps({"summary": "ok"}, ensure_ascii=False),
+                        }
+                    }
+                ]
+            }
+
+    class Retryable429Response:
+        status_code = 429
+        headers = {"retry-after": "0"}
+
+        def raise_for_status(self):
+            request = httpx.Request("POST", "https://open.bigmodel.cn/api/paas/v4/chat/completions")
+            raise httpx.HTTPStatusError("Too Many Requests", request=request, response=self)
+
+        def json(self):
+            return {}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, headers=None, json=None):
+            state["count"] += 1
+            if state["count"] < 3:
+                return Retryable429Response()
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.providers.zhipu_adapter.httpx.Client", FakeClient)
+    monkeypatch.setattr("app.services.providers.zhipu_adapter.time.sleep", lambda *_args, **_kwargs: None)
+
+    response = ZhipuAdapter().analyze(
+        ProviderRequest(
+            model="glm-4v-plus",
+            prompt="请返回 JSON",
+            image_paths=[str(image_path)],
+            response_schema={"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]},
+        )
+    )
+
+    assert state["count"] == 3
+    assert response.success is True
+    assert response.normalized_json == {"summary": "ok"}
+
+
 def test_openai_adapter_returns_failure_for_refusal(monkeypatch, tmp_path):
     image_path = tmp_path / "blocked.jpg"
     image_path.write_bytes(b"fake-image")
@@ -590,6 +670,82 @@ def test_google_adapter_calls_generate_content_and_parses_json(monkeypatch, tmp_
     assert captured["json"]["contents"][0]["parts"][1]["inline_data"]["mime_type"] == "image/png"
 
 
+def test_google_adapter_retries_429_then_succeeds(monkeypatch, tmp_path):
+    image_path = tmp_path / "google-retry.png"
+    image_path.write_bytes(b"fake-image")
+    state = {"count": 0}
+
+    monkeypatch.setattr(
+        "app.services.providers.google_adapter.load_model_provider_runtime",
+        lambda _provider: ModelProviderRuntimeConfig(
+            provider="google",
+            display_name="Google Gemini",
+            base_url="https://generativelanguage.googleapis.com/v1beta/models",
+            api_key="google-test-key",
+            default_model="gemini-2.5-flash",
+            timeout_seconds=60,
+            status="active",
+        ),
+    )
+
+    class FakeResponse:
+        status_code = 200
+        headers = {}
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "candidates": [
+                    {"content": {"parts": [{"text": json.dumps({"summary": "ok"}, ensure_ascii=False)}]}}
+                ]
+            }
+
+    class Retryable429Response:
+        status_code = 429
+        headers = {"retry-after": "0"}
+
+        def raise_for_status(self):
+            request = httpx.Request("POST", "https://generativelanguage.googleapis.com/v1beta/models")
+            raise httpx.HTTPStatusError("Too Many Requests", request=request, response=self)
+
+        def json(self):
+            return {}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, headers=None, json=None):
+            state["count"] += 1
+            if state["count"] < 3:
+                return Retryable429Response()
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.providers.google_adapter.httpx.Client", FakeClient)
+    monkeypatch.setattr("app.services.providers.google_adapter.time.sleep", lambda *_args, **_kwargs: None)
+
+    response = GoogleAdapter().analyze(
+        ProviderRequest(
+            model="gemini-2.5-flash",
+            prompt="请返回 JSON",
+            image_paths=[str(image_path)],
+            response_schema={"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]},
+        )
+    )
+
+    assert state["count"] == 3
+    assert response.success is True
+    assert response.normalized_json == {"summary": "ok"}
+
+
 def test_openai_adapter_text_mode_accepts_plain_text(monkeypatch, tmp_path):
     image_path = tmp_path / "note.jpg"
     image_path.write_bytes(b"fake-image")
@@ -724,6 +880,86 @@ def test_ark_adapter_calls_chat_completions_and_parses_json(monkeypatch, tmp_pat
     assert captured["url"] == "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
     assert captured["headers"]["Authorization"] == "Bearer ark-test-key"
     assert captured["json"]["messages"][1]["content"][1]["type"] == "image_url"
+
+
+def test_ark_adapter_retries_429_then_succeeds(monkeypatch, tmp_path):
+    image_path = tmp_path / "ark-retry.jpg"
+    image_path.write_bytes(b"fake-image")
+    state = {"count": 0}
+
+    monkeypatch.setattr(
+        "app.services.providers.ark_adapter.load_model_provider_runtime",
+        lambda _provider: ModelProviderRuntimeConfig(
+            provider="ark",
+            display_name="火山方舟",
+            base_url="https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+            api_key="ark-test-key",
+            default_model="ep-123",
+            timeout_seconds=60,
+            status="active",
+        ),
+    )
+
+    class FakeResponse:
+        status_code = 200
+        headers = {}
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps({"summary": "ok"}, ensure_ascii=False),
+                        }
+                    }
+                ]
+            }
+
+    class Retryable429Response:
+        status_code = 429
+        headers = {"retry-after": "0"}
+
+        def raise_for_status(self):
+            request = httpx.Request("POST", "https://ark.cn-beijing.volces.com/api/v3/chat/completions")
+            raise httpx.HTTPStatusError("Too Many Requests", request=request, response=self)
+
+        def json(self):
+            return {}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, headers=None, json=None):
+            state["count"] += 1
+            if state["count"] < 3:
+                return Retryable429Response()
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.providers.ark_adapter.httpx.Client", FakeClient)
+    monkeypatch.setattr("app.services.providers.ark_adapter.time.sleep", lambda *_args, **_kwargs: None)
+
+    response = ArkAdapter().analyze(
+        ProviderRequest(
+            model="ep-123",
+            prompt="请返回 JSON",
+            image_paths=[str(image_path)],
+            response_schema={"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]},
+        )
+    )
+
+    assert state["count"] == 3
+    assert response.success is True
+    assert response.normalized_json == {"summary": "ok"}
 
 
 def test_ark_adapter_http_400_includes_server_detail_and_hint(monkeypatch, tmp_path):

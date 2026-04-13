@@ -5,8 +5,16 @@ type CameraSelectionPair = {
   effectiveSelectedCameraId: string | null;
 };
 
+export function normalizeCameraId(cameraId: string | null | undefined): string | null {
+  if (cameraId == null) {
+    return null;
+  }
+  const normalized = cameraId.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 export function readCameraIdFromSearch(search: string): string | null {
-  return new URLSearchParams(search).get('cameraId');
+  return normalizeCameraId(new URLSearchParams(search).get('cameraId'));
 }
 
 export function shouldSelectCameraFromQuery(params: CameraSelectionPair & { queryCameraId: string | null }): boolean {

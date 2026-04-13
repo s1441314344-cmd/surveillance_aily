@@ -118,6 +118,80 @@ def test_reconcile_script_starts_dependencies_and_uses_quoted_python_heredoc():
     assert "python3 - <<'PY'" in script
 
 
+def test_preflight_supports_failure_injection_modes():
+    script = (ROOT_DIR / "scripts/v2/preflight.sh").read_text(encoding="utf-8")
+
+    assert "--inject-deps-unready" in script
+    assert "--inject-queue-down" in script
+    assert "--inject-worker-unregistered" in script
+    assert '"injection_mode": "${INJECTION_MODE}" or None' in script
+
+
+def test_e2e_entrypoint_supports_group_selection_via_env():
+    script = (ROOT_DIR / "scripts/v2/e2e-entrypoint.sh").read_text(encoding="utf-8")
+
+    assert 'E2E_GROUP="${V2_E2E_GROUP:-}"' in script
+    assert "npm run e2e:grouped" in script
+    assert "npm run e2e:mainline" in script
+    assert "npm run e2e:observability" in script
+    assert "npm run e2e:regression" in script
+    assert "unsupported V2_E2E_GROUP" in script
+
+
+def test_preflight_deps_unready_injection_fails_fast_and_writes_summary(tmp_path: Path):
+    output_dir = tmp_path / "preflight-injection"
+    result = run_script(
+        "./scripts/v2/preflight.sh",
+        "--inject-deps-unready",
+        "--output-dir",
+        str(output_dir),
+    )
+
+    assert result.returncode == 2
+    summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["result"] == "failed"
+    assert summary["parameter_summary"]["injection_mode"] == "deps-unready"
+    assert summary["readiness"]["api"]["status"] == "failed"
+    assert summary["readiness"]["worker"]["status"] == "skipped"
+    assert summary["readiness"]["scheduler"]["status"] == "skipped"
+
+
+def test_preflight_queue_down_injection_fails_fast_and_writes_summary(tmp_path: Path):
+    output_dir = tmp_path / "preflight-queue-injection"
+    result = run_script(
+        "./scripts/v2/preflight.sh",
+        "--inject-queue-down",
+        "--output-dir",
+        str(output_dir),
+    )
+
+    assert result.returncode == 2
+    summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["result"] == "failed"
+    assert summary["parameter_summary"]["injection_mode"] == "queue-down"
+    assert summary["readiness"]["api"]["status"] == "skipped"
+    assert summary["readiness"]["worker"]["status"] == "failed"
+    assert summary["readiness"]["scheduler"]["status"] == "skipped"
+
+
+def test_preflight_worker_unregistered_injection_fails_fast_and_writes_summary(tmp_path: Path):
+    output_dir = tmp_path / "preflight-worker-injection"
+    result = run_script(
+        "./scripts/v2/preflight.sh",
+        "--inject-worker-unregistered",
+        "--output-dir",
+        str(output_dir),
+    )
+
+    assert result.returncode == 2
+    summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["result"] == "failed"
+    assert summary["parameter_summary"]["injection_mode"] == "worker-unregistered"
+    assert summary["readiness"]["api"]["status"] == "skipped"
+    assert summary["readiness"]["worker"]["status"] == "failed"
+    assert summary["readiness"]["scheduler"]["status"] == "skipped"
+
+
 def test_legacy_reconcile_fixture_files_exist():
     source_db = ROOT_DIR / "data" / "surveillance.db"
     assert source_db.exists(), f"missing legacy source db: {source_db}"

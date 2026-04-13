@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { type SetURLSearchParams } from 'react-router-dom';
-import { CREATE_CAMERA_ID } from '@/pages/cameras/cameraCenterConfig';
+import {
+  getDesiredCameraIdForUrlSync,
+  readCameraIdFromSearch,
+  shouldSelectCameraFromQuery,
+} from '@/pages/cameras/cameraUrlSyncUtils';
 
 type UseCameraUrlSyncParams = {
   search: string;
@@ -9,8 +13,6 @@ type UseCameraUrlSyncParams = {
   selectCamera: (cameraId: string | null) => void;
   setSearchParams: SetURLSearchParams;
 };
-
-const readCameraIdFromSearch = (search: string) => new URLSearchParams(search).get('cameraId');
 
 export function useCameraUrlSync({
   search,
@@ -37,18 +39,22 @@ export function useCameraUrlSync({
   }, [selectCamera]);
 
   useEffect(() => {
-    if (!queryCameraId) {
-      return;
-    }
-    const currentSelected = selectedCameraIdRef.current;
-    const currentEffective = effectiveSelectedCameraIdRef.current;
-    if (queryCameraId !== currentSelected && queryCameraId !== currentEffective) {
+    if (
+      shouldSelectCameraFromQuery({
+        queryCameraId,
+        selectedCameraId: selectedCameraIdRef.current,
+        effectiveSelectedCameraId: effectiveSelectedCameraIdRef.current,
+      })
+    ) {
       selectCameraRef.current(queryCameraId);
     }
   }, [queryCameraId]);
 
   useEffect(() => {
-    const desired = selectedCameraId === CREATE_CAMERA_ID ? null : effectiveSelectedCameraId;
+    const desired = getDesiredCameraIdForUrlSync({
+      selectedCameraId,
+      effectiveSelectedCameraId,
+    });
     if ((queryCameraId ?? null) === (desired ?? null)) {
       return;
     }

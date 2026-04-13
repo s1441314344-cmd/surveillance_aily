@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { getDesiredCameraIdForUrlSync } from '@/pages/cameras/cameraUrlSyncUtils';
+import { getDesiredCameraIdForUrlSync, normalizeCameraId } from '@/pages/cameras/cameraUrlSyncUtils';
 
 type UseCameraSelectionStateParams = {
   selectedCameraId: string | null;
@@ -14,7 +14,7 @@ export function useCameraSelectionState({
 }: UseCameraSelectionStateParams) {
   const selectCamera = useCallback(
     (cameraId: string | null) => {
-      setSelectedCameraId(cameraId);
+      setSelectedCameraId(normalizeCameraId(cameraId));
     },
     [setSelectedCameraId],
   );

@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { CREATE_CAMERA_ID } from '@/pages/cameras/cameraCenterConfig';
 import {
   getDesiredCameraIdForUrlSync,
+  normalizeCameraId,
+  readCameraIdFromSearch,
   shouldSelectCameraFromQuery,
 } from '@/pages/cameras/cameraUrlSyncUtils';
 import { useCameraUrlSync } from './useCameraUrlSync';
@@ -90,5 +92,36 @@ describe('useCameraUrlSync', () => {
         effectiveSelectedCameraId: 'camera-b',
       }),
     ).toBe(true);
+  });
+
+  it('normalizes blank query camera id to null', () => {
+    expect(normalizeCameraId(undefined)).toBeNull();
+    expect(normalizeCameraId(null)).toBeNull();
+    expect(normalizeCameraId('   ')).toBeNull();
+    expect(normalizeCameraId(' camera-z ')).toBe('camera-z');
+
+    expect(readCameraIdFromSearch('?cameraId=')).toBeNull();
+    expect(readCameraIdFromSearch('?cameraId=%20%20')).toBeNull();
+    expect(readCameraIdFromSearch('?cameraId=%20camera-z%20')).toBe('camera-z');
+  });
+
+  it('removes cameraId but preserves other query params in create mode', async () => {
+    const onSelect = vi.fn();
+    const setSearchParams = vi.fn() as unknown as SetURLSearchParams;
+    render(
+      <Harness
+        onSelect={onSelect}
+        search={`?cameraId=${CREATE_CAMERA_ID}&tab=monitoring&debug=1`}
+        setSearchParams={setSearchParams}
+      />,
+    );
+
+    await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
+
+    const [nextParams] = setSearchParams.mock.calls[0];
+    const searchValue = String(nextParams);
+    expect(searchValue).toContain('tab=monitoring');
+    expect(searchValue).toContain('debug=1');
+    expect(searchValue).not.toContain('cameraId=');
   });
 });

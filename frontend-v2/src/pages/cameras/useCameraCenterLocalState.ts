@@ -8,12 +8,13 @@ import {
   type MonitorConfigFormValues,
   type TriggerRuleFormValues,
 } from '@/pages/cameras/cameraCenterConfig';
+import { normalizeCameraId } from '@/pages/cameras/cameraUrlSyncUtils';
 
 export function useCameraCenterLocalState(initialSelectedCameraId?: string | null) {
   const [form] = Form.useForm<CameraFormValues>();
   const [triggerRuleForm] = Form.useForm<TriggerRuleFormValues>();
   const [monitorConfigForm] = Form.useForm<MonitorConfigFormValues>();
-  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(initialSelectedCameraId ?? null);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(() => normalizeCameraId(initialSelectedCameraId));
   const [alertOnly, setAlertOnly] = useState(false);
   const [cameraSearch, setCameraSearch] = useState('');
   const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
