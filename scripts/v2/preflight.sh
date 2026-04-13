@@ -17,6 +17,16 @@ PERF_ARGS_RAW="${V2_PREFLIGHT_PERF_ARGS:-}"
 SOAK_ARGS_RAW="${V2_PREFLIGHT_SOAK_ARGS:-}"
 SMOKE_SCHEDULE_WAIT_SECONDS="${V2_SMOKE_SCHEDULE_WAIT_SECONDS:-125}"
 OUTPUT_DIR="${V2_PREFLIGHT_OUTPUT_DIR:-}"
+INJECTION_MODE="${V2_PREFLIGHT_INJECTION_MODE:-}"
+
+set_injection_mode() {
+  local mode="$1"
+  if [[ -n "${INJECTION_MODE}" && "${INJECTION_MODE}" != "${mode}" ]]; then
+    echo "[v2-preflight] failure injection mode conflict: ${INJECTION_MODE} vs ${mode}" >&2
+    exit 2
+  fi
+  INJECTION_MODE="${mode}"
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,6 +53,18 @@ while [[ $# -gt 0 ]]; do
     --output-dir)
       OUTPUT_DIR="$2"
       shift 2
+      ;;
+    --inject-deps-unready)
+      set_injection_mode "deps-unready"
+      shift
+      ;;
+    --inject-queue-down)
+      set_injection_mode "queue-down"
+      shift
+      ;;
+    --inject-worker-unregistered)
+      set_injection_mode "worker-unregistered"
+      shift
       ;;
     *)
       echo "[v2-preflight] unknown argument: $1" >&2
@@ -178,6 +200,7 @@ summary = {
         "smoke_wait_seconds": int("${SMOKE_SCHEDULE_WAIT_SECONDS}"),
         "perf_args": "${PERF_ARGS_RAW}",
         "soak_args": "${SOAK_ARGS_RAW}",
+        "injection_mode": "${INJECTION_MODE}" or None,
         "output_dir": "${OUTPUT_DIR}",
     },
     "readiness": {
@@ -237,6 +260,31 @@ trap cleanup EXIT
 
 echo "[v2-preflight] logs dir: ${log_dir}"
 echo "[v2-preflight] run_id: ${run_id}"
+
+if [[ "${INJECTION_MODE}" == "deps-unready" ]]; then
+  api_readiness_status="failed"
+  worker_readiness_status="skipped"
+  scheduler_readiness_status="skipped"
+  echo "[v2-preflight] failure injection active: deps-unready" >&2
+  exit 2
+fi
+
+if [[ "${INJECTION_MODE}" == "queue-down" ]]; then
+  api_readiness_status="skipped"
+  worker_readiness_status="failed"
+  scheduler_readiness_status="skipped"
+  echo "[v2-preflight] failure injection active: queue-down" >&2
+  exit 2
+fi
+
+if [[ "${INJECTION_MODE}" == "worker-unregistered" ]]; then
+  api_readiness_status="skipped"
+  worker_readiness_status="failed"
+  scheduler_readiness_status="skipped"
+  echo "[v2-preflight] failure injection active: worker-unregistered" >&2
+  exit 2
+fi
+
 echo "[v2-preflight] starting dependencies"
 make v2-deps-up
 
