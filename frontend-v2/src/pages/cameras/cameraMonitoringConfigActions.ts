@@ -126,3 +126,32 @@ export const syncMonitorConfigForm = ({
     roi_points: monitorConfig.roi_points ?? undefined,
   });
 };
+
+export const buildMonitorConfigSyncKey = (monitorConfig: SignalMonitorConfig | undefined): string | null => {
+  if (!monitorConfig) {
+    return null;
+  }
+
+  return JSON.stringify({
+    runtime_mode: monitorConfig.runtime_mode,
+    enabled: Boolean(monitorConfig.enabled),
+    signal_strategy_id: monitorConfig.signal_strategy_id ?? null,
+    strict_local_gate: Boolean(monitorConfig.strict_local_gate),
+    monitor_interval_seconds: Number(monitorConfig.monitor_interval_seconds),
+    schedule_type: monitorConfig.schedule_type ?? DEFAULT_MONITOR_CONFIG_VALUES.schedule_type,
+    schedule_value: monitorConfig.schedule_value ?? '',
+    manual_until: monitorConfig.manual_until ?? '',
+    roi_enabled: Boolean(monitorConfig.roi_enabled),
+    roi_x: monitorConfig.roi_x ?? null,
+    roi_y: monitorConfig.roi_y ?? null,
+    roi_width: monitorConfig.roi_width ?? null,
+    roi_height: monitorConfig.roi_height ?? null,
+    roi_shape: monitorConfig.roi_shape === 'polygon' ? 'polygon' : 'rect',
+    roi_points: Array.isArray(monitorConfig.roi_points)
+      ? monitorConfig.roi_points.map((item) => ({
+          x: Number(item.x),
+          y: Number(item.y),
+        }))
+      : null,
+  });
+};

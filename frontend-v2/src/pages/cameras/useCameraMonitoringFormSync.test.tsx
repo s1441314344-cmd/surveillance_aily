@@ -143,4 +143,68 @@ describe('useCameraMonitoringFormSync', () => {
       roi_points: undefined,
     });
   });
+
+  it('does not re-sync monitor form when polling returns the same config payload', async () => {
+    const setTriggerRuleFields = vi.fn();
+    const setMonitorConfigFields = vi.fn();
+    const triggerRuleForm = { setFieldsValue: setTriggerRuleFields } as unknown as FormInstance<TriggerRuleFormValues>;
+    const monitorConfigForm = { setFieldsValue: setMonitorConfigFields } as unknown as FormInstance<MonitorConfigFormValues>;
+    const setEditingTriggerRule = vi.fn();
+    const setTriggerRuleModalOpen = vi.fn();
+    const setTriggerDebugResult = vi.fn();
+    const setLiveDebugResult = vi.fn();
+    const monitorConfig: SignalMonitorConfig = {
+      camera_id: 'camera-a',
+      runtime_mode: 'daemon',
+      enabled: true,
+      signal_strategy_id: 'strategy-1',
+      strict_local_gate: true,
+      monitor_interval_seconds: 30,
+      schedule_type: 'interval_minutes',
+      schedule_value: '5',
+      manual_until: null,
+      roi_enabled: false,
+      roi_x: null,
+      roi_y: null,
+      roi_width: null,
+      roi_height: null,
+      roi_shape: 'rect',
+      roi_points: null,
+      last_run_at: null,
+      next_run_at: null,
+      last_error: null,
+      created_at: null,
+      updated_at: null,
+    };
+
+    const { rerender } = render(
+      <Harness
+        cameraId="camera-a"
+        monitorConfig={monitorConfig}
+        triggerRuleForm={triggerRuleForm}
+        monitorConfigForm={monitorConfigForm}
+        setEditingTriggerRule={setEditingTriggerRule}
+        setTriggerRuleModalOpen={setTriggerRuleModalOpen}
+        setTriggerDebugResult={setTriggerDebugResult}
+        setLiveDebugResult={setLiveDebugResult}
+      />,
+    );
+
+    await waitFor(() => expect(setMonitorConfigFields).toHaveBeenCalledTimes(2));
+
+    rerender(
+      <Harness
+        cameraId="camera-a"
+        monitorConfig={{ ...monitorConfig }}
+        triggerRuleForm={triggerRuleForm}
+        monitorConfigForm={monitorConfigForm}
+        setEditingTriggerRule={setEditingTriggerRule}
+        setTriggerRuleModalOpen={setTriggerRuleModalOpen}
+        setTriggerDebugResult={setTriggerDebugResult}
+        setLiveDebugResult={setLiveDebugResult}
+      />,
+    );
+
+    await waitFor(() => expect(setMonitorConfigFields).toHaveBeenCalledTimes(2));
+  });
 });

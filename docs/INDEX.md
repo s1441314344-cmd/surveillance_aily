@@ -24,6 +24,7 @@
 - `testing/智能巡检系统_V2_治理状态补充说明_2026-04-12.md`：`2026-04-12` 时点的治理收敛现状、最新 preflight / release gate 证据与历史文档使用说明。
 - `testing/v2-p0-failure-injection-matrix.md`：P0 失败注入场景矩阵（依赖未就绪、队列不可用、worker 未注册）与证据要求。
 - `testing/v2-e2e-grouped-entrypoint.md`：`V2_E2E_GROUP` 分组执行入口（mainline / observability / regression）与默认行为说明。
+- `testing/v2-mainline-e2e-smoke-2026-04-13.md`：`mainline` 分组 E2E 冒烟执行记录与结论。
 - `testing/智能巡检系统_V2_Pre-merge_Checklist流程接入说明_2026-04-13.md`：Pre-merge Checklist 在 PR/提审流程中的接入方式与 Supervisor G1-G6 校验项。
 - `testing/智能巡检系统_V2_提审模板.md`：评审与发布前提审材料模板。
 - `testing/智能巡检系统_V2_P0-P3整体优化提审单_2026-04-04.md`：本轮治理收敛与架构优化的已填写提审材料。
