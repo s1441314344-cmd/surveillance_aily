@@ -1,4 +1,4 @@
-import type { Camera, CameraStatus, CameraStatusLog } from '@/shared/api/configCenter';
+import type { Camera, CameraStatus, CameraStatusLog } from '@/shared/api/cameras';
 import type { CameraStatusSummary } from '@/pages/cameras/cameraCenterStateContracts';
 
 type FilterVisibleCamerasArgs = {

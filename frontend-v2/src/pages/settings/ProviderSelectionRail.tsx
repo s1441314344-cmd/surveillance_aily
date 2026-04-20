@@ -1,5 +1,5 @@
 import { Space } from 'antd';
-import { type ModelProvider } from '@/shared/api/configCenter';
+import { type ModelProvider } from '@/shared/api/modelProviders';
 import {
   ACTIVE_STATUS_LABELS,
   ACTIVE_STATUS_OPTIONS,

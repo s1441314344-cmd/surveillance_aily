@@ -1,6 +1,13 @@
+// @prd /prd/modules/local-detector.md §5 数据模型 - LocalDetectorConfig / LocalDetectorDetectResult
 import axios from 'axios';
+import { resolveBaseUrl } from '@/shared/api/baseUrl';
 
-const localDetectorBaseUrl = import.meta.env.VITE_LOCAL_DETECTOR_BASE_URL ?? 'http://localhost:8091';
+const localDetectorBaseUrl = resolveBaseUrl({
+  envValue: import.meta.env.VITE_LOCAL_DETECTOR_BASE_URL,
+  fallbackBaseUrl: 'http://localhost:8091',
+  envName: 'VITE_LOCAL_DETECTOR_BASE_URL',
+  isProduction: import.meta.env.PROD,
+});
 
 const localDetectorClient = axios.create({
   baseURL: localDetectorBaseUrl,

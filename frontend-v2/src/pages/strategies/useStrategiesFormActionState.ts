@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { App, type FormInstance } from 'antd';
-import type { ModelProvider, Strategy } from '@/shared/api/configCenter';
+import type { ModelProvider } from '@/shared/api/modelProviders';
+import type { Strategy } from '@/shared/api/strategies';
 import {
   CREATE_STRATEGY_ID,
   DEFAULT_STRATEGY_FORM_VALUES,

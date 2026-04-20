@@ -1,3 +1,4 @@
+// @prd /prd/modules/audit-logs.md §5 数据模型 - OperationAuditLog
 import { apiClient } from './client';
 
 export type AuditLog = {

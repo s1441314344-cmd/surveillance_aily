@@ -2,7 +2,7 @@ export * from './DataStateBlock';
 export * from './DetailPanel';
 export * from './FilterToolbar';
 export * from './MetricCard';
-export * from './PageHeader';
+export * from './RoutePageHeader';
 export * from './optionHelpers';
 export * from './SectionCard';
 export * from './StatusFilterActions';

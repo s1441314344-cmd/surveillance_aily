@@ -1,6 +1,6 @@
 import { App } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
-import type { Camera } from '@/shared/api/configCenter';
+import type { Camera } from '@/shared/api/cameras';
 import type { UploadFormValues } from '@/pages/jobs/types';
 import { collectRcFiles, getScheduleValue, requireSelectedCamera, requireRtspCamera } from '@/pages/jobs/jobsFormUtils';
 import type { useJobsMutationState } from '@/pages/jobs/useJobsMutationState';
@@ -10,12 +10,22 @@ const RTSP_WARNING = '当前 V1 任务链路仅支持 RTSP 摄像头，ONVIF 为
 const SNAPSHOT_CAMERA_WARNING = '请先选择拍照摄像头';
 const SNAPSHOT_RTSP_WARNING = '当前 V1 仅支持 RTSP 摄像头拍照上传';
 
-type JobsSubmitActionsParams = {
+type JobsSubmitActionsFeedbackParams = {
   message: ReturnType<typeof App.useApp>['message'];
+};
+
+type JobsSubmitActionsResourcesParams = {
   fileList: UploadFile[];
   selectedCameraInForm: Camera | null;
   selectedUploadCameraInForm: Camera | null;
-  mutations: ReturnType<typeof useJobsMutationState>;
+};
+
+type JobsSubmitActionsMutationsParams = ReturnType<typeof useJobsMutationState>;
+
+type JobsSubmitActionsParams = {
+  feedback: JobsSubmitActionsFeedbackParams;
+  resources: JobsSubmitActionsResourcesParams;
+  mutations: JobsSubmitActionsMutationsParams;
 };
 
 function validateRtspCameraSelection({
@@ -31,10 +41,26 @@ function validateRtspCameraSelection({
   cameraWarning: string;
   rtspWarning: string;
 }) {
-  if (!requireSelectedCamera(cameraId, message, cameraWarning)) {
+  if (
+    !requireSelectedCamera({
+      cameraId,
+      feedback: {
+        message,
+        warningText: cameraWarning,
+      },
+    })
+  ) {
     return null;
   }
-  if (!requireRtspCamera(camera, message, rtspWarning)) {
+  if (
+    !requireRtspCamera({
+      camera,
+      feedback: {
+        message,
+        warningText: rtspWarning,
+      },
+    })
+  ) {
     return null;
   }
   return cameraId ?? null;
@@ -43,10 +69,8 @@ function validateRtspCameraSelection({
 export async function handleJobsUploadSubmit(
   values: UploadFormValues,
   {
-    message,
-    fileList,
-    selectedCameraInForm,
-    selectedUploadCameraInForm,
+    feedback,
+    resources,
     mutations,
   }: JobsSubmitActionsParams,
 ) {
@@ -60,8 +84,8 @@ export async function handleJobsUploadSubmit(
   if (values.taskMode === 'camera_schedule') {
     const cameraId = validateRtspCameraSelection({
       cameraId: values.cameraId,
-      camera: selectedCameraInForm,
-      message,
+      camera: resources.selectedCameraInForm,
+      message: feedback.message,
       cameraWarning: CAMERA_WARNING,
       rtspWarning: RTSP_WARNING,
     });
@@ -69,14 +93,14 @@ export async function handleJobsUploadSubmit(
       return;
     }
 
-    const scheduleValue = getScheduleValue(
-      values.scheduleType,
-      values.dailyTime,
-      values.intervalMinutes,
-    );
+    const scheduleValue = getScheduleValue({
+      scheduleType: values.scheduleType,
+      dailyTime: values.dailyTime,
+      intervalMinutes: values.intervalMinutes,
+    });
 
     if (!values.scheduleType || !scheduleValue) {
-      message.warning('请补充完整的定时任务配置');
+      feedback.message.warning('请补充完整的定时任务配置');
       return;
     }
     await scheduleMutation.mutateAsync({
@@ -100,8 +124,8 @@ export async function handleJobsUploadSubmit(
   if (values.taskMode === 'camera_once') {
     const cameraId = validateRtspCameraSelection({
       cameraId: values.cameraId,
-      camera: selectedCameraInForm,
-      message,
+      camera: resources.selectedCameraInForm,
+      message: feedback.message,
       cameraWarning: CAMERA_WARNING,
       rtspWarning: RTSP_WARNING,
     });
@@ -116,8 +140,8 @@ export async function handleJobsUploadSubmit(
   if (values.uploadSource === 'camera_snapshot') {
     const cameraId = validateRtspCameraSelection({
       cameraId: values.uploadCameraId,
-      camera: selectedUploadCameraInForm,
-      message,
+      camera: resources.selectedUploadCameraInForm,
+      message: feedback.message,
       cameraWarning: SNAPSHOT_CAMERA_WARNING,
       rtspWarning: SNAPSHOT_RTSP_WARNING,
     });
@@ -129,10 +153,10 @@ export async function handleJobsUploadSubmit(
     return;
   }
 
-  const files = collectRcFiles(fileList);
+  const files = collectRcFiles(resources.fileList);
 
   if (!files.length) {
-    message.warning('请先选择至少一张图片');
+    feedback.message.warning('请先选择至少一张图片');
     return;
   }
 

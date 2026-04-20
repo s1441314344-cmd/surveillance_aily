@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { MessageInstance } from 'antd/es/message/interface';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import { DASHBOARDS_QUERY_KEYS } from '@/pages/dashboards/dashboardsQueryKeys';
 
 export const invalidateDashboardQueries = async (queryClient: QueryClient, statusFilter: string) => {

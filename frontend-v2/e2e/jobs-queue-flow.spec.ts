@@ -67,7 +67,7 @@ test('upload job is queued and can be cancelled in job center', async ({ page })
     await cancelButton.click();
     const cancelResponse = await cancelResponsePromise;
     expect(cancelResponse.ok()).toBeTruthy();
-    await expect(jobRow).toContainText('cancelled');
+    await expect(jobRow).toContainText('已取消');
   }
 
   const detailDrawer = page.getByRole('dialog', { name: /任务详情/ });
@@ -75,5 +75,5 @@ test('upload job is queued and can be cancelled in job center', async ({ page })
     await jobRow.click();
   }
   await expect(detailDrawer).toBeVisible();
-  await expect(detailDrawer).toContainText(/queued|running|completed|failed|cancelled/);
+  await expect(detailDrawer).toContainText(/等待中|处理中|已完成|失败|已取消/);
 });

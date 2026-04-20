@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listAuditLogs } from '@/shared/api/auditLogs';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import type { AuditLogFilterState } from '@/pages/audit-logs/types';
 
 type UseAuditLogsQueryStateParams = {

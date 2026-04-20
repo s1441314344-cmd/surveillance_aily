@@ -5,9 +5,9 @@ import {
   listAlerts,
   listAlertNotificationRoutes,
   listAlertWebhooks,
-  listStrategies,
-} from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+} from '@/shared/api/alerts';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
+import { listStrategies } from '@/shared/api/strategies';
 
 const ALERTS_REFETCH_INTERVAL_MS = 10000;
 const ALERTS_QUERY_KEY_ROOT = 'alerts';

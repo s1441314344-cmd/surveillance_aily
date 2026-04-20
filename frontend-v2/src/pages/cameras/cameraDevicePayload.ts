@@ -1,4 +1,4 @@
-import type { CameraPayload } from '@/shared/api/configCenter';
+import type { CameraPayload } from '@/shared/api/cameras';
 import type { CameraFormValues } from '@/pages/cameras/cameraCenterConfig';
 
 export const buildCameraPayload = (values: CameraFormValues): CameraPayload => ({

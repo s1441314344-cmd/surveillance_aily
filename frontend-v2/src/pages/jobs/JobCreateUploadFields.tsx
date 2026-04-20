@@ -1,45 +1,62 @@
 import { InboxOutlined } from '@ant-design/icons';
 import { Alert, Form, Select, Upload } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
-import type { Camera } from '@/shared/api/configCenter';
-import { JOB_UPLOAD_SOURCE_OPTIONS, type UploadFormValues } from '@/pages/jobs/types';
+import type { OptionItem } from '@/pages/jobs/jobsOptionItem';
+import type { UploadFormValues } from '@/pages/jobs/types';
 
 const { Dragger } = Upload;
 
-type JobCreateUploadFieldsProps = {
+type JobCreateUploadWorkflowProps = {
   uploadSource: NonNullable<UploadFormValues['uploadSource']>;
-  fileList: UploadFile[];
-  cameras: Camera[];
+};
+
+type JobCreateUploadResourcesProps = {
   cameraLoading: boolean;
+};
+
+type JobCreateUploadStateProps = {
+  fileList: UploadFile[];
   hasUnsupportedUploadCameraProtocol: boolean;
+};
+
+type JobCreateUploadHandlersProps = {
   onFileListChange: (nextFileList: UploadFile[]) => void;
 };
 
+type JobCreateUploadOptionsProps = {
+  uploadSourceOptions: readonly OptionItem[];
+  uploadCameraOptions: readonly OptionItem[];
+};
+
+type JobCreateUploadFieldsProps = {
+  workflow: JobCreateUploadWorkflowProps;
+  resources: JobCreateUploadResourcesProps;
+  state: JobCreateUploadStateProps;
+  handlers: JobCreateUploadHandlersProps;
+  options: JobCreateUploadOptionsProps;
+};
+
 export function JobCreateUploadFields({
-  uploadSource,
-  fileList,
-  cameras,
-  cameraLoading,
-  hasUnsupportedUploadCameraProtocol,
-  onFileListChange,
+  workflow,
+  resources,
+  state,
+  handlers,
+  options,
 }: JobCreateUploadFieldsProps) {
   return (
     <>
       <Form.Item label="上传来源" name="uploadSource">
-        <Select
-          data-testid="job-create-upload-source"
-          options={[...JOB_UPLOAD_SOURCE_OPTIONS]}
-        />
+        <Select data-testid="job-create-upload-source" options={[...options.uploadSourceOptions]} />
       </Form.Item>
 
-      {uploadSource === 'local_file' ? (
+      {workflow.uploadSource === 'local_file' ? (
         <Form.Item label="上传图片">
           <Dragger
             multiple
             accept=".jpg,.jpeg,.png,.bmp,.webp"
-            fileList={fileList}
+            fileList={state.fileList}
             beforeUpload={() => false}
-            onChange={({ fileList: nextFileList }) => onFileListChange(nextFileList)}
+            onChange={({ fileList: nextFileList }) => handlers.onFileListChange(nextFileList)}
           >
             <p className="ant-upload-drag-icon">
               <InboxOutlined />
@@ -58,14 +75,11 @@ export function JobCreateUploadFields({
             <Select
               data-testid="job-create-upload-camera"
               placeholder="请选择一个可用摄像头"
-              loading={cameraLoading}
-              options={cameras.map((item) => ({
-                label: `${item.name} [${item.protocol.toUpperCase()}] (${item.location || item.rtsp_url || '未配置位置'})`,
-                value: item.id,
-              }))}
+              loading={resources.cameraLoading}
+              options={[...options.uploadCameraOptions]}
             />
           </Form.Item>
-          {hasUnsupportedUploadCameraProtocol ? (
+          {state.hasUnsupportedUploadCameraProtocol ? (
             <Alert
               type="warning"
               showIcon

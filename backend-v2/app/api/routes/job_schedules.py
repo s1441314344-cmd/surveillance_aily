@@ -13,7 +13,7 @@ from app.services.job_schedule_service import (
     update_job_schedule_status as update_job_schedule_status_record,
 )
 from app.services.job_schedule_service import create_job_schedule as create_job_schedule_record
-from app.services.job_service import create_camera_schedule_job as create_camera_schedule_job_record
+from app.services.job_creation_service import create_camera_schedule_job as create_camera_schedule_job_record
 from app.services.rbac import ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR
 
 router = APIRouter()

@@ -1,3 +1,4 @@
+// @prd /prd/modules/auth-login.md §5 数据模型 - User / Role / token / refresh_token
 import { apiClient } from './client';
 import type { AuthApiUser, TokenSessionResponse } from '@/shared/auth/session';
 

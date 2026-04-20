@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { App, type FormInstance } from 'antd';
-import type { ModelProvider } from '@/shared/api/configCenter';
+import type { ModelProvider } from '@/shared/api/modelProviders';
 import {
   DEFAULT_DEBUG_VALUES,
   type DebugFormValues,

@@ -1,5 +1,5 @@
 import { Button, Empty, Image, Modal } from 'antd';
-import type { CameraMedia } from '@/shared/api/configCenter';
+import type { CameraMedia } from '@/shared/api/cameras';
 import { DataStateBlock } from '@/shared/ui';
 
 type MediaPreviewModalProps = {

@@ -1,8 +1,14 @@
 import axios from 'axios';
 import { useAuthStore } from '@/shared/state/authStore';
 import { toStoreSessionPayload, type TokenSessionResponse } from '@/shared/auth/session';
+import { resolveBaseUrl } from '@/shared/api/baseUrl';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+const baseURL = resolveBaseUrl({
+  envValue: import.meta.env.VITE_API_BASE_URL,
+  fallbackBaseUrl: 'http://localhost:8000',
+  envName: 'VITE_API_BASE_URL',
+  isProduction: import.meta.env.PROD,
+});
 type RetryableRequestConfig = {
   url?: string;
   headers?: Record<string, string>;

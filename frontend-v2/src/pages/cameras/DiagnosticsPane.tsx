@@ -33,7 +33,7 @@ export function DiagnosticsPane() {
   const closeDiagnosticModal = () => setDiagnosticModalOpen(false);
 
   return (
-    <Space direction="vertical" size={16} className="stack-full">
+    <Space orientation="vertical" size={16} className="stack-full">
       <CameraPaneHeader
         title="连接状态与深度诊断"
         description="查看状态概览、分页日志并执行连接检查或深度诊断，定位设备异常原因。"

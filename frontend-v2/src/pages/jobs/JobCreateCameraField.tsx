@@ -1,12 +1,20 @@
 import { Form, Select } from 'antd';
-import type { Camera } from '@/shared/api/configCenter';
+import type { OptionItem } from '@/pages/jobs/jobsOptionItem';
 
-type JobCreateCameraFieldProps = {
-  cameras: Camera[];
+type JobCreateCameraResourcesProps = {
   cameraLoading: boolean;
 };
 
-export function JobCreateCameraField({ cameras, cameraLoading }: JobCreateCameraFieldProps) {
+type JobCreateCameraOptionsProps = {
+  cameraOptions: readonly OptionItem[];
+};
+
+type JobCreateCameraFieldProps = {
+  resources: JobCreateCameraResourcesProps;
+  options: JobCreateCameraOptionsProps;
+};
+
+export function JobCreateCameraField({ resources, options }: JobCreateCameraFieldProps) {
   return (
     <Form.Item
       label="选择摄像头"
@@ -16,11 +24,8 @@ export function JobCreateCameraField({ cameras, cameraLoading }: JobCreateCamera
       <Select
         data-testid="job-create-camera"
         placeholder="请选择一个可用摄像头"
-        loading={cameraLoading}
-        options={cameras.map((item) => ({
-          label: `${item.name} [${item.protocol.toUpperCase()}] (${item.location || item.rtsp_url || '未配置位置'})`,
-          value: item.id,
-        }))}
+        loading={resources.cameraLoading}
+        options={[...options.cameraOptions]}
       />
     </Form.Item>
   );

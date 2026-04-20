@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { FormInstance } from 'antd';
-import type { Strategy } from '@/shared/api/configCenter';
+import type { Strategy } from '@/shared/api/strategies';
 import type { UploadFormValues } from '@/pages/jobs/types';
 
 type UseEnsureDefaultJobStrategyParams = {

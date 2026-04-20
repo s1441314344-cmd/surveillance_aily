@@ -6,7 +6,7 @@ import {
   updateDashboardDefinition,
   validateDashboardDefinition,
   validateDashboardDefinitionDraft,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/dashboard';
 import {
   createDashboardApiErrorHandler,
   invalidateDashboardQueries,

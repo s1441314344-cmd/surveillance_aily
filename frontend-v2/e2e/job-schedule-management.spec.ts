@@ -86,6 +86,7 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
   await page.getByRole('menuitem', { name: '任务中心' }).click();
   await expect(page).toHaveURL(/\/jobs$/);
   await expect(page.getByRole('heading', { name: '任务中心' })).toBeVisible();
+  await page.getByRole('tab', { name: '定时计划' }).click();
 
   const scheduleCard = page.locator('.ant-card').filter({ hasText: '定时任务计划' }).first();
   const scheduleCameraFilter = page.getByTestId('schedule-filter-camera');
@@ -105,14 +106,14 @@ test('schedule can be paused/resumed and linked to queue filters', async ({ page
 
   const scheduleRow = scheduleCard.locator('.ant-table-tbody tr').filter({ hasText: shortScheduleId }).first();
   await expect(scheduleRow).toBeVisible({ timeout: 30000 });
-  await expect(scheduleRow).toContainText('active');
+  await expect(scheduleRow).toContainText('启用');
   await expect(scheduleRow).toContainText('5 分钟');
 
   await scheduleRow.getByRole('button', { name: /暂\s*停/ }).click();
-  await expect(scheduleRow).toContainText('paused');
+  await expect(scheduleRow).toContainText('暂停');
 
   await scheduleRow.getByRole('button', { name: /启\s*用/ }).click();
-  await expect(scheduleRow).toContainText('active');
+  await expect(scheduleRow).toContainText('启用');
 
   const runNowResponsePromise = page.waitForResponse(
     (response) =>

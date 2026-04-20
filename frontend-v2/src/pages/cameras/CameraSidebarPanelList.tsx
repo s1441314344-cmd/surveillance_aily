@@ -1,5 +1,5 @@
 import { Space, Typography } from 'antd';
-import type { Camera, CameraStatus } from '@/shared/api/configCenter';
+import type { Camera, CameraStatus } from '@/shared/api/cameras';
 import { CAMERA_ALERT_STATUS_LABELS, CAMERA_CONNECTION_LABELS } from './cameraCenterConfig';
 import { DataStateBlock, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 

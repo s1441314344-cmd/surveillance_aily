@@ -5,7 +5,7 @@ import {
   type Camera,
   type CameraDiagnostic,
   type CameraMedia,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
 import type { CameraFormValues } from '@/pages/cameras/cameraCenterConfig';
 import { useCameraDeviceMutations } from '@/pages/cameras/useCameraDeviceMutations';
 import { buildCameraPayload } from '@/pages/cameras/cameraDevicePayload';

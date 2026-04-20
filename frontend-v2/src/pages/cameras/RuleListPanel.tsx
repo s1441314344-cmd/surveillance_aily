@@ -1,6 +1,6 @@
 import { Button, Empty, Popconfirm, Space, Tag, Typography } from 'antd';
 import { TRIGGER_EVENT_TYPE_LABELS } from './cameraCenterConfig';
-import type { CameraTriggerRule } from '@/shared/api/configCenter';
+import type { CameraTriggerRule } from '@/shared/api/cameras';
 import { DataStateBlock, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 
 const { Text } = Typography;
@@ -33,10 +33,10 @@ export function RuleListPanel({
   }
 
   return (
-    <Space direction="vertical" size={8} className="stack-full">
+    <Space orientation="vertical" size={8} className="stack-full">
       {selectedCameraTriggerRules.map((rule) => (
         <div key={rule.id} className="console-block camera-rule-item">
-          <Space direction="vertical" size={6} className="stack-full">
+          <Space orientation="vertical" size={6} className="stack-full">
             <Space wrap>
               <Text strong>{rule.name}</Text>
               <StatusBadge

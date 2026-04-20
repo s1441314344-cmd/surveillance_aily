@@ -6,7 +6,9 @@ import type { useCameraMediaState } from '@/pages/cameras/useCameraMediaState';
 import type { useCameraMonitoringRuleState } from '@/pages/cameras/useCameraMonitoringRuleState';
 import type { useCameraDeviceOpsState } from '@/pages/cameras/useCameraDeviceOpsState';
 
-type LocalState = ReturnType<typeof useCameraCenterLocalState>;
+type LocalState = Omit<ReturnType<typeof useCameraCenterLocalState>, 'setSelectedCameraId'> & {
+  setSelectedCameraId: (cameraId: string | null) => void;
+};
 type QueryState = ReturnType<typeof useCameraCenterQueryState>;
 type MediaState = ReturnType<typeof useCameraMediaState>;
 type MonitoringRuleState = ReturnType<typeof useCameraMonitoringRuleState>;

@@ -10,7 +10,7 @@ import {
   deleteCamera,
   diagnoseCamera,
   updateCamera,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
 import { DEFAULT_CAMERA_VALUES, type CameraFormValues } from '@/pages/cameras/cameraCenterConfig';
 import { CAMERA_QUERY_KEYS } from '@/pages/cameras/cameraQueryKeys';
 import {

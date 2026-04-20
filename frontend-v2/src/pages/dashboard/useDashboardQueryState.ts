@@ -2,14 +2,12 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getDashboardAnomalies,
+  listDashboardDefinitions,
   getDashboardSummary,
   getDashboardTrends,
 } from '@/shared/api/dashboard';
-import {
-  listDashboardDefinitions,
-  listModelProviders,
-  listStrategies,
-} from '@/shared/api/configCenter';
+import { listModelProviders } from '@/shared/api/modelProviders';
+import { listStrategies } from '@/shared/api/strategies';
 import { type MetricEntry } from '@/pages/insights/MetricsGrid';
 import { type TrendPoint } from '@/pages/insights/TrendPanel';
 import { dateLabel } from '@/pages/dashboard/types';

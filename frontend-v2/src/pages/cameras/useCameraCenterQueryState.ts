@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listCameras, type Camera } from '@/shared/api/configCenter';
+import { listCameras, type Camera } from '@/shared/api/cameras';
 import { CREATE_CAMERA_ID } from '@/pages/cameras/cameraCenterConfig';
 import {
   buildCameraStatusMap,
@@ -26,6 +26,13 @@ type UseCameraCenterQueryStateParams = {
   statusLogsPage: number;
 };
 
+function normalizeStatusLogsPage(page: number) {
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+  return Math.max(1, Math.trunc(page));
+}
+
 function getQueryArrayData<T>(data: T[] | undefined) {
   return data ?? [];
 }
@@ -36,14 +43,6 @@ function getCameraIdentifiers(cameras: Camera[]) {
     cameraIds,
     cameraIdsKey: cameraIds.join(','),
   };
-}
-
-function getCameraMemoKey(cameras: Camera[]) {
-  return cameras.map((camera) => camera.id).join(',');
-}
-
-function getCameraQueryResult<T>(query: { data?: T[] }) {
-  return getQueryArrayData(query.data);
 }
 
 function getQueryLoadingState(params: {
@@ -71,15 +70,15 @@ export function useCameraCenterQueryState({
   statusLogsPage,
 }: UseCameraCenterQueryStateParams) {
   const statusLogsPageSize = CAMERA_CENTER_QUERY_CONFIG.statusLogsPageSize;
+  const normalizedStatusLogsPage = normalizeStatusLogsPage(statusLogsPage);
 
   const cameraQuery = useQuery({
     queryKey: CAMERA_QUERY_KEYS.cameras,
     queryFn: listCameras,
   });
 
-  const cameras = useMemo(() => getQueryArrayData(cameraQuery.data), [cameraQuery.data]);
-  const camerasMemoKey = useMemo(() => getCameraMemoKey(cameras), [cameras]);
-  const { cameraIds, cameraIdsKey } = useMemo(() => getCameraIdentifiers(cameras), [camerasMemoKey]);
+  const cameras = getQueryArrayData(cameraQuery.data);
+  const { cameraIds, cameraIdsKey } = useMemo(() => getCameraIdentifiers(cameras), [cameras]);
 
   const effectiveSelectedCameraId = useMemo(
     () =>
@@ -145,15 +144,12 @@ export function useCameraCenterQueryState({
   );
 
   const pagedStatusLogs = useMemo(
-    () => getPagedStatusLogs(selectedCameraStatusLogs, statusLogsPage, statusLogsPageSize),
-    [selectedCameraStatusLogs, statusLogsPage, statusLogsPageSize],
+    () => getPagedStatusLogs(selectedCameraStatusLogs, normalizedStatusLogsPage, statusLogsPageSize),
+    [selectedCameraStatusLogs, normalizedStatusLogsPage, statusLogsPageSize],
   );
 
-  const selectedCameraMedia = useMemo(() => getCameraQueryResult(mediaQuery), [mediaQuery.data]);
-  const selectedCameraTriggerRules = useMemo(
-    () => getCameraQueryResult(triggerRulesQuery),
-    [triggerRulesQuery.data],
-  );
+  const selectedCameraMedia = getQueryArrayData(mediaQuery.data);
+  const selectedCameraTriggerRules = getQueryArrayData(triggerRulesQuery.data);
   const activeRecordingMedia = useMemo(
     () => getActiveRecordingMedia(selectedCameraMedia),
     [selectedCameraMedia],

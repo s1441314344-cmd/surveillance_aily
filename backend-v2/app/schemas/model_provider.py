@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelProviderRead(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     provider: str
     display_name: str
     base_url: str
@@ -13,6 +15,8 @@ class ModelProviderRead(BaseModel):
 
 
 class ModelProviderUpdate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     display_name: str | None = None
     base_url: str
     api_key: str | None = None
@@ -22,6 +26,8 @@ class ModelProviderUpdate(BaseModel):
 
 
 class ModelProviderDebugRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model: str | None = None
     prompt: str = "请返回一句调试成功确认，并说明当前模型已可用。"
     response_format: str = "text"
@@ -30,11 +36,15 @@ class ModelProviderDebugRequest(BaseModel):
 
 
 class ModelProviderDebugLog(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     level: str
     message: str
 
 
 class ModelProviderDebugRead(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     provider: str
     display_name: str
     base_url: str
@@ -54,6 +64,8 @@ class ModelProviderDebugRead(BaseModel):
 
 
 class ModelCallLogRead(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     id: str
     provider: str
     model_name: str

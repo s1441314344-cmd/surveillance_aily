@@ -1,5 +1,5 @@
 import { Button, Card, Col, Empty, Image, Popconfirm, Row, Space, Typography } from 'antd';
-import type { CameraMedia } from '@/shared/api/configCenter';
+import type { CameraMedia } from '@/shared/api/cameras';
 import { CAMERA_MEDIA_STATUS_LABELS, CAMERA_MEDIA_TYPE_LABELS } from '@/pages/cameras/cameraCenterConfig';
 import { DataStateBlock, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 
@@ -148,7 +148,7 @@ export function MediaGridSection({
                 }
               }}
             >
-              <Space direction="vertical" size={8} className="stack-full">
+              <Space orientation="vertical" size={8} className="stack-full">
                 {renderMediaThumbnail(item, thumbnailUrl)}
 
                 <Space wrap size={6}>

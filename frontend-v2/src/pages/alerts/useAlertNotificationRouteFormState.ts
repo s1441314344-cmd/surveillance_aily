@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormInstance } from 'antd/es/form';
-import type { AlertNotificationRoute } from '@/shared/api/configCenter';
+import type { AlertNotificationRoute } from '@/shared/api/alerts';
 import type { NotificationRouteFormValues } from '@/pages/alerts/types';
 import type { useAlertsMutationState } from '@/pages/alerts/useAlertsMutationState';
 

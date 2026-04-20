@@ -7,7 +7,7 @@ import {
   deleteCameraMedia,
   startCameraRecording,
   stopCameraRecording,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
 import {
   createApiErrorHandler,
   createNetworkErrorHandler,

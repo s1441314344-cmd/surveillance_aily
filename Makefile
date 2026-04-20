@@ -1,4 +1,4 @@
-.PHONY: help v2-help v2-setup v2-deps-up v2-deps-down v2-api v2-worker v2-scheduler v2-frontend v2-backend-test v2-frontend-test v2-verify v2-dev v2-smoke v2-e2e v2-perf v2-soak v2-preflight v2-backfill v2-eval v2-camera-check v2-camera-validate v2-release-drill v2-uat v2-release-checklist v2-release-gate v2-release-gate-final
+.PHONY: help v2-help v2-setup v2-deps-up v2-deps-down v2-api v2-worker v2-scheduler v2-frontend v2-backend-test v2-backend-integration-test v2-frontend-test v2-verify v2-dev v2-smoke v2-e2e v2-perf v2-soak v2-preflight v2-real-async-test v2-backfill v2-eval v2-camera-check v2-camera-validate v2-security v2-reconcile v2-release-drill v2-uat v2-release-checklist v2-release-gate v2-release-gate-final
 
 help: v2-help
 
@@ -29,6 +29,9 @@ v2-frontend:
 v2-backend-test:
 	@./scripts/v2/backend-test.sh
 
+v2-backend-integration-test:
+	@./scripts/v2/backend-integration-test.sh
+
 v2-frontend-test:
 	@./scripts/v2/frontend-test.sh
 
@@ -53,6 +56,9 @@ v2-soak:
 v2-preflight:
 	@./scripts/v2/preflight.sh
 
+v2-real-async-test:
+	@./scripts/v2/real-async-test.sh
+
 v2-backfill:
 	@./scripts/v2/backfill.sh
 
@@ -64,6 +70,12 @@ v2-camera-check:
 
 v2-camera-validate:
 	@./scripts/v2/camera-validate.sh
+
+v2-security:
+	@./scripts/v2/security.sh
+
+v2-reconcile:
+	@./scripts/v2/reconcile.sh
 
 v2-release-drill:
 	@./scripts/v2/release-drill.sh

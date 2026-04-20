@@ -1,5 +1,5 @@
 import { Button, Table } from 'antd';
-import { type TaskRecord } from '@/shared/api/tasks';
+import { type TaskRecord } from '@/shared/api/records';
 import {
   FEEDBACK_STATUS_LABELS,
   RESULT_STATUS_LABELS,

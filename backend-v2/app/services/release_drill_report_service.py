@@ -17,6 +17,7 @@ class ReleaseDrillReport:
     preflight_summary_path: str
     preflight_result: str
     preflight_checks: dict[str, str]
+    preflight_scheduler_cycle: dict[str, object] | None
     backfill_report_path: str
     backfill_dry_run: bool
     source_counts: dict[str, int]
@@ -64,6 +65,22 @@ def build_release_drill_report(
     elif preflight_checks.get("e2e") in {"missing", "skipped"}:
         risks.append("E2E check is skipped; execute `make v2-e2e` before production cutover.")
 
+    preflight_scheduler_cycle = _normalize_scheduler_cycle(preflight_summary.get("scheduler_cycle"))
+    if preflight_scheduler_cycle is not None:
+        observed_count = int(preflight_scheduler_cycle.get("observed_count", 0))
+        latest_payload = preflight_scheduler_cycle.get("latest")
+        if observed_count <= 0:
+            risks.append("Scheduler cycle metrics are not observed in preflight logs; validate scheduler visibility.")
+        if isinstance(latest_payload, dict):
+            error_count = _safe_int(latest_payload.get("errors"), default=0)
+            stale_recovered = _safe_int(latest_payload.get("stale_recovered"), default=0)
+            if error_count > 0:
+                blocking_issues.append(f"Scheduler cycle reported errors={error_count} during preflight.")
+            if stale_recovered > 0:
+                risks.append(
+                    f"Scheduler cycle recovered stale in-flight jobs {stale_recovered} time(s); inspect queue latency."
+                )
+
     warnings = list(backfill_report.get("warnings") or [])
     missing_files = list(backfill_report.get("missing_files") or [])
     warning_count = len(warnings)
@@ -88,6 +105,7 @@ def build_release_drill_report(
         preflight_summary_path=str(Path(preflight_summary_path).expanduser().resolve()),
         preflight_result=preflight_result,
         preflight_checks=preflight_checks,
+        preflight_scheduler_cycle=preflight_scheduler_cycle,
         backfill_report_path=str(Path(backfill_report_path).expanduser().resolve()),
         backfill_dry_run=backfill_dry_run,
         source_counts={k: int(v) for k, v in (backfill_report.get("source_counts") or {}).items()},
@@ -120,6 +138,25 @@ def _is_expected_backfill_warning(message: str) -> bool:
     return any(pattern in normalized for pattern in EXPECTED_BACKFILL_WARNING_PATTERNS)
 
 
+def _safe_int(value, *, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_scheduler_cycle(raw_payload: object) -> dict[str, object] | None:
+    if not isinstance(raw_payload, dict):
+        return None
+    observed_count = _safe_int(raw_payload.get("observed_count"), default=0)
+    latest = raw_payload.get("latest")
+    normalized_latest = latest if isinstance(latest, dict) else None
+    return {
+        "observed_count": max(observed_count, 0),
+        "latest": normalized_latest,
+    }
+
+
 def save_release_drill_report(report: ReleaseDrillReport, output_path: str | Path) -> Path:
     path = Path(output_path).expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -144,6 +181,18 @@ def render_release_drill_markdown(report: ReleaseDrillReport, *, title: str = "�
     ]
     for check_name in ("smoke", "perf", "soak", "e2e"):
         lines.append(f"| {check_name} | {report.preflight_checks.get(check_name, 'missing')} |")
+
+    if report.preflight_scheduler_cycle is not None:
+        latest_payload = report.preflight_scheduler_cycle.get("latest")
+        lines.extend(
+            [
+                "",
+                "### Scheduler Cycle 指标",
+                "",
+                f"- 观测次数: `{report.preflight_scheduler_cycle.get('observed_count', 0)}`",
+                f"- 最新周期: `{json.dumps(latest_payload, ensure_ascii=False) if isinstance(latest_payload, dict) else '-'}`",
+            ]
+        )
 
     lines.extend(
         [

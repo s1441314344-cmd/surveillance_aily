@@ -7,7 +7,7 @@ import type {
   CameraTriggerRule,
   CameraTriggerRuleDebugResult,
   DebugLiveResult,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
 import type {
   CameraFormValues,
   MonitorConfigFormValues,

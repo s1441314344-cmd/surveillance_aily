@@ -1,19 +1,13 @@
 import { useMemo } from 'react';
 import { formatDateTime } from '@/pages/jobs/jobsTableFormatters';
-import type { MouseEvent } from 'react';
 import { Button, Popconfirm, Space, Typography } from 'antd';
 import type { ColumnsType } from 'antd/lib/table';
-import type { Camera, Strategy } from '@/shared/api/configCenter';
-import type { JobSchedule } from '@/shared/api/tasks';
+import type { Camera } from '@/shared/api/cameras';
+import type { Strategy } from '@/shared/api/strategies';
+import type { JobSchedule } from '@/shared/api/jobs';
 import { SCHEDULE_STATUS_LABELS, SCHEDULE_TYPE_LABELS, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
-
-const withRowClickGuard =
-  (action: () => void) => (event: MouseEvent<HTMLElement>) => {
-    event.stopPropagation();
-    action();
-  };
-
-const stopRowClickPropagation = withRowClickGuard(() => undefined);
+import { stopRowClickPropagation, withRowClickGuard } from '@/pages/jobs/jobsTableEventGuards';
+import { buildLookupNameMap } from '@/pages/jobs/jobsTableLookups';
 
 const getScheduleValueLabel = (scheduleType: string, scheduleValue: string) =>
   scheduleType === 'interval_minutes' ? `${scheduleValue} 分钟` : scheduleValue;
@@ -28,18 +22,21 @@ const renderScheduleStatusBadge = (value: string) => (
   <StatusBadge namespace="schedule" value={value} label={SCHEDULE_STATUS_LABELS[value] ?? UNKNOWN_LABELS.generic} />
 );
 
-const buildNameMap = (items: Array<{ id: string; name: string }>) =>
-  new Map(items.map((item) => [item.id, item.name]));
-
 const { Text } = Typography;
 
-export type UseScheduleColumnsProps = {
+export type UseScheduleColumnsLookupsProps = {
   cameras: Camera[];
   strategies: Strategy[];
+};
+
+export type UseScheduleColumnsActionsLoadingProps = {
   scheduleStatusLoading: boolean;
   runNowLoading: boolean;
   updateLoading: boolean;
   deleteLoading: boolean;
+};
+
+export type UseScheduleColumnsActionsHandlersProps = {
   onViewJobs: (scheduleId: string) => void;
   onRunNow: (scheduleId: string) => void;
   onEdit: (schedule: JobSchedule) => void;
@@ -47,17 +44,31 @@ export type UseScheduleColumnsProps = {
   onDelete: (scheduleId: string) => void;
 };
 
+export type UseScheduleColumnsActionsProps = {
+  loading: UseScheduleColumnsActionsLoadingProps;
+  handlers: UseScheduleColumnsActionsHandlersProps;
+};
+
+export type UseScheduleColumnsProps = {
+  lookups: UseScheduleColumnsLookupsProps;
+  actions: UseScheduleColumnsActionsProps;
+};
+
 function createScheduleActionsRenderer({
-  scheduleStatusLoading,
-  runNowLoading,
-  updateLoading,
-  deleteLoading,
-  onViewJobs,
-  onRunNow,
-  onEdit,
-  onToggleStatus,
-  onDelete,
-}: Omit<UseScheduleColumnsProps, 'cameras' | 'strategies'>): ColumnsType<JobSchedule>[number]['render'] {
+  loading: {
+    scheduleStatusLoading,
+    runNowLoading,
+    updateLoading,
+    deleteLoading,
+  },
+  handlers: {
+    onViewJobs,
+    onRunNow,
+    onEdit,
+    onToggleStatus,
+    onDelete,
+  },
+}: UseScheduleColumnsActionsProps): ColumnsType<JobSchedule>[number]['render'] {
   return (_, record) => (
     <Space size={8}>
       <Button
@@ -189,44 +200,14 @@ function createScheduleColumns(params: {
 }
 
 export function useScheduleColumns({
-  cameras,
-  strategies,
-  scheduleStatusLoading,
-  runNowLoading,
-  updateLoading,
-  deleteLoading,
-  onViewJobs,
-  onRunNow,
-  onEdit,
-  onToggleStatus,
-  onDelete,
+  lookups: { cameras, strategies },
+  actions,
 }: UseScheduleColumnsProps): ColumnsType<JobSchedule> {
-  const cameraNameMap = useMemo(() => buildNameMap(cameras), [cameras]);
-  const strategyNameMap = useMemo(() => buildNameMap(strategies), [strategies]);
+  const cameraNameMap = useMemo(() => buildLookupNameMap(cameras), [cameras]);
+  const strategyNameMap = useMemo(() => buildLookupNameMap(strategies), [strategies]);
   const renderActions = useMemo(
-    () =>
-      createScheduleActionsRenderer({
-        scheduleStatusLoading,
-        runNowLoading,
-        updateLoading,
-        deleteLoading,
-        onViewJobs,
-        onRunNow,
-        onEdit,
-        onToggleStatus,
-        onDelete,
-      }),
-    [
-      scheduleStatusLoading,
-      runNowLoading,
-      updateLoading,
-      deleteLoading,
-      onViewJobs,
-      onRunNow,
-      onEdit,
-      onToggleStatus,
-      onDelete,
-    ],
+    () => createScheduleActionsRenderer(actions),
+    [actions],
   );
 
   return useMemo(

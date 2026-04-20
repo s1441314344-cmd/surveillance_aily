@@ -1,3 +1,4 @@
+// @prd /prd/modules/users-and-permissions.md §5 数据模型 - User / Role
 import { apiClient } from './client';
 
 export type User = {

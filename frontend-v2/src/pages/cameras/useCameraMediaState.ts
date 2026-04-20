@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect -- media preview state intentionally reconciles URLs and timers based on source changes. */
 import { useEffect, useMemo, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { fetchCameraMediaFile, type CameraMedia } from '@/shared/api/configCenter';
+import { fetchCameraMediaFile, type CameraMedia } from '@/shared/api/cameras';
 
 type UseCameraMediaStateParams = {
   cameraId: string | null;

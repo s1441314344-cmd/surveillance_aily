@@ -1,5 +1,5 @@
 import { Empty, Pagination, Space, Typography } from 'antd';
-import type { CameraStatusLog } from '@/shared/api/configCenter';
+import type { CameraStatusLog } from '@/shared/api/cameras';
 import { CAMERA_ALERT_STATUS_LABELS, CAMERA_CONNECTION_LABELS } from '@/pages/cameras/cameraCenterConfig';
 import { DataStateBlock, SectionCard, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 
@@ -54,10 +54,10 @@ export function DiagnosticsStatusLogs({
 
   return (
     <SectionCard title="状态日志">
-      <Space direction="vertical" size={8} className="stack-full">
+      <Space orientation="vertical" size={8} className="stack-full">
         {pagedLogs.map((item) => (
           <div key={item.id} className="console-block camera-log-item">
-            <Space direction="vertical" size={2} className="stack-full">
+            <Space orientation="vertical" size={2} className="stack-full">
               <Space wrap>
                 <StatusBadge
                   namespace="cameraConnection"

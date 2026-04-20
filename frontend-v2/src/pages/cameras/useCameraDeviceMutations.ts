@@ -2,7 +2,7 @@ import type { FormInstance } from 'antd';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import {
   type CameraDiagnostic,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
 import { type CameraFormValues } from '@/pages/cameras/cameraCenterConfig';
 import { CAMERA_INVALIDATION_KEYS } from '@/pages/cameras/cameraQueryKeys';
 import { useCameraBaseMutations } from '@/pages/cameras/useCameraBaseMutations';

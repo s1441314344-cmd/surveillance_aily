@@ -5,8 +5,8 @@ import {
   updateStrategy,
   updateStrategyStatus,
   validateStrategySchema,
-} from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+} from '@/shared/api/strategies';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 
 type UseStrategiesMutationStateParams = {
   statusFilter: string;

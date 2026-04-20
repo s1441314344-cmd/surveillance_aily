@@ -4,6 +4,13 @@ function getTotalStatusLogPages(totalLogs: number, pageSize: number) {
   return Math.max(1, Math.ceil(totalLogs / pageSize));
 }
 
+function normalizeStatusLogsPage(statusLogsPage: number) {
+  if (!Number.isFinite(statusLogsPage)) {
+    return 1;
+  }
+  return Math.max(1, Math.trunc(statusLogsPage));
+}
+
 export function useResetStatusLogsPageOnCameraChange(
   effectiveSelectedCameraId: string | null,
   setStatusLogsPage: (page: number) => void,
@@ -21,7 +28,12 @@ export function useClampStatusLogsPage(
 ) {
   useEffect(() => {
     const totalPages = getTotalStatusLogPages(totalLogs, statusLogsPageSize);
-    if (statusLogsPage > totalPages) {
+    const normalizedPage = normalizeStatusLogsPage(statusLogsPage);
+    if (normalizedPage !== statusLogsPage) {
+      setStatusLogsPage(normalizedPage);
+      return;
+    }
+    if (normalizedPage > totalPages) {
       setStatusLogsPage(totalPages);
     }
   }, [totalLogs, statusLogsPage, statusLogsPageSize, setStatusLogsPage]);

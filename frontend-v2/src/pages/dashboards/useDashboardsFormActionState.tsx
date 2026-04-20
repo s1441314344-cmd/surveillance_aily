@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { App, type FormInstance } from 'antd';
-import type { DashboardDefinition } from '@/shared/api/configCenter';
+import type { DashboardDefinition } from '@/shared/api/dashboard';
 import {
   CREATE_DASHBOARD_ID,
   DEFAULT_DASHBOARD_FORM_VALUES,

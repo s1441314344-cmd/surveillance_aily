@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { App, type FormInstance } from 'antd';
 import { createUser, updateUserStatus } from '@/shared/api/users';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import { GENERIC_STATE_LABELS } from '@/shared/ui';
 import type { CreateUserFormValues } from '@/pages/users/types';
 

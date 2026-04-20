@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Alert, Button, Drawer, Empty, Input, Select, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { type ModelCallLog } from '@/shared/api/configCenter';
+import { type ModelCallLog } from '@/shared/api/modelProviders';
 import { StatusBadge } from '@/shared/ui';
 
 const { Paragraph, Text } = Typography;
@@ -311,7 +311,7 @@ export function ProviderCallLogPanel({ logs, loading, error }: ProviderCallLogPa
 
   return (
     <div className="page-stack">
-      {error ? <Alert type="error" showIcon message={error} /> : null}
+      {error ? <Alert type="error" showIcon title={error} /> : null}
 
       <div className="call-log-toolbar">
         <Select
@@ -366,7 +366,7 @@ export function ProviderCallLogPanel({ logs, loading, error }: ProviderCallLogPa
 
       <Drawer
         title="调用详情"
-        width={760}
+        size={760}
         open={Boolean(activeLog)}
         onClose={() => setActiveLog(null)}
       >

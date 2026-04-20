@@ -1,12 +1,15 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listCameras, listModelProviders, listStrategies } from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { listCameras } from '@/shared/api/cameras';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
+import { listModelProviders } from '@/shared/api/modelProviders';
+import { listStrategies } from '@/shared/api/strategies';
+import { useObjectUrl } from '@/shared/hooks/useObjectUrl';
 import {
   fetchTaskRecordImage,
   getTaskRecord,
   listTaskRecords,
-} from '@/shared/api/tasks';
+} from '@/shared/api/records';
 import type { RecordsFilterState } from '@/pages/records/types';
 import { buildTaskRecordFilterParams } from '@/pages/records/recordsTaskRecordParams';
 
@@ -28,12 +31,6 @@ function buildRecordsQueryKey(filters: RecordsFilterState) {
     filters.createdFromFilter,
     filters.createdToFilter,
   ] as const;
-}
-
-function revokeObjectUrl(url: string | null) {
-  if (url) {
-    URL.revokeObjectURL(url);
-  }
 }
 
 export function useRecordsQueryState({ filters, selectedRecordId }: UseRecordsQueryStateParams) {
@@ -71,17 +68,7 @@ export function useRecordsQueryState({ filters, selectedRecordId }: UseRecordsQu
     enabled: Boolean(selectedRecordId),
   });
 
-  const imagePreviewUrl = useMemo(
-    () => (imageQuery.data ? URL.createObjectURL(imageQuery.data) : null),
-    [imageQuery.data],
-  );
-
-  useEffect(
-    () => () => {
-      revokeObjectUrl(imagePreviewUrl);
-    },
-    [imagePreviewUrl],
-  );
+  const imagePreviewUrl = useObjectUrl(imageQuery.data);
 
   const records = recordsQuery.data ?? [];
   const detail = recordDetailQuery.data;
