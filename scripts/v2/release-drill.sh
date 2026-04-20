@@ -85,23 +85,21 @@ fi
 
 mkdir -p "${OUTPUT_DIR}"
 preflight_log="${OUTPUT_DIR}/preflight.log"
+preflight_output_dir="${OUTPUT_DIR}/preflight"
 backfill_json="${OUTPUT_DIR}/backfill.json"
 report_json="${OUTPUT_DIR}/release-drill-report.json"
 report_md="${OUTPUT_DIR}/release-drill-report.md"
 
 echo "[v2-release-drill] output dir: ${OUTPUT_DIR}"
 echo "[v2-release-drill] running preflight"
-preflight_args=(--api-port "${API_PORT}")
+preflight_args=(--api-port "${API_PORT}" --output-dir "${preflight_output_dir}")
 if [[ "${WITH_E2E}" == "true" ]]; then
   preflight_args+=(--with-e2e)
 fi
 ./scripts/v2/preflight.sh "${preflight_args[@]}" | tee "${preflight_log}"
 
-preflight_summary_path="$(grep -E '^\[v2-preflight\] summary:' "${preflight_log}" | tail -1 | sed 's/^\[v2-preflight\] summary: //')"
-if [[ -z "${preflight_summary_path}" || ! -f "${preflight_summary_path}" ]]; then
-  echo "[v2-release-drill] failed to locate preflight summary from ${preflight_log}" >&2
-  exit 2
-fi
+preflight_summary_path="${preflight_output_dir}/summary.json"
+require_readable_file "${preflight_summary_path}" "release drill preflight summary"
 
 echo "[v2-release-drill] running backfill (${APPLY_BACKFILL})"
 backfill_args=(--source "${SOURCE_PATH}" --source-root "${SOURCE_ROOT}")

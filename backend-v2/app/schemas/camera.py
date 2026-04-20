@@ -180,6 +180,8 @@ class CameraTriggerRuleDebugRequest(BaseModel):
 
 
 class CameraTriggerRuleDebugLiveRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     strategy_id: str | None = None
     model_provider: str | None = None
     model_name: str | None = None

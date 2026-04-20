@@ -1,7 +1,9 @@
 import time
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 
+from PIL import Image
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -19,6 +21,7 @@ from app.services.model_call_log_service import build_model_call_details, create
 from app.services.providers.base import ProviderRequest
 from app.services.providers.factory import get_provider_adapter
 from app.services.storage import FileStorageService
+from app.services.version_recognition_pipeline_service import process_version_recognition_job
 
 try:
     from jsonschema import Draft202012Validator
@@ -61,6 +64,8 @@ def process_job(job_id: str) -> dict[str, str]:
         try:
             if job.job_type in {"upload_single", "upload_batch"}:
                 _process_upload_job(db, job)
+            elif job.job_type == "version_recognition_upload":
+                _process_version_recognition_job(db, job)
             elif job.job_type in {"camera_once", "camera_schedule"}:
                 _process_camera_job(db, job)
             else:
@@ -124,11 +129,12 @@ def _process_upload_job(db: Session, job: Job) -> None:
             db.commit()
             continue
 
+        model_input_path = _convert_upload_image_to_png_for_model(job_id=job.id, input_path=file_asset.storage_path)
         provider_response = adapter.analyze(
             ProviderRequest(
                 model=job.model_name,
                 prompt=strategy_snapshot["prompt_template"],
-                image_paths=[file_asset.storage_path],
+                image_paths=[model_input_path],
                 response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
                 response_schema=strategy_snapshot["response_schema"],
             )
@@ -151,7 +157,7 @@ def _process_upload_job(db: Session, job: Job) -> None:
             details=build_model_call_details(
                 prompt=str(strategy_snapshot.get("prompt_template") or ""),
                 response_format=str(strategy_snapshot.get("result_format") or "json_schema"),
-                image_paths=[file_asset.storage_path],
+                image_paths=[model_input_path],
                 input_summary={
                     "input_filename": file_asset.original_name,
                     "job_type": job.job_type,
@@ -185,7 +191,7 @@ def _process_upload_job(db: Session, job: Job) -> None:
             strategy_snapshot=strategy_snapshot,
             input_file_asset_id=file_asset.id,
             input_filename=file_asset.original_name,
-            input_image_path=file_asset.storage_path,
+            input_image_path=model_input_path,
             preview_image_path=None,
             source_type=normalized_source_type,
             camera_id=job.camera_id,
@@ -216,6 +222,23 @@ def _process_upload_job(db: Session, job: Job) -> None:
         return
 
     _finish_job(db, job, status=JOB_STATUS_COMPLETED, error_message=job.error_message)
+
+
+def _convert_upload_image_to_png_for_model(*, job_id: str, input_path: str) -> str:
+    path = Path(input_path)
+    if path.suffix.lower() == ".png":
+        return str(path)
+
+    try:
+        with Image.open(path) as image:
+            converted = image.convert("RGB")
+            buffer = BytesIO()
+            converted.save(buffer, format="PNG")
+        storage = FileStorageService()
+        return storage.save_bytes(buffer.getvalue(), f"{path.stem}.png", folder=f"jobs/{job_id}/model-inputs")
+    except Exception:
+        # Keep backward-compatible behavior for invalid image bytes in tests/legacy data.
+        return str(path)
 
 
 def _process_camera_job(db: Session, job: Job) -> None:
@@ -375,6 +398,17 @@ def _process_camera_job(db: Session, job: Job) -> None:
     db.commit()
     _finish_job(db, job, status=JOB_STATUS_FAILED, error_message=job.error_message)
     _sync_schedule_error_state(db, job, job.error_message)
+
+
+def _process_version_recognition_job(db: Session, job: Job) -> None:
+    process_version_recognition_job(
+        db,
+        job,
+        job_cancelled=_job_cancelled,
+        finish_job=_finish_job,
+        create_failed_upload_record=_create_failed_upload_record,
+    )
+
 
 
 def _job_cancelled(db: Session, job_id: str) -> bool:

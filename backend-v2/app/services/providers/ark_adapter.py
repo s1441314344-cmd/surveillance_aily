@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 import httpx
 
@@ -8,6 +9,7 @@ from app.core.config import get_settings
 from app.services.model_provider_service import load_model_provider_runtime
 from app.services.providers.base import ModelProviderAdapter, ProviderRequest, ProviderResponse
 from app.services.providers.mock_response import build_mock_provider_response
+from app.services.providers.retry_policy import HTTPRetryPolicy, post_json_with_retry
 from app.services.providers.utils import (
     build_schema_instruction,
     encode_image_to_data_url,
@@ -16,6 +18,12 @@ from app.services.providers.utils import (
 )
 
 settings = get_settings()
+ARK_RETRY_POLICY = HTTPRetryPolicy(
+    max_attempts=8,
+    retryable_status_codes=frozenset({429, 500, 502, 503, 504}),
+    max_backoff_seconds=120.0,
+    max_retry_after_seconds=300.0,
+)
 
 
 class ArkAdapter(ModelProviderAdapter):
@@ -38,10 +46,12 @@ class ArkAdapter(ModelProviderAdapter):
         }
 
         try:
-            with httpx.Client(timeout=runtime.timeout_seconds) as client:
-                response = client.post(runtime.base_url, headers=headers, json=payload)
-                response.raise_for_status()
-                body = response.json()
+            body = self._post_with_retry(
+                endpoint=runtime.base_url,
+                headers=headers,
+                payload=payload,
+                timeout_seconds=runtime.timeout_seconds,
+            )
         except httpx.HTTPStatusError as exc:
             return ProviderResponse(
                 success=False,
@@ -70,6 +80,24 @@ class ArkAdapter(ModelProviderAdapter):
             raw_fallback=json.dumps(body, ensure_ascii=False),
             response_format=request.response_format,
             usage=_extract_usage(body),
+        )
+
+    def _post_with_retry(
+        self,
+        *,
+        endpoint: str,
+        headers: dict,
+        payload: dict,
+        timeout_seconds: int,
+    ) -> dict:
+        return post_json_with_retry(
+            endpoint=endpoint,
+            headers=headers,
+            payload=payload,
+            timeout_seconds=timeout_seconds,
+            retry_policy=ARK_RETRY_POLICY,
+            client_factory=httpx.Client,
+            sleep_func=time.sleep,
         )
 
     def _build_payload(self, request: ProviderRequest, model_name: str) -> dict:

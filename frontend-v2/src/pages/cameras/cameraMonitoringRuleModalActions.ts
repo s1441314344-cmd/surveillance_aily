@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { FormInstance } from 'antd';
 import type { MessageInstance } from 'antd/es/message/interface';
 
-import type { CameraTriggerRule } from '@/shared/api/configCenter';
+import type { CameraTriggerRule } from '@/shared/api/cameras';
 import {
   DEFAULT_TRIGGER_RULE_VALUES,
   type TriggerRuleFormValues,

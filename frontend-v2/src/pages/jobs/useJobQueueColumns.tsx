@@ -1,22 +1,17 @@
 import { Button, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/lib/table';
-import type { Camera } from '@/shared/api/configCenter';
-import type { Job } from '@/shared/api/tasks';
+import type { Camera } from '@/shared/api/cameras';
+import type { Job } from '@/shared/api/jobs';
 import { JOB_STATUS_LABELS, JOB_TYPE_LABELS, StatusBadge, TRIGGER_MODE_LABELS, UNKNOWN_LABELS } from '@/shared/ui';
 import { useMemo } from 'react';
 import { formatDateTime, formatDuration } from '@/pages/jobs/jobsTableFormatters';
-import type { MouseEvent } from 'react';
+import { withRowClickGuard } from '@/pages/jobs/jobsTableEventGuards';
+import { buildLookupNameMap } from '@/pages/jobs/jobsTableLookups';
 
 const { Text } = Typography;
 
 const retryableJobStatus = new Set(['failed', 'cancelled']);
 const terminalJobStatus = new Set(['completed', 'failed', 'cancelled']);
-
-const withRowClickGuard =
-  (action: () => void) => (event: MouseEvent<HTMLElement>) => {
-    event.stopPropagation();
-    action();
-  };
 
 const renderJobStatus = (value: string) => (
   <StatusBadge namespace="job" value={value} label={JOB_STATUS_LABELS[value] ?? UNKNOWN_LABELS.generic} />
@@ -97,17 +92,29 @@ function createJobColumns(params: {
   ];
 }
 
-export type UseJobQueueColumnsProps = {
+export type UseJobQueueColumnsLookupsProps = {
   cameras: Camera[];
+};
+
+export type UseJobQueueColumnsActionsLoadingProps = {
   cancelLoading: boolean;
   retryLoading: boolean;
+};
+
+export type UseJobQueueColumnsActionsHandlersProps = {
   onCancelJob: (jobId: string) => void;
   onRetryJob: (jobId: string) => void;
 };
 
-function buildCameraNameMap(cameras: Camera[]) {
-  return new Map(cameras.map((camera) => [camera.id, camera.name]));
-}
+export type UseJobQueueColumnsActionsProps = {
+  loading: UseJobQueueColumnsActionsLoadingProps;
+  handlers: UseJobQueueColumnsActionsHandlersProps;
+};
+
+export type UseJobQueueColumnsProps = {
+  lookups: UseJobQueueColumnsLookupsProps;
+  actions: UseJobQueueColumnsActionsProps;
+};
 
 function renderJobModel(record: Job) {
   return `${record.model_provider || UNKNOWN_LABELS.provider} / ${record.model_name || UNKNOWN_LABELS.model}`;
@@ -136,11 +143,9 @@ function renderJobError(value: string | null) {
 }
 
 function createJobActionsRenderer({
-  cancelLoading,
-  retryLoading,
-  onCancelJob,
-  onRetryJob,
-}: Omit<UseJobQueueColumnsProps, 'cameras'>): ColumnsType<Job>[number]['render'] {
+  loading: { cancelLoading, retryLoading },
+  handlers: { onCancelJob, onRetryJob },
+}: UseJobQueueColumnsActionsProps): ColumnsType<Job>[number]['render'] {
   return (_, record) => (
     <Space size={6}>
       {!terminalJobStatus.has(record.status) ? (
@@ -167,16 +172,13 @@ function createJobActionsRenderer({
 }
 
 export function useJobQueueColumns({
-  cameras,
-  cancelLoading,
-  retryLoading,
-  onCancelJob,
-  onRetryJob,
+  lookups: { cameras },
+  actions,
 }: UseJobQueueColumnsProps): ColumnsType<Job> {
-  const cameraNameMap = useMemo(() => buildCameraNameMap(cameras), [cameras]);
+  const cameraNameMap = useMemo(() => buildLookupNameMap(cameras), [cameras]);
   const renderActions = useMemo(
-    () => createJobActionsRenderer({ cancelLoading, retryLoading, onCancelJob, onRetryJob }),
-    [cancelLoading, retryLoading, onCancelJob, onRetryJob],
+    () => createJobActionsRenderer(actions),
+    [actions],
   );
 
   return useMemo(

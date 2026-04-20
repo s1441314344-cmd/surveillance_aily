@@ -33,14 +33,14 @@ export function MediaPane() {
   } = useCameraCenter();
 
   return (
-    <Space direction="vertical" size={16} className="stack-full">
+    <Space orientation="vertical" size={16} className="stack-full">
       <CameraPaneHeader
         title="拍照录制与媒体管理"
         description="手动拍照、视频录制和媒体文件浏览在同一子页集中处理，避免主页面拥挤。"
       />
 
       <SectionCard title="拍照与录制控制">
-        <Space direction="vertical" size={12} className="stack-full">
+        <Space orientation="vertical" size={12} className="stack-full">
           <MediaControlToolbar
             hasCameraSelected={Boolean(effectiveSelectedCameraId)}
             recordDurationSeconds={recordDurationSeconds}

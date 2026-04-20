@@ -1,64 +1,91 @@
-import type { Camera, Strategy } from '@/shared/api/configCenter';
-import type { Job, JobSchedule } from '@/shared/api/tasks';
+import type { JobQueueTable } from '@/pages/jobs/JobQueueTable';
+import type { ScheduleTable } from '@/pages/jobs/ScheduleTable';
+import type { OptionItem } from '@/pages/jobs/jobsOptionItem';
 
 export type JobsWorkspaceTabKey = 'queue' | 'schedule';
 
-export type OptionItem = {
-  label: string;
-  value: string;
+export type JobsWorkspaceSharedProps = {
+  values: {
+    workspaceTab: JobsWorkspaceTabKey;
+  };
+  handlers: {
+    onWorkspaceTabChange: (value: JobsWorkspaceTabKey) => void;
+  };
+};
+
+export type JobsWorkspaceQueueFiltersProps = {
+  values: {
+    statusFilter: string;
+    strategyFilter: string;
+    triggerModeFilter: string;
+    cameraFilter: string;
+    scheduleFilter: string;
+  };
+  options: {
+    statusOptions: OptionItem[];
+    strategyOptions: OptionItem[];
+    triggerModeOptions: OptionItem[];
+    cameraOptions: OptionItem[];
+    scheduleOptions: OptionItem[];
+  };
+  handlers: {
+    onStatusChange: (value: string) => void;
+    onStrategyChange: (value: string) => void;
+    onTriggerModeChange: (value: string) => void;
+    onCameraChange: (value: string) => void;
+    onScheduleChange: (value: string) => void;
+  };
+};
+
+export type JobsWorkspaceQueueTimeRangeProps = {
+  values: {
+    createdFromFilter: string;
+    createdToFilter: string;
+  };
+  handlers: {
+    onCreatedFromChange: (value: string) => void;
+    onCreatedToChange: (value: string) => void;
+    onClearDateRange: () => void;
+    onResetFilters: () => void;
+  };
+};
+
+export type JobsWorkspaceQueueTableProps = Parameters<typeof JobQueueTable>[0];
+
+export type JobsWorkspaceQueueProps = {
+  filters: JobsWorkspaceQueueFiltersProps;
+  timeRange: JobsWorkspaceQueueTimeRangeProps;
+  table: JobsWorkspaceQueueTableProps;
+};
+
+export type JobsWorkspaceScheduleFiltersProps = {
+  values: {
+    scheduleStatusFilter: string;
+    scheduleCameraFilter: string;
+    scheduleStrategyFilter: string;
+  };
+  options: {
+    statusOptions: OptionItem[];
+    cameraOptions: OptionItem[];
+    strategyOptions: OptionItem[];
+  };
+  handlers: {
+    onScheduleStatusFilterChange: (value: string) => void;
+    onScheduleCameraFilterChange: (value: string) => void;
+    onScheduleStrategyFilterChange: (value: string) => void;
+    onResetFilters: () => void;
+  };
+};
+
+export type JobsWorkspaceScheduleTableProps = Parameters<typeof ScheduleTable>[0];
+
+export type JobsWorkspaceScheduleProps = {
+  filters: JobsWorkspaceScheduleFiltersProps;
+  table: JobsWorkspaceScheduleTableProps;
 };
 
 export type JobsWorkspaceTabsProps = {
-  workspaceTab: JobsWorkspaceTabKey;
-  onWorkspaceTabChange: (value: JobsWorkspaceTabKey) => void;
-  jobs: Job[];
-  schedules: JobSchedule[];
-  cameras: Camera[];
-  strategies: Strategy[];
-  selectedJobId: string | null;
-  selectedScheduleId: string | null;
-  jobsLoading: boolean;
-  schedulesLoading: boolean;
-  cancelLoading: boolean;
-  retryLoading: boolean;
-  scheduleStatusLoading: boolean;
-  runNowLoading: boolean;
-  updateLoading: boolean;
-  deleteLoading: boolean;
-  statusFilter: string;
-  strategyFilter: string;
-  triggerModeFilter: string;
-  cameraFilter: string;
-  scheduleFilter: string;
-  createdFromFilter: string;
-  createdToFilter: string;
-  scheduleStatusFilter: string;
-  scheduleCameraFilter: string;
-  scheduleStrategyFilter: string;
-  statusOptions: OptionItem[];
-  strategyOptions: OptionItem[];
-  cameraOptions: OptionItem[];
-  scheduleOptions: OptionItem[];
-  onStatusChange: (value: string) => void;
-  onStrategyChange: (value: string) => void;
-  onTriggerModeChange: (value: string) => void;
-  onCameraChange: (value: string) => void;
-  onQueueScheduleChange: (value: string) => void;
-  onCreatedFromChange: (value: string) => void;
-  onCreatedToChange: (value: string) => void;
-  onClearDateRange: () => void;
-  onResetQueueFilters: () => void;
-  onSelectJob: (jobId: string) => void;
-  onCancelJob: (jobId: string) => void;
-  onRetryJob: (jobId: string) => void;
-  onScheduleStatusFilterChange: (value: string) => void;
-  onScheduleCameraFilterChange: (value: string) => void;
-  onScheduleStrategyFilterChange: (value: string) => void;
-  onResetScheduleFilters: () => void;
-  onSelectSchedule: (scheduleId: string) => void;
-  onScheduleViewJobs: (scheduleId: string) => void;
-  onRunNow: (scheduleId: string) => void;
-  onEditSchedule: (schedule: JobSchedule) => void;
-  onToggleScheduleStatus: (scheduleId: string, status: string) => void;
-  onDeleteSchedule: (scheduleId: string) => void;
+  shared: JobsWorkspaceSharedProps;
+  queue: JobsWorkspaceQueueProps;
+  schedule: JobsWorkspaceScheduleProps;
 };

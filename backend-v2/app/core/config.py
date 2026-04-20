@@ -1,8 +1,11 @@
 from functools import lru_cache
-from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+try:
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+except ImportError:  # pragma: no cover - compatibility with older pydantic-settings
+    from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 DEFAULT_CORS_ORIGIN_PORTS = range(5173, 5181)
@@ -27,6 +30,7 @@ class Settings(BaseSettings):
     scheduler_poll_interval_seconds: int = 30
     scheduler_camera_status_sweep_enabled: bool = True
     scheduler_camera_status_sweep_interval_seconds: int = 60
+    scheduler_inflight_job_timeout_seconds: int = 900
     feedback_training_enabled: bool = True
     feedback_training_cron: str = "0 2 * * *"
     feedback_training_min_samples: int = 30
@@ -43,7 +47,9 @@ class Settings(BaseSettings):
     alert_lark_cli_timeout_seconds: int = 15
     storage_root: str = "./data/storage"
     provider_mock_fallback_enabled: bool = True
-    cors_origins: Annotated[list[str], NoDecode] = DEFAULT_CORS_ORIGINS
+    ocr_service_base_url: str = "http://127.0.0.1:8092"
+    ocr_service_timeout_seconds: int = 30
+    cors_origins: str | list[str] = DEFAULT_CORS_ORIGINS
     bootstrap_admin_username: str = "admin"
     bootstrap_admin_password: str = "admin123456"
     bootstrap_admin_display_name: str = "开发管理员"

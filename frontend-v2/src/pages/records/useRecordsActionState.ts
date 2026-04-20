@@ -1,6 +1,6 @@
 import { App } from 'antd';
-import { exportTaskRecords } from '@/shared/api/tasks';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { exportTaskRecords } from '@/shared/api/records';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import type { RecordsFilterState } from '@/pages/records/types';
 import { buildTaskRecordFilterParams } from '@/pages/records/recordsTaskRecordParams';
 

@@ -1,5 +1,5 @@
 import { Alert, Button, Empty, InputNumber, Space } from 'antd';
-import type { CameraMedia } from '@/shared/api/configCenter';
+import type { CameraMedia } from '@/shared/api/cameras';
 
 type MediaControlToolbarProps = {
   hasCameraSelected: boolean;
@@ -31,7 +31,7 @@ export function MediaControlToolbar({
   }
 
   return (
-    <Space direction="vertical" size={12} className="stack-full">
+    <Space orientation="vertical" size={12} className="stack-full">
       <Alert
         type="info"
         showIcon

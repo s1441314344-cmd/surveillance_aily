@@ -1,42 +1,61 @@
 import { Alert, Button, Form, Select, Space } from 'antd';
 import type { FormInstance } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
-import type { Camera, Strategy } from '@/shared/api/configCenter';
 import { SectionCard } from '@/shared/ui';
 import { JobCreateCameraField } from '@/pages/jobs/JobCreateCameraField';
 import { JobCreateScheduleFields } from '@/pages/jobs/JobCreateScheduleFields';
 import { JobCreateUploadFields } from '@/pages/jobs/JobCreateUploadFields';
+import type { OptionItem } from '@/pages/jobs/jobsOptionItem';
 import {
   DEFAULT_FORM_VALUES,
   JOB_TASK_MODE_OPTIONS,
   type UploadFormValues,
 } from '@/pages/jobs/types';
 
-type JobCreatePanelProps = {
+type JobCreatePanelFormProps = {
   form: FormInstance<UploadFormValues>;
+};
+
+type JobCreatePanelWorkflowProps = {
   taskMode: UploadFormValues['taskMode'];
   uploadSource: NonNullable<UploadFormValues['uploadSource']>;
   scheduleType: NonNullable<UploadFormValues['scheduleType']>;
-  strategies: Strategy[];
-  cameras: Camera[];
+};
+
+type JobCreatePanelResourcesProps = {
   strategyLoading: boolean;
   cameraLoading: boolean;
+};
+
+type JobCreatePanelStateProps = {
   fileList: UploadFile[];
   hasUnsupportedCameraProtocol: boolean;
   hasUnsupportedUploadCameraProtocol: boolean;
   submitLoading: boolean;
+};
+
+type JobCreatePanelHandlersProps = {
   onSubmit: (values: UploadFormValues) => void | Promise<void>;
   onValuesChange: (changedValues: Partial<UploadFormValues>) => void;
   onFileListChange: (nextFileList: UploadFile[]) => void;
   onResetInput: () => void;
 };
 
-function getStrategyOptions(strategies: Strategy[]) {
-  return strategies.map((item) => ({
-    label: `${item.name} (${item.model_provider}/${item.model_name})`,
-    value: item.id,
-  }));
-}
+type JobCreatePanelOptionsProps = {
+  strategyOptions: readonly OptionItem[];
+  scheduleTypeOptions: readonly OptionItem[];
+  uploadSourceOptions: readonly OptionItem[];
+  cameraOptions: readonly OptionItem[];
+};
+
+type JobCreatePanelProps = {
+  form: JobCreatePanelFormProps;
+  workflow: JobCreatePanelWorkflowProps;
+  resources: JobCreatePanelResourcesProps;
+  state: JobCreatePanelStateProps;
+  handlers: JobCreatePanelHandlersProps;
+  options: JobCreatePanelOptionsProps;
+};
 
 function getSubmitButtonLabel(
   taskMode: UploadFormValues['taskMode'],
@@ -83,41 +102,31 @@ function shouldShowUnsupportedProtocolAlert(
 
 export function JobCreatePanel({
   form,
-  taskMode,
-  uploadSource,
-  scheduleType,
-  strategies,
-  cameras,
-  strategyLoading,
-  cameraLoading,
-  fileList,
-  hasUnsupportedCameraProtocol,
-  hasUnsupportedUploadCameraProtocol,
-  submitLoading,
-  onSubmit,
-  onValuesChange,
-  onFileListChange,
-  onResetInput,
+  workflow,
+  resources,
+  state,
+  handlers,
+  options,
 }: JobCreatePanelProps) {
-  const strategyOptions = getStrategyOptions(strategies);
-  const isUploadMode = isUploadTaskMode(taskMode);
+  const isUploadMode = isUploadTaskMode(workflow.taskMode);
   const shouldShowCameraField = !isUploadMode;
-  const shouldShowScheduleFields = taskMode === 'camera_schedule';
+  const shouldShowScheduleFields = workflow.taskMode === 'camera_schedule';
   const shouldShowUnsupportedCameraAlert = shouldShowUnsupportedProtocolAlert(
-    taskMode,
-    hasUnsupportedCameraProtocol,
+    workflow.taskMode,
+    state.hasUnsupportedCameraProtocol,
   );
-  const submitDisabled = hasUnsupportedCameraProtocol || hasUnsupportedUploadCameraProtocol;
+  const submitDisabled =
+    state.hasUnsupportedCameraProtocol || state.hasUnsupportedUploadCameraProtocol;
   const handleValuesChange = (changedValues: unknown) => {
-    onValuesChange(changedValues as Partial<UploadFormValues>);
+    handlers.onValuesChange(changedValues as Partial<UploadFormValues>);
   };
 
   return (
     <SectionCard title="任务创建" subtitle="支持本地上传、摄像头单次和定时计划">
       <Form
         layout="vertical"
-        form={form}
-        onFinish={onSubmit}
+        form={form.form}
+        onFinish={handlers.onSubmit}
         onValuesChange={handleValuesChange}
         initialValues={DEFAULT_FORM_VALUES}
       >
@@ -133,26 +142,41 @@ export function JobCreatePanel({
           <Select
             data-testid="job-create-strategy"
             placeholder="请选择一个启用中的策略"
-            loading={strategyLoading}
-            options={strategyOptions}
+            loading={resources.strategyLoading}
+            options={[...options.strategyOptions]}
           />
         </Form.Item>
 
         {isUploadMode ? (
           <JobCreateUploadFields
-            uploadSource={uploadSource}
-            fileList={fileList}
-            cameras={cameras}
-            cameraLoading={cameraLoading}
-            hasUnsupportedUploadCameraProtocol={hasUnsupportedUploadCameraProtocol}
-            onFileListChange={onFileListChange}
+            workflow={{
+              uploadSource: workflow.uploadSource,
+            }}
+            resources={{
+              cameraLoading: resources.cameraLoading,
+            }}
+            state={{
+              fileList: state.fileList,
+              hasUnsupportedUploadCameraProtocol: state.hasUnsupportedUploadCameraProtocol,
+            }}
+            handlers={{
+              onFileListChange: handlers.onFileListChange,
+            }}
+            options={{
+              uploadSourceOptions: options.uploadSourceOptions,
+              uploadCameraOptions: options.cameraOptions,
+            }}
           />
         ) : null}
 
         {shouldShowCameraField ? (
           <JobCreateCameraField
-            cameras={cameras}
-            cameraLoading={cameraLoading}
+            resources={{
+              cameraLoading: resources.cameraLoading,
+            }}
+            options={{
+              cameraOptions: options.cameraOptions,
+            }}
           />
         ) : null}
 
@@ -167,9 +191,16 @@ export function JobCreatePanel({
 
         {shouldShowScheduleFields ? (
           <JobCreateScheduleFields
-            scheduleType={scheduleType}
-            strategies={strategies}
-            strategyLoading={strategyLoading}
+            workflow={{
+              scheduleType: workflow.scheduleType,
+            }}
+            resources={{
+              strategyLoading: resources.strategyLoading,
+            }}
+            options={{
+              scheduleTypeOptions: options.scheduleTypeOptions,
+              precheckStrategyOptions: options.strategyOptions,
+            }}
           />
         ) : null}
 
@@ -178,11 +209,11 @@ export function JobCreatePanel({
             type="primary"
             htmlType="submit"
             disabled={submitDisabled}
-            loading={submitLoading}
+            loading={state.submitLoading}
           >
-            {getSubmitButtonLabel(taskMode, uploadSource)}
+            {getSubmitButtonLabel(workflow.taskMode, workflow.uploadSource)}
           </Button>
-          <Button onClick={onResetInput}>{isUploadMode ? '清空文件' : '清空当前配置'}</Button>
+          <Button onClick={handlers.onResetInput}>{isUploadMode ? '清空文件' : '清空当前配置'}</Button>
         </Space>
       </Form>
 
@@ -190,7 +221,7 @@ export function JobCreatePanel({
         type="info"
         showIcon
         title="当前范围"
-        description={getCurrentScopeDescription(taskMode, uploadSource)}
+        description={getCurrentScopeDescription(workflow.taskMode, workflow.uploadSource)}
       />
     </SectionCard>
   );

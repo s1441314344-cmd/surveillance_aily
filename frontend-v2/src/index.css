@@ -172,6 +172,16 @@ body {
   letter-spacing: -0.03em;
 }
 
+.app-shell__header-eyebrow {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--app-accent-strong) !important;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .app-shell__header-description {
   display: block;
   margin-top: 4px;

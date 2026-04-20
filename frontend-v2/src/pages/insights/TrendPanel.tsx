@@ -12,7 +12,7 @@ export function TrendPanel({ title, points }: { title: string; points: TrendPoin
   const max = Math.max(...points.map((point) => point.value), 1);
   return (
     <SectionCard title={title} subtitle="最近 30 次任务变化">
-      <Space direction="vertical" size={12} className="stack-full">
+      <Space orientation="vertical" size={12} className="stack-full">
         <div className="trend-chart">
           {points.map((point) => {
             return (

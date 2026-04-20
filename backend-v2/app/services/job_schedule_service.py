@@ -92,6 +92,8 @@ def create_job_schedule(db: Session, payload: JobScheduleCreate) -> JobScheduleR
 def update_job_schedule(db: Session, schedule: JobSchedule, payload: JobScheduleUpdate) -> JobScheduleRead:
     updates = payload.model_dump(exclude_unset=True)
     current_time = _ensure_aware(datetime.now(timezone.utc))
+    has_explicit_next_run_at = "next_run_at" in updates
+    explicit_next_run_at_raw = updates.pop("next_run_at", None)
 
     if "camera_id" in updates and updates["camera_id"] is not None:
         get_camera_or_404(db, updates["camera_id"])
@@ -114,7 +116,13 @@ def update_job_schedule(db: Session, schedule: JobSchedule, payload: JobSchedule
         setattr(schedule, field_name, value)
 
     if schedule.status == SCHEDULE_STATUS_ACTIVE:
-        schedule.next_run_at = calculate_next_run_at(schedule.schedule_type, schedule.schedule_value, current_time)
+        if has_explicit_next_run_at:
+            if explicit_next_run_at_raw is None:
+                schedule.next_run_at = calculate_next_run_at(schedule.schedule_type, schedule.schedule_value, current_time)
+            else:
+                schedule.next_run_at = _parse_datetime(explicit_next_run_at_raw, field_name="next_run_at")
+        else:
+            schedule.next_run_at = calculate_next_run_at(schedule.schedule_type, schedule.schedule_value, current_time)
     else:
         schedule.next_run_at = None
 
@@ -278,6 +286,17 @@ def _ensure_aware(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _parse_datetime(value: str, *, field_name: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} must be a valid ISO datetime string",
+        ) from exc
+    return _ensure_aware(parsed)
 
 
 def _serialize_datetime(value: datetime | None) -> str | None:

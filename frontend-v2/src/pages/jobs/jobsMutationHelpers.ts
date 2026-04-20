@@ -1,9 +1,17 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { MessageInstance } from 'antd/es/message/interface';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import { JOBS_QUERY_KEYS } from '@/pages/jobs/jobsQueryKeys';
 
-export const invalidateJobsQueries = async (queryClient: QueryClient) => {
+type JobsMutationHelperCacheParams = {
+  queryClient: QueryClient;
+};
+
+type JobsMutationHelperFeedbackParams = {
+  message: MessageInstance;
+};
+
+export const invalidateJobsQueries = async ({ queryClient }: JobsMutationHelperCacheParams) => {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: JOBS_QUERY_KEYS.jobsRoot }),
     queryClient.invalidateQueries({ queryKey: JOBS_QUERY_KEYS.jobDetailRoot }),
@@ -11,11 +19,18 @@ export const invalidateJobsQueries = async (queryClient: QueryClient) => {
   ]);
 };
 
-export const invalidateScheduleQueries = async (queryClient: QueryClient) => {
+export const invalidateScheduleQueries = async ({ queryClient }: JobsMutationHelperCacheParams) => {
   await queryClient.invalidateQueries({ queryKey: JOBS_QUERY_KEYS.jobSchedulesRoot });
 };
 
 export const createJobsApiErrorHandler =
-  (message: MessageInstance, fallback: string) => (error: Error) => {
+  ({
+    feedback,
+    fallback,
+  }: {
+    feedback: JobsMutationHelperFeedbackParams;
+    fallback: string;
+  }) => (error: Error) => {
+    const { message } = feedback;
     message.error(getApiErrorMessage(error, fallback));
   };

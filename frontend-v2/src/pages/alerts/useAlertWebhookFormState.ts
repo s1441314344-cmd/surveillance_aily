@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { type FormInstance } from 'antd';
-import type { AlertWebhook } from '@/shared/api/configCenter';
+import type { AlertWebhook } from '@/shared/api/alerts';
 import type { WebhookFormValues } from '@/pages/alerts/types';
 import type { useAlertsMutationState } from '@/pages/alerts/useAlertsMutationState';
 

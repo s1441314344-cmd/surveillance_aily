@@ -1,7 +1,7 @@
 import type { QueryKey } from '@tanstack/react-query';
 import type {
   CameraTriggerRuleDebugResult,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
 import type { TriggerRuleFormValues } from '@/pages/cameras/cameraCenterConfig';
 import { CAMERA_QUERY_KEYS } from '@/pages/cameras/cameraQueryKeys';
 

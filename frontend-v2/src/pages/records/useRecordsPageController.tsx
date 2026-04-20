@@ -7,34 +7,21 @@ import { useRecordsFilterState } from '@/pages/records/useRecordsFilterState';
 import { useRecordsQueryState } from '@/pages/records/useRecordsQueryState';
 import type { RecordsFilterState } from '@/pages/records/types';
 
-function buildRecordFilters(filters: ReturnType<typeof useRecordsFilterState>): RecordsFilterState {
-  return {
-    statusFilter: filters.statusFilter,
-    strategyFilter: filters.strategyFilter,
-    jobTypeFilter: filters.jobTypeFilter,
-    cameraFilter: filters.cameraFilter,
-    modelProviderFilter: filters.modelProviderFilter,
-    feedbackFilter: filters.feedbackFilter,
-    createdFromFilter: filters.createdFromFilter,
-    createdToFilter: filters.createdToFilter,
-  };
-}
-
 export function useRecordsPageController() {
   const filters = useRecordsFilterState();
   const { selectedRecordId, handleSelectRecord } = useRecordSelectionState();
   const recordFilters: RecordsFilterState = useMemo(
-    () => buildRecordFilters(filters),
-    [
-      filters.statusFilter,
-      filters.strategyFilter,
-      filters.jobTypeFilter,
-      filters.cameraFilter,
-      filters.modelProviderFilter,
-      filters.feedbackFilter,
-      filters.createdFromFilter,
-      filters.createdToFilter,
-    ],
+    () => ({
+      statusFilter: filters.statusFilter,
+      strategyFilter: filters.strategyFilter,
+      jobTypeFilter: filters.jobTypeFilter,
+      cameraFilter: filters.cameraFilter,
+      modelProviderFilter: filters.modelProviderFilter,
+      feedbackFilter: filters.feedbackFilter,
+      createdFromFilter: filters.createdFromFilter,
+      createdToFilter: filters.createdToFilter,
+    }),
+    [filters],
   );
 
   const queries = useRecordsQueryState({

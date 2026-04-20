@@ -1,4 +1,5 @@
-import type { Camera, CameraMedia, SignalMonitorConfig, Strategy } from '@/shared/api/configCenter';
+import type { Camera, CameraMedia, SignalMonitorConfig } from '@/shared/api/cameras';
+import type { Strategy } from '@/shared/api/strategies';
 import type { StrategyOption } from '@/pages/cameras/cameraCenterTypes';
 
 type ResolveSelectedCameraArgs = {

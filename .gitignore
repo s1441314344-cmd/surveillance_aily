@@ -81,6 +81,10 @@ cloudflared.tgz
 mes-workflow-designer/frontend/node_modules/
 mes-workflow-designer/backend/node_modules/
 frontend-v2/node_modules/
+frontend-v2/.env
+frontend-v2/.env.local
+frontend-v2/.env.*.local
+!frontend-v2/.env.example
 frontend-v2/dist/
 frontend-v2/playwright-report/
 frontend-v2/test-results/
@@ -100,6 +104,19 @@ check_*.py
 
 # Detection results (local test data)
 data/detections/*
+!data/detections/detect_20260320_232612_133d2731.jpg
+!data/detections/detect_20260320_233545_8746e22d.jpg
+!data/detections/detect_20260320_233855_5619cd19.jpg
+!data/detections/detect_20260320_234204_15008948.jpg
+!data/detections/detect_20260320_234234_075907e0.jpg
+!data/detections/detect_20260322_134013_b402e1c7.jpg
+!data/detections/detect_20260322_140001_d4536d45.jpg
+!data/detections/detect_20260322_140013_dc2286c7.jpg
+!data/detections/detect_20260322_155820_a7018ef0.jpg
+!data/detections/submit_1_20260322_135403_22578a9e.jpg
+!data/detections/submit_1_20260322_142328_027d5f78.jpg
+!data/detections/submit_2_20260322_135403_f0c42cde.jpg
+!data/detections/submit_2_20260322_142328_9bef38b9.jpg
 data/storage/
 data/preflight-logs/
 data/release-drill-logs/
@@ -107,8 +124,13 @@ data/uat-logs/
 data/release-checklists/
 data/release-gates/
 data/verify-logs/
+data/real-async-tests/
 data/manual_captures/
 data/terminal_captures/
 data/hik_verify_*/
 data/screenshot_*
 data/screenshot_probe_*
+.worktrees/
+
+# Claude Code local settings
+.claude/

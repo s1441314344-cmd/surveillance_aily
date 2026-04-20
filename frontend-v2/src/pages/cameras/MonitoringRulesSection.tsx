@@ -1,5 +1,5 @@
 import { Button, Empty, Space } from 'antd';
-import type { CameraTriggerRule, CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/configCenter';
+import type { CameraTriggerRule, CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/cameras';
 import { SectionCard } from '@/shared/ui';
 import { DebugControls } from './DebugControls';
 import { DebugResultPanel } from './DebugResultPanel';
@@ -64,7 +64,7 @@ export function MonitoringRulesSection({
       }
     >
       {effectiveSelectedCameraId ? (
-        <Space direction="vertical" size={12} className="stack-full">
+        <Space orientation="vertical" size={12} className="stack-full">
           <DebugControls
             triggerDebugDryRun={triggerDebugDryRun}
             triggerDebugCaptureOnMatch={triggerDebugCaptureOnMatch}

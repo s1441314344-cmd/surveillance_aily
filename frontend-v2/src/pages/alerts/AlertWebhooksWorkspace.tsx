@@ -1,5 +1,5 @@
 import { Table } from 'antd';
-import { type AlertWebhook } from '@/shared/api/configCenter';
+import { type AlertWebhook } from '@/shared/api/alerts';
 import { DataStateBlock, SectionCard } from '@/shared/ui';
 import { AlertWebhookCreateForm } from '@/pages/alerts/AlertWebhookCreateForm';
 import { type WebhookFormValues } from '@/pages/alerts/types';

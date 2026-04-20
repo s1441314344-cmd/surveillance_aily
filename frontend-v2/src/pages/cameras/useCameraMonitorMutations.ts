@@ -15,7 +15,7 @@ import {
   deleteCameraTriggerRule,
   updateCameraTriggerRule,
   updateSignalMonitorConfig,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
 import {
   DEFAULT_TRIGGER_RULE_VALUES,
   type TriggerRuleFormValues,

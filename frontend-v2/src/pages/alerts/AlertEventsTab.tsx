@@ -1,6 +1,6 @@
 import { Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { AlertRecord } from '@/shared/api/configCenter';
+import type { AlertRecord } from '@/shared/api/alerts';
 import { DataStateBlock, SectionCard } from '@/shared/ui';
 import { AlertEventFilters } from '@/pages/alerts/AlertEventFilters';
 import type { KeyboardEvent } from 'react';

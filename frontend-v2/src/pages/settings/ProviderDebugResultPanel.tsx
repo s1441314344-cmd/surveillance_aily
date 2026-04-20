@@ -1,5 +1,5 @@
 import { Input } from 'antd';
-import { type ModelProviderDebugResult } from '@/shared/api/configCenter';
+import { type ModelProviderDebugResult } from '@/shared/api/modelProviders';
 import {
   ACTIVE_STATUS_LABELS,
   DataStateBlock,

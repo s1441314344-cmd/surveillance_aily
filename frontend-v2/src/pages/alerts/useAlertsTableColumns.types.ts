@@ -1,4 +1,4 @@
-import type { AlertWebhook } from '@/shared/api/configCenter';
+import type { AlertWebhook } from '@/shared/api/alerts';
 import type { useAlertsMutationState } from '@/pages/alerts/useAlertsMutationState';
 
 export type UseAlertsTableColumnsParams = {

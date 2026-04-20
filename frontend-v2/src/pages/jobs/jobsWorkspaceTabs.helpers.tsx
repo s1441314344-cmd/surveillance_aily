@@ -1,137 +1,27 @@
+import type { ReactNode } from 'react';
+import type { TabsProps } from 'antd';
 import { JobQueueSection } from '@/pages/jobs/JobQueueSection';
 import { JobScheduleSection } from '@/pages/jobs/JobScheduleSection';
 import type { JobsWorkspaceTabsProps } from './jobsWorkspaceTabs.types';
-import type { ReactNode } from 'react';
 
 const QUEUE_TAB_LABEL = '任务队列';
 const SCHEDULE_TAB_LABEL = '定时计划';
 
-const buildWorkspaceTabItem = (key: 'queue' | 'schedule', label: string, children: ReactNode) => ({
+type JobsWorkspaceTabItem = NonNullable<TabsProps['items']>[number];
+
+const buildWorkspaceTabItem = (
+  key: 'queue' | 'schedule',
+  label: string,
+  children: ReactNode,
+): JobsWorkspaceTabItem => ({
   key,
   label,
   children,
 });
 
-const buildQueueSectionProps = ({
-  jobs,
-  cameras,
-  selectedJobId,
-  jobsLoading,
-  cancelLoading,
-  retryLoading,
-  statusFilter,
-  strategyFilter,
-  triggerModeFilter,
-  cameraFilter,
-  scheduleFilter,
-  createdFromFilter,
-  createdToFilter,
-  statusOptions,
-  strategyOptions,
-  cameraOptions,
-  scheduleOptions,
-  onStatusChange,
-  onStrategyChange,
-  onTriggerModeChange,
-  onCameraChange,
-  onQueueScheduleChange,
-  onCreatedFromChange,
-  onCreatedToChange,
-  onClearDateRange,
-  onResetQueueFilters,
-  onSelectJob,
-  onCancelJob,
-  onRetryJob,
-}: JobsWorkspaceTabsProps) => ({
-  jobs,
-  cameras,
-  selectedJobId,
-  loading: jobsLoading,
-  cancelLoading,
-  retryLoading,
-  statusFilter,
-  strategyFilter,
-  triggerModeFilter,
-  cameraFilter,
-  scheduleFilter,
-  createdFromFilter,
-  createdToFilter,
-  statusOptions,
-  strategyOptions,
-  cameraOptions,
-  scheduleOptions,
-  onStatusChange,
-  onStrategyChange,
-  onTriggerModeChange,
-  onCameraChange,
-  onScheduleChange: onQueueScheduleChange,
-  onCreatedFromChange,
-  onCreatedToChange,
-  onClearDateRange,
-  onResetFilters: onResetQueueFilters,
-  onSelectJob,
-  onCancelJob,
-  onRetryJob,
-});
-
-const buildScheduleSectionProps = ({
-  schedules,
-  cameras,
-  strategies,
-  schedulesLoading,
-  scheduleStatusLoading,
-  runNowLoading,
-  updateLoading,
-  deleteLoading,
-  selectedScheduleId,
-  scheduleStatusFilter,
-  scheduleCameraFilter,
-  scheduleStrategyFilter,
-  cameraOptions,
-  strategyOptions,
-  onScheduleStatusFilterChange,
-  onScheduleCameraFilterChange,
-  onScheduleStrategyFilterChange,
-  onResetScheduleFilters,
-  onSelectSchedule,
-  onScheduleViewJobs,
-  onRunNow,
-  onEditSchedule,
-  onToggleScheduleStatus,
-  onDeleteSchedule,
-}: JobsWorkspaceTabsProps) => ({
-  schedules,
-  cameras,
-  strategies,
-  loading: schedulesLoading,
-  scheduleStatusLoading,
-  runNowLoading,
-  updateLoading,
-  deleteLoading,
-  selectedScheduleId,
-  scheduleStatusFilter,
-  scheduleCameraFilter,
-  scheduleStrategyFilter,
-  cameraOptions,
-  strategyOptions,
-  onScheduleStatusFilterChange,
-  onScheduleCameraFilterChange,
-  onScheduleStrategyFilterChange,
-  onResetFilters: onResetScheduleFilters,
-  onSelectSchedule,
-  onViewJobs: onScheduleViewJobs,
-  onRunNow,
-  onEdit: onEditSchedule,
-  onToggleStatus: onToggleScheduleStatus,
-  onDelete: onDeleteSchedule,
-});
-
-export function buildJobsWorkspaceTabsItems(props: JobsWorkspaceTabsProps) {
-  const queueSectionProps = buildQueueSectionProps(props);
-  const scheduleSectionProps = buildScheduleSectionProps(props);
-
+export function buildJobsWorkspaceTabsItems(props: JobsWorkspaceTabsProps): TabsProps['items'] {
   return [
-    buildWorkspaceTabItem('queue', QUEUE_TAB_LABEL, <JobQueueSection {...queueSectionProps} />),
-    buildWorkspaceTabItem('schedule', SCHEDULE_TAB_LABEL, <JobScheduleSection {...scheduleSectionProps} />),
+    buildWorkspaceTabItem('queue', QUEUE_TAB_LABEL, <JobQueueSection {...props.queue} />),
+    buildWorkspaceTabItem('schedule', SCHEDULE_TAB_LABEL, <JobScheduleSection {...props.schedule} />),
   ];
 }

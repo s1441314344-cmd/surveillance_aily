@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listDashboardDefinitions } from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { listDashboardDefinitions } from '@/shared/api/dashboard';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import { CREATE_DASHBOARD_ID } from '@/pages/dashboards/types';
 import { DASHBOARDS_QUERY_KEYS } from '@/pages/dashboards/dashboardsQueryKeys';
 import { getEffectiveSelectionId } from '@/shared/utils/effectiveSelection';

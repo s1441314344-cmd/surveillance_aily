@@ -65,6 +65,7 @@ class JobScheduleUpdate(BaseModel):
     schedule_type: str | None = None
     schedule_value: str | None = None
     status: str | None = None
+    next_run_at: str | None = None
 
 
 class JobScheduleStatusUpdate(BaseModel):

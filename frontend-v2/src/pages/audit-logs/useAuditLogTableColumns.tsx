@@ -23,7 +23,7 @@ export function useAuditLogTableColumns() {
       {
         title: '请求',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Tag color="blue">{record.http_method}</Tag>
             <Text code>{record.request_path}</Text>
           </Space>
@@ -33,7 +33,7 @@ export function useAuditLogTableColumns() {
         title: '结果',
         width: 120,
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <StatusBadge
               namespace="generic"
               value={record.success ? 'success' : 'failed'}

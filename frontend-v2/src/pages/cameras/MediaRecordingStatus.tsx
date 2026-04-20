@@ -1,5 +1,5 @@
 import { Alert, Typography } from 'antd';
-import type { CameraMedia } from '@/shared/api/configCenter';
+import type { CameraMedia } from '@/shared/api/cameras';
 
 const { Text } = Typography;
 

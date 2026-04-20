@@ -1,5 +1,5 @@
 import { formatDateInput, isDashboardPresetFilters } from '@/pages/dashboard/types';
-import type { DashboardDefinition } from '@/shared/api/configCenter';
+import type { DashboardDefinition } from '@/shared/api/dashboard';
 
 type UseDashboardFormActionStateParams = {
   activeDashboardDefinition: DashboardDefinition | null;

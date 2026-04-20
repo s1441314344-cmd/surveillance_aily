@@ -57,7 +57,7 @@ export function MonitoringPane() {
     void handleSubmitTriggerRule(values);
 
   return (
-    <Space direction="vertical" size={16} className="stack-full">
+    <Space orientation="vertical" size={16} className="stack-full">
       <CameraPaneHeader
         title="监测配置与规则调试"
         description="配置自动监测运行模式、维护触发规则并执行实时调试，统一规则命中入口。"

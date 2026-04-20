@@ -72,7 +72,7 @@ from app.services.camera_trigger_rule_service import (
     update_camera_trigger_rule as update_camera_trigger_rule_record,
 )
 from app.services.rbac import ROLE_SYSTEM_ADMIN, ROLE_TASK_OPERATOR
-from app.services.scheduler_service import run_camera_status_sweep_once_with_db
+from app.services.camera_status_sweep_service import run_camera_status_sweep_once_with_db
 
 router = APIRouter()
 

@@ -4,8 +4,8 @@ import {
   createFeedback,
   updateFeedback,
   type Feedback,
-} from '@/shared/api/tasks';
-import { getApiErrorMessage } from '@/shared/api/errors';
+} from '@/shared/api/feedback';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import type { FeedbackFormValues } from '@/pages/feedback/types';
 
 type UseFeedbackMutationStateParams = {

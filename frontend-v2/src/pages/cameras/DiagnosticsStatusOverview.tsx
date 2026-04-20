@@ -1,5 +1,5 @@
 import { Descriptions, Empty } from 'antd';
-import type { CameraStatus } from '@/shared/api/configCenter';
+import type { CameraStatus } from '@/shared/api/cameras';
 import { CAMERA_ALERT_STATUS_LABELS, CAMERA_CONNECTION_LABELS } from '@/pages/cameras/cameraCenterConfig';
 import { DataStateBlock, SectionCard, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 

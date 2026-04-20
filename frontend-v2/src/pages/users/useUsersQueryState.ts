@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listUsers } from '@/shared/api/users';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 
 type UseUsersQueryStateParams = {
   canManageUsers: boolean;

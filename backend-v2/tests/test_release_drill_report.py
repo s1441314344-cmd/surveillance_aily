@@ -150,3 +150,80 @@ def test_release_drill_report_keeps_unexpected_warning_as_risk():
     assert report.gate_status == "passed"
     assert report.warning_count == 1
     assert any("unexpected warning" in item for item in report.risks)
+
+
+def test_release_drill_report_marks_scheduler_cycle_errors_as_blocking():
+    report = build_release_drill_report(
+        preflight_summary_path="/tmp/preflight-summary.json",
+        preflight_summary={
+            "result": "passed",
+            "checks": {
+                "smoke": {"status": "passed"},
+                "perf": {"status": "passed"},
+                "soak": {"status": "passed"},
+                "e2e": {"status": "passed"},
+            },
+            "scheduler_cycle": {
+                "observed_count": 3,
+                "latest": {
+                    "mode": "locked",
+                    "due": 2,
+                    "claimed": 2,
+                    "created": 1,
+                    "skipped_inflight": 0,
+                    "stale_recovered": 0,
+                    "precheck_skipped": 0,
+                    "errors": 2,
+                },
+            },
+        },
+        backfill_report_path="/tmp/backfill.json",
+        backfill_report={
+            "dry_run": False,
+            "warnings": [],
+            "missing_files": [],
+        },
+    )
+
+    assert report.gate_status == "failed"
+    assert report.preflight_scheduler_cycle is not None
+    assert report.preflight_scheduler_cycle.get("observed_count") == 3
+    assert any("Scheduler cycle reported errors=2" in item for item in report.blocking_issues)
+
+
+def test_render_release_drill_markdown_contains_scheduler_cycle_section_when_available():
+    report = build_release_drill_report(
+        preflight_summary_path="/tmp/preflight-summary.json",
+        preflight_summary={
+            "result": "passed",
+            "checks": {
+                "smoke": {"status": "passed"},
+                "perf": {"status": "passed"},
+                "soak": {"status": "passed"},
+                "e2e": {"status": "passed"},
+            },
+            "scheduler_cycle": {
+                "observed_count": 1,
+                "latest": {
+                    "mode": "locked",
+                    "due": 1,
+                    "claimed": 1,
+                    "created": 1,
+                    "skipped_inflight": 0,
+                    "stale_recovered": 0,
+                    "precheck_skipped": 0,
+                    "errors": 0,
+                },
+            },
+        },
+        backfill_report_path="/tmp/backfill.json",
+        backfill_report={
+            "dry_run": False,
+            "warnings": [],
+            "missing_files": [],
+        },
+    )
+
+    markdown = render_release_drill_markdown(report)
+    assert "### Scheduler Cycle 指标" in markdown
+    assert "- 观测次数: `1`" in markdown

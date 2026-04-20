@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Button, Space, Switch, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { AlertNotificationRoute } from '@/shared/api/configCenter';
+import type { AlertNotificationRoute } from '@/shared/api/alerts';
 import {
   ALERT_SEVERITY_LABELS,
   GENERIC_STATE_LABELS,
@@ -36,7 +36,7 @@ export function useAlertNotificationRouteColumns({
         title: '路由',
         key: 'route',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text strong>{record.name}</Text>
             <Text type="secondary">{record.id}</Text>
           </Space>
@@ -46,7 +46,7 @@ export function useAlertNotificationRouteColumns({
         title: '匹配条件',
         key: 'match',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text>策略：{record.strategy_name || record.strategy_id || '全部'}</Text>
             <Text type="secondary">
               事件：{record.event_key || '全部'} / 级别：{record.severity ? (ALERT_SEVERITY_LABELS[record.severity] || record.severity) : '全部'}
@@ -59,7 +59,7 @@ export function useAlertNotificationRouteColumns({
         title: '接收对象',
         key: 'recipient',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text>{getRecipientTypeLabel(record.recipient_type)}</Text>
             <Text type="secondary">{record.recipient_id}</Text>
           </Space>
@@ -69,7 +69,7 @@ export function useAlertNotificationRouteColumns({
         title: '状态',
         key: 'status',
         render: (_, record) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <StatusBadge
               namespace="generic"
               value={record.enabled ? 'enabled' : 'disabled'}

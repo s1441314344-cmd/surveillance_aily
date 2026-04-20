@@ -8,7 +8,7 @@ import {
   UNKNOWN_LABELS,
 } from '@/shared/ui';
 import { RecordDetailCard } from '@/pages/insights/RecordDetailCard';
-import { type TaskRecord } from '@/shared/api/tasks';
+import { type TaskRecord } from '@/shared/api/records';
 
 type RecordDetailSectionProps = {
   detail: TaskRecord | undefined;

@@ -1,4 +1,4 @@
-import type { Job } from '@/shared/api/tasks';
+import type { Job } from '@/shared/api/jobs';
 
 export type JobDetailViewModel = {
   id: string;

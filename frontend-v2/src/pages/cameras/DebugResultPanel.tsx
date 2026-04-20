@@ -1,6 +1,6 @@
 import { Input, Space, Tag, Typography } from 'antd';
 import { TRIGGER_EVENT_TYPE_LABELS } from './cameraCenterConfig';
-import type { CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/configCenter';
+import type { CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/cameras';
 import { StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 
 const { Text } = Typography;
@@ -16,11 +16,11 @@ export function DebugResultPanel({ liveDebugResult, triggerDebugResult }: DebugR
   }
 
   return (
-    <Space direction="vertical" size={12} className="stack-full">
+    <Space orientation="vertical" size={12} className="stack-full">
       {liveDebugResult ? (
         <div className="console-block">
           <div className="console-block__title">实时调试结果（命中 {liveDebugResult.matched_count} 条）</div>
-          <Space direction="vertical" size={6} className="stack-full">
+          <Space orientation="vertical" size={6} className="stack-full">
             <Text code>{JSON.stringify(liveDebugResult.detected_signals)}</Text>
             <Input.TextArea
               value={JSON.stringify(liveDebugResult.results, null, 2)}
@@ -34,10 +34,10 @@ export function DebugResultPanel({ liveDebugResult, triggerDebugResult }: DebugR
       {triggerDebugResult ? (
         <div className="console-block">
           <div className="console-block__title">规则调试结果（命中 {triggerDebugResult.matched_count} 条）</div>
-          <Space direction="vertical" size={8} className="stack-full">
+          <Space orientation="vertical" size={8} className="stack-full">
             {triggerDebugResult.results.map((item) => (
               <div key={item.rule_id} className="console-block camera-rule-item">
-                <Space direction="vertical" size={4} className="stack-full">
+                <Space orientation="vertical" size={4} className="stack-full">
                   <Space wrap>
                     <Text strong>{item.rule_name}</Text>
                     <StatusBadge

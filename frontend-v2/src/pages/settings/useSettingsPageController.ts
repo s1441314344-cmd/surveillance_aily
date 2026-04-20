@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Form } from 'antd';
-import { type ModelProviderDebugResult } from '@/shared/api/configCenter';
+import { type ModelProviderDebugResult } from '@/shared/api/modelProviders';
 import { useSettingsFormActionState } from '@/pages/settings/useSettingsFormActionState';
 import { useSettingsMutationState } from '@/pages/settings/useSettingsMutationState';
 import { useSettingsQueryState } from '@/pages/settings/useSettingsQueryState';

@@ -1,5 +1,5 @@
 import { Button, Space } from 'antd';
-import type { Camera, CameraStatus } from '@/shared/api/configCenter';
+import type { Camera, CameraStatus } from '@/shared/api/cameras';
 import { SectionCard } from '@/shared/ui';
 import { CameraSidebarPanelFilters } from './CameraSidebarPanelFilters';
 import { CameraSidebarPanelList } from './CameraSidebarPanelList';
