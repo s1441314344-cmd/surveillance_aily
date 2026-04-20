@@ -17,8 +17,8 @@
 - 复核详情
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §4.1 主业务闭环、§5 指标口径
-- **关联模块**：`docs/PRD/modules/records-center.md` §3.2
+- **全局规则**：`/prd/需求总览.md` §4.1 主业务闭环、§5 指标口径
+- **关联模块**：`/prd/modules/records-center.md` §3.2
 
 ### Demo 实现状态
 

@@ -17,8 +17,8 @@
 - 用户启停
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §3 角色与权限
-- **关联模块**：`docs/PRD/modules/auth-login.md` §5
+- **全局规则**：`/prd/需求总览.md` §3 角色与权限
+- **关联模块**：`/prd/modules/auth-login.md` §5
 
 ### Demo 实现状态
 

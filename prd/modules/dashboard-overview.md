@@ -17,8 +17,8 @@
 - 异常案例表
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §4 全局规则与共享状态、§5 共享实体与统计口径
-- **关联模块**：`docs/PRD/modules/dashboards-config.md` §3.1、`docs/PRD/modules/records-center.md` §3.1
+- **全局规则**：`/prd/需求总览.md` §4 全局规则与共享状态、§5 共享实体与统计口径
+- **关联模块**：`/prd/modules/dashboards-config.md` §3.1、`/prd/modules/records-center.md` §3.1
 
 ### Demo 实现状态
 
@@ -143,8 +143,8 @@
 ## 5. 数据模型
 
 ### 5.1 依赖共享实体
-- `DashboardDefinition`：引用 `docs/PRD/需求总览.md` §5.1
-- `Job`、`TaskRecord`、`PredictionFeedback`：引用 `docs/PRD/需求总览.md` §5.1
+- `DashboardDefinition`：引用 `/prd/需求总览.md` §5.1
+- `Job`、`TaskRecord`、`PredictionFeedback`：引用 `/prd/需求总览.md` §5.1
 
 ### 5.2 页面私有包装对象
 | 对象 | 说明 |

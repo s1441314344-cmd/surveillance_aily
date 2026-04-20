@@ -17,8 +17,8 @@
 - 导出
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §3 角色与权限、§5 指标口径
-- **关联模块**：`docs/PRD/modules/jobs-center.md` §3.2、`docs/PRD/modules/feedback-center.md` §3.1
+- **全局规则**：`/prd/需求总览.md` §3 角色与权限、§5 指标口径
+- **关联模块**：`/prd/modules/jobs-center.md` §3.2、`/prd/modules/feedback-center.md` §3.1
 
 ### Demo 实现状态
 

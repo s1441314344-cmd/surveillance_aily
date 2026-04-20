@@ -17,8 +17,8 @@
 - 训练回流
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §4.3 扩展子域定级、§5.1 共享实体
-- **关联模块**：`docs/PRD/modules/strategies-center.md` §3.2、`docs/PRD/modules/feedback-center.md` §3.2
+- **全局规则**：`/prd/需求总览.md` §4.3 扩展子域定级、§5.1 共享实体
+- **关联模块**：`/prd/modules/strategies-center.md` §3.2、`/prd/modules/feedback-center.md` §3.2
 
 ### Demo 实现状态
 
