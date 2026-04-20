@@ -6,8 +6,8 @@ import {
   searchAlertFeishuUsers,
   type AlertFeishuChatCandidate,
   type AlertFeishuUserCandidate,
-} from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+} from '@/shared/api/alerts';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 
 type FeishuRecipientSelectProps = {
   recipientType: 'user' | 'chat';

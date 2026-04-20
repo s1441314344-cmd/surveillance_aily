@@ -1,6 +1,6 @@
 import { Col, Form, Input, InputNumber, Row, Select } from 'antd';
 import type { FormInstance } from 'antd/es/form';
-import type { ModelProvider } from '@/shared/api/configCenter';
+import type { ModelProvider } from '@/shared/api/modelProviders';
 import { ACTIVE_STATUS_OPTIONS } from '@/shared/ui';
 import type { ProviderFormValues } from '@/pages/settings/types';
 

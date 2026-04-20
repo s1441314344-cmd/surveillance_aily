@@ -1,15 +1,36 @@
-import type { Camera } from '@/shared/api/configCenter';
+import type { Camera } from '@/shared/api/cameras';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { RcFile, UploadFile } from 'antd/es/upload/interface';
 import type { UploadFormValues } from '@/pages/jobs/types';
 
 export type JobsFormMessage = MessageInstance;
 
-export const getScheduleValue = (
-  scheduleType: UploadFormValues['scheduleType'],
-  dailyTime: UploadFormValues['dailyTime'],
-  intervalMinutes: UploadFormValues['intervalMinutes'],
-) => {
+type JobsFormUtilsScheduleParams = {
+  scheduleType: UploadFormValues['scheduleType'];
+  dailyTime: UploadFormValues['dailyTime'];
+  intervalMinutes: UploadFormValues['intervalMinutes'];
+};
+
+type JobsFormUtilsFeedbackParams = {
+  message: JobsFormMessage;
+  warningText: string;
+};
+
+type JobsFormUtilsCameraSelectionParams = {
+  cameraId: string | undefined;
+  feedback: JobsFormUtilsFeedbackParams;
+};
+
+type JobsFormUtilsCameraProtocolParams = {
+  camera: Camera | null;
+  feedback: JobsFormUtilsFeedbackParams;
+};
+
+export const getScheduleValue = ({
+  scheduleType,
+  dailyTime,
+  intervalMinutes,
+}: JobsFormUtilsScheduleParams) => {
   if (scheduleType === 'daily_time') {
     return dailyTime?.trim() ?? '';
   }
@@ -20,11 +41,11 @@ export const getScheduleValue = (
 export const isRtspCamera = (camera: Camera | null | undefined) =>
   (camera?.protocol ?? '').toLowerCase() === 'rtsp';
 
-export const requireSelectedCamera = (
-  cameraId: string | undefined,
-  message: JobsFormMessage,
-  warningText: string,
-): cameraId is string => {
+export const requireSelectedCamera = ({
+  cameraId,
+  feedback,
+}: JobsFormUtilsCameraSelectionParams) => {
+  const { message, warningText } = feedback;
   if (!cameraId) {
     message.warning(warningText);
     return false;
@@ -33,11 +54,11 @@ export const requireSelectedCamera = (
   return true;
 };
 
-export const requireRtspCamera = (
-  camera: Camera | null,
-  message: JobsFormMessage,
-  warningText: string,
-) => {
+export const requireRtspCamera = ({
+  camera,
+  feedback,
+}: JobsFormUtilsCameraProtocolParams) => {
+  const { message, warningText } = feedback;
   if (!isRtspCamera(camera)) {
     message.warning(warningText);
     return false;

@@ -1,7 +1,7 @@
 import { Table } from 'antd';
 import type { FormInstance } from 'antd/es/form';
 import type { ColumnsType } from 'antd/es/table';
-import type { AlertNotificationRoute } from '@/shared/api/configCenter';
+import type { AlertNotificationRoute } from '@/shared/api/alerts';
 import { DataStateBlock, SectionCard } from '@/shared/ui';
 import { AlertNotificationRouteCreateForm } from '@/pages/alerts/AlertNotificationRouteCreateForm';
 import type { NotificationRouteFormValues } from '@/pages/alerts/types';

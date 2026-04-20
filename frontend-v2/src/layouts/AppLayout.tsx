@@ -25,6 +25,7 @@ import {
   getRoleLabel,
   hasAnyRole,
 } from '@/shared/auth/permissions';
+import { getRouteMetaByPath } from '@/shared/navigation/routeRegistry';
 import { StatusBadge } from '@/shared/ui';
 
 const { Header, Sider, Content } = Layout;
@@ -86,6 +87,10 @@ export function AppLayout() {
     () => filteredMenuItems.find((item) => item.key === selectedKeys[0]) ?? filteredMenuItems[0] ?? null,
     [filteredMenuItems, selectedKeys],
   );
+  const activeRouteMeta = useMemo(
+    () => getRouteMetaByPath(location.pathname) ?? activeMenuItem,
+    [activeMenuItem, location.pathname],
+  );
 
   const groupedMenuItems = useMemo(
     () =>
@@ -145,9 +150,12 @@ export function AppLayout() {
               onClick={() => setCollapsed((value) => !value)}
             />
             <div>
-              <div className="app-shell__header-title">{activeMenuItem?.label ?? '智能巡检系统'}</div>
+              {activeRouteMeta?.pageEyebrow ? (
+                <Text className="app-shell__header-eyebrow">{activeRouteMeta.pageEyebrow}</Text>
+              ) : null}
+              <div className="app-shell__header-title">{activeRouteMeta?.pageTitle ?? activeRouteMeta?.label ?? '智能巡检系统'}</div>
               <Text className="app-shell__header-description">
-                {activeMenuItem?.description ?? '统一管理智能巡检任务、设备、模型与审计。'}
+                {activeRouteMeta?.description ?? '统一管理智能巡检任务、设备、模型与审计。'}
               </Text>
             </div>
           </div>
@@ -161,7 +169,12 @@ export function AppLayout() {
           </Space>
         </Header>
         <Content className="app-shell__content">
-          <div className="app-shell__content-inner">
+          <div
+            className="app-shell__content-inner"
+            data-testid={activeRouteMeta?.e2eId ?? 'page-shell'}
+            data-doc-slug={activeRouteMeta?.docSlug}
+            data-route-module={activeRouteMeta?.module}
+          >
             <Outlet />
           </div>
         </Content>

@@ -84,7 +84,7 @@ test('admin can login and access key V2 pages', async ({ page }) => {
   await navigateByMenu(page, '任务记录', /\/records$/, '任务记录');
   await navigateByMenu(page, '人工复核', /\/feedback$/, '人工复核');
   await navigateByMenu(page, '操作审计', /\/audit-logs$/, '操作审计日志');
-  await navigateByMenu(page, '模型与设置', /\/settings$/, '模型与系统设置');
+  await navigateByMenu(page, '模型与系统设置', /\/settings$/, '模型与系统设置');
   await navigateByMenu(page, '看板配置', /\/dashboards$/, '看板配置');
   await navigateByMenu(page, '用户与权限', /\/users$/, '用户与权限');
 });
@@ -109,7 +109,7 @@ test('analysis viewer can only access viewer pages and is blocked on restricted 
   await expect(page.getByRole('menuitem', { name: '任务中心' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '人工复核' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '操作审计' })).toHaveCount(0);
-  await expect(page.getByRole('menuitem', { name: '模型与设置' })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: '模型与系统设置' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '看板配置' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '用户与权限' })).toHaveCount(0);
 

@@ -9,7 +9,7 @@ from app.services.feedback_training_pipeline_service import run_feedback_trainin
 from app.services.bootstrap import seed_defaults
 from app.services.alert_delivery_service import run_due_alert_webhook_deliveries_once
 from app.services.camera_status_sweep_service import run_camera_status_sweep_once
-from app.services.schedule_dispatch_service import run_due_job_schedules_once
+from app.services.schedule_dispatch_service import run_due_job_schedules_once_report
 from app.services.signal_monitor_orchestrator import run_due_signal_monitors_once
 
 logger = logging.getLogger(__name__)
@@ -92,9 +92,27 @@ def main() -> None:
 
 
 def _run_due_schedules() -> None:
-    created_job_ids = run_due_job_schedules_once()
+    report = run_due_job_schedules_once_report()
+    if (
+        report["due_count"] > 0
+        or report["error_count"] > 0
+        or report["stale_failed_count"] > 0
+        or report["skipped_inflight_count"] > 0
+    ):
+        logger.info(
+            "schedule cycle mode=%s due=%s claimed=%s created=%s skipped_inflight=%s stale_recovered=%s precheck_skipped=%s errors=%s",
+            report["mode"],
+            report["due_count"],
+            report["claimed_count"],
+            report["created_count"],
+            report["skipped_inflight_count"],
+            report["stale_failed_count"],
+            report["precheck_skipped_count"],
+            report["error_count"],
+        )
+    created_job_ids = report["created_job_ids"]
     if created_job_ids:
-        logger.info("triggered %s scheduled job(s): %s", len(created_job_ids), ", ".join(created_job_ids))
+        logger.info("triggered scheduled job ids: %s", ", ".join(created_job_ids))
 
 
 def _run_camera_status_sweep() -> None:

@@ -51,7 +51,8 @@ function Harness({
 describe('useCameraUrlSync', () => {
   it('does not revert selection to the stale query when user changes selection', async () => {
     const onSelect = vi.fn();
-    const setSearchParams = vi.fn() as unknown as SetURLSearchParams;
+    const setSearchParamsMock = vi.fn();
+    const setSearchParams = setSearchParamsMock as unknown as SetURLSearchParams;
     render(<Harness onSelect={onSelect} search="?cameraId=camera-a" setSearchParams={setSearchParams} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'switch' }));
@@ -107,7 +108,8 @@ describe('useCameraUrlSync', () => {
 
   it('removes cameraId but preserves other query params in create mode', async () => {
     const onSelect = vi.fn();
-    const setSearchParams = vi.fn() as unknown as SetURLSearchParams;
+    const setSearchParamsMock = vi.fn();
+    const setSearchParams = setSearchParamsMock as unknown as SetURLSearchParams;
     render(
       <Harness
         onSelect={onSelect}
@@ -118,7 +120,7 @@ describe('useCameraUrlSync', () => {
 
     await waitFor(() => expect(setSearchParams).toHaveBeenCalled());
 
-    const [nextParams] = setSearchParams.mock.calls[0];
+    const [nextParams] = setSearchParamsMock.mock.calls[0];
     const searchValue = String(nextParams);
     expect(searchValue).toContain('tab=monitoring');
     expect(searchValue).toContain('debug=1');

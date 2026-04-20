@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listCameras, type Camera } from '@/shared/api/configCenter';
+import { listCameras, type Camera } from '@/shared/api/cameras';
 import { CREATE_CAMERA_ID } from '@/pages/cameras/cameraCenterConfig';
 import {
   buildCameraStatusMap,
@@ -25,6 +25,13 @@ type UseCameraCenterQueryStateParams = {
   alertOnly: boolean;
   statusLogsPage: number;
 };
+
+function normalizeStatusLogsPage(page: number) {
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+  return Math.max(1, Math.trunc(page));
+}
 
 function getQueryArrayData<T>(data: T[] | undefined) {
   return data ?? [];
@@ -63,6 +70,7 @@ export function useCameraCenterQueryState({
   statusLogsPage,
 }: UseCameraCenterQueryStateParams) {
   const statusLogsPageSize = CAMERA_CENTER_QUERY_CONFIG.statusLogsPageSize;
+  const normalizedStatusLogsPage = normalizeStatusLogsPage(statusLogsPage);
 
   const cameraQuery = useQuery({
     queryKey: CAMERA_QUERY_KEYS.cameras,
@@ -136,8 +144,8 @@ export function useCameraCenterQueryState({
   );
 
   const pagedStatusLogs = useMemo(
-    () => getPagedStatusLogs(selectedCameraStatusLogs, statusLogsPage, statusLogsPageSize),
-    [selectedCameraStatusLogs, statusLogsPage, statusLogsPageSize],
+    () => getPagedStatusLogs(selectedCameraStatusLogs, normalizedStatusLogsPage, statusLogsPageSize),
+    [selectedCameraStatusLogs, normalizedStatusLogsPage, statusLogsPageSize],
   );
 
   const selectedCameraMedia = getQueryArrayData(mediaQuery.data);

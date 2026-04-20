@@ -6,8 +6,8 @@ import {
   listCameraStatusLogs,
   listCameraStatuses,
   listCameraTriggerRules,
-  listStrategies,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
+import { listStrategies } from '@/shared/api/strategies';
 import { CAMERA_QUERY_KEYS } from '@/pages/cameras/cameraQueryKeys';
 import { CAMERA_CENTER_QUERY_CONFIG } from '@/pages/cameras/cameraCenterQueryConfig';
 

@@ -151,6 +151,16 @@ python3 - <<PY
 import json
 from pathlib import Path
 
+preflight_scheduler_cycle = None
+if "${preflight_summary_path}":
+    preflight_path = Path("${preflight_summary_path}")
+    if preflight_path.exists():
+        try:
+            preflight_data = json.loads(preflight_path.read_text(encoding="utf-8"))
+            preflight_scheduler_cycle = preflight_data.get("scheduler_cycle")
+        except Exception:
+            preflight_scheduler_cycle = None
+
 summary = {
     "run_id": "${run_id}",
     "git_sha": "${git_sha}",
@@ -187,6 +197,7 @@ summary = {
             "summary_path": "${uat_summary_path}" or None,
         },
     },
+    "preflight_scheduler_cycle": preflight_scheduler_cycle,
 }
 Path("${summary_json}").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -203,6 +214,17 @@ for stage_name in ("precheck_backend_unit", "precheck_frontend_unit", "integrati
     stage = summary["stages"][stage_name]
     lines.append(
         f"| {stage_name} | {stage['status']} | {stage.get('log_path') or '-'} | {stage.get('summary_path') or '-'} |"
+    )
+cycle = summary.get("preflight_scheduler_cycle")
+if isinstance(cycle, dict):
+    latest = cycle.get("latest") or {}
+    lines.extend(
+        [
+            "",
+            "- preflight scheduler cycle metrics:",
+            f"  - observed_count: {cycle.get('observed_count', 0)}",
+            f"  - latest: {latest if latest else '-'}",
+        ]
     )
 Path("${summary_md}").write_text("\\n".join(lines), encoding="utf-8")
 PY

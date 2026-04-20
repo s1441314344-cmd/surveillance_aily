@@ -112,7 +112,10 @@ export function AppRouter() {
               />
             }
           />
-          <Route path="records" element={<RecordsPage />} />
+          <Route
+            path="records"
+            element={<RoleRoute allowedRoles={routeRoles('/records')} element={<RecordsPage />} />}
+          />
           <Route
             path="feedback"
             element={

@@ -4,8 +4,8 @@ import {
   debugModelProvider,
   type ModelProviderDebugResult,
   updateModelProvider,
-} from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+} from '@/shared/api/modelProviders';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import { parseDebugSchema, type DebugFormValues, type ProviderFormValues } from '@/pages/settings/types';
 
 type UseSettingsMutationStateParams = {

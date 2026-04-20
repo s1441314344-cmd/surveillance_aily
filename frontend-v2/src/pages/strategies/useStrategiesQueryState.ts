@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listModelProviders, listStrategies } from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
+import { listModelProviders } from '@/shared/api/modelProviders';
+import { listStrategies } from '@/shared/api/strategies';
 import { CREATE_STRATEGY_ID } from '@/pages/strategies/types';
 
 type UseStrategiesQueryStateParams = {

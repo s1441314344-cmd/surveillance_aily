@@ -1,6 +1,4 @@
 import { Button, Drawer, Image, Space, Typography } from 'antd';
-import { useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   DetailPanel,
   FEEDBACK_STATUS_LABELS,
@@ -12,73 +10,52 @@ import {
   UNKNOWN_LABELS,
 } from '@/shared/ui';
 import type { JobDetailViewModel } from '@/pages/jobs/jobDetailMapper';
-import { fetchTaskRecordImage, listTaskRecords, type TaskRecord } from '@/shared/api/tasks';
+import { formatDateTime } from '@/pages/jobs/jobsTableFormatters';
+import { useJobDetailDrawerState } from '@/pages/jobs/useJobDetailDrawerState';
 
 const { Paragraph, Text } = Typography;
 
-function formatDateTime(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : '-';
-}
-
-export type JobDetailDrawerProps = {
+type JobDetailDrawerModalProps = {
   open: boolean;
+};
+
+type JobDetailDrawerDataProps = {
   job?: JobDetailViewModel | null;
+};
+
+type JobDetailDrawerHandlersProps = {
   onClose: () => void;
 };
 
-export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
-  const recordsQuery = useQuery({
-    queryKey: ['jobs', 'detail', job?.id, 'task-records'],
-    queryFn: async () => listTaskRecords({ jobId: job?.id }),
-    enabled: Boolean(open && job?.id),
+export type JobDetailDrawerProps = {
+  modal: JobDetailDrawerModalProps;
+  data: JobDetailDrawerDataProps;
+  handlers: JobDetailDrawerHandlersProps;
+};
+
+export function JobDetailDrawer({ modal, data, handlers }: JobDetailDrawerProps) {
+  const drawer = useJobDetailDrawerState({
+    open: modal.open,
+    job: data.job,
   });
 
-  const latestRecord = useMemo<TaskRecord | null>(() => {
-    const records = recordsQuery.data;
-    if (!records || records.length === 0) {
-      return null;
+  const job = data.job;
+  const handleOpenRecordImage = () => {
+    if (!drawer.recordImageUrl) {
+      return;
     }
-    return [...records].sort((a, b) => {
-      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return bTime - aTime;
-    })[0] ?? null;
-  }, [recordsQuery.data]);
-
-  const recordImageQuery = useQuery({
-    queryKey: ['jobs', 'detail', job?.id, 'task-record-image', latestRecord?.id],
-    queryFn: async () => {
-      if (!latestRecord?.id) {
-        return null;
-      }
-      return fetchTaskRecordImage(latestRecord.id);
-    },
-    enabled: Boolean(open && latestRecord?.id),
-  });
-
-  const recordImageUrl = useMemo(() => {
-    if (!recordImageQuery.data) {
-      return null;
-    }
-    return URL.createObjectURL(recordImageQuery.data);
-  }, [recordImageQuery.data]);
-
-  useEffect(() => {
-    return () => {
-      if (recordImageUrl) {
-        URL.revokeObjectURL(recordImageUrl);
-      }
-    };
-  }, [recordImageUrl]);
-
-  const resultStatusValue = job?.result_status ?? latestRecord?.result_status;
-  const feedbackStatusValue = job?.feedback_status ?? latestRecord?.feedback_status;
-  const normalizedJsonValue = job?.normalized_json ?? latestRecord?.normalized_json ?? null;
-  const rawResponseValue = job?.raw_model_response ?? latestRecord?.raw_model_response ?? '';
+    window.open(drawer.recordImageUrl, '_blank', 'noopener,noreferrer');
+  };
 
   if (!job) {
     return (
-      <Drawer open={open} title="任务详情" placement="right" size="large" onClose={onClose}>
+      <Drawer
+        open={modal.open}
+        title="任务详情"
+        placement="right"
+        size="large"
+        onClose={handlers.onClose}
+      >
         <Paragraph>请选择一条任务以查看详情。</Paragraph>
       </Drawer>
     );
@@ -86,11 +63,11 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
 
   return (
     <Drawer
-      open={open}
+      open={modal.open}
       title={`任务详情 · ${job.id}`}
       placement="right"
       size="large"
-      onClose={onClose}
+      onClose={handlers.onClose}
       destroyOnHidden
     >
       <Space orientation="vertical" size={16} className="stack-full">
@@ -136,52 +113,53 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
 
         <DetailPanel title="结果概览">
           <Space orientation="vertical" size={4} className="stack-full">
-            <Text>关联记录：{recordsQuery.isLoading ? '加载中...' : `${recordsQuery.data?.length ?? 0} 条`}</Text>
+            <Text>
+              关联记录：
+              {drawer.recordsQuery.isLoading ? '加载中...' : `${drawer.recordsQuery.data?.length ?? 0} 条`}
+            </Text>
             <Space size={8} wrap>
               <Text>结果：</Text>
-              {resultStatusValue ? (
+              {drawer.resultStatusValue ? (
                 <StatusBadge
                   namespace="result"
-                  value={resultStatusValue}
-                  label={RESULT_STATUS_LABELS[resultStatusValue] ?? UNKNOWN_LABELS.generic}
+                  value={drawer.resultStatusValue}
+                  label={RESULT_STATUS_LABELS[drawer.resultStatusValue] ?? UNKNOWN_LABELS.generic}
                 />
               ) : <Text>-</Text>}
             </Space>
             <Space size={8} wrap>
               <Text>反馈：</Text>
-              {feedbackStatusValue ? (
+              {drawer.feedbackStatusValue ? (
                 <StatusBadge
                   namespace="feedback"
-                  value={feedbackStatusValue}
-                  label={FEEDBACK_STATUS_LABELS[feedbackStatusValue] ?? UNKNOWN_LABELS.generic}
+                  value={drawer.feedbackStatusValue}
+                  label={FEEDBACK_STATUS_LABELS[drawer.feedbackStatusValue] ?? UNKNOWN_LABELS.generic}
                 />
               ) : <Text>-</Text>}
             </Space>
-            {latestRecord ? (
+            {drawer.latestRecord ? (
               <Text type="secondary">
-                最近记录：{latestRecord.input_filename} · {formatDateTime(latestRecord.created_at)}
+                最近记录：{drawer.latestRecord.input_filename} · {formatDateTime(drawer.latestRecord.created_at)}
               </Text>
             ) : null}
           </Space>
         </DetailPanel>
 
         <DetailPanel title="图片预览">
-          {!latestRecord ? (
+          {!drawer.latestRecord ? (
             <Text type="secondary">暂无关联记录图片</Text>
-          ) : recordImageQuery.isLoading ? (
+          ) : drawer.recordImageQuery.isLoading ? (
             <Text type="secondary">图片加载中...</Text>
-          ) : recordImageUrl ? (
+          ) : drawer.recordImageUrl ? (
             <Space orientation="vertical" size={8} className="stack-full">
               <Image
-                src={recordImageUrl}
-                alt={latestRecord.input_filename}
+                src={drawer.recordImageUrl}
+                alt={drawer.latestRecord.input_filename}
                 className="local-detector-preview__image"
               />
               <Button
                 size="small"
-                onClick={() => {
-                  window.open(recordImageUrl, '_blank', 'noopener,noreferrer');
-                }}
+                onClick={handleOpenRecordImage}
               >
                 新窗口查看原图
               </Button>
@@ -193,13 +171,16 @@ export function JobDetailDrawer({ open, job, onClose }: JobDetailDrawerProps) {
 
         <DetailPanel title="结构化 JSON">
           <pre className="page-code-block">
-            {normalizedJsonValue ? JSON.stringify(normalizedJsonValue, null, 2) : '暂无结构化结果'}
+            {drawer.normalizedJsonValue ? JSON.stringify(drawer.normalizedJsonValue, null, 2) : '暂无结构化结果'}
           </pre>
         </DetailPanel>
 
         <DetailPanel title="原始模型响应">
-          <Paragraph className="page-code-block" copyable={rawResponseValue ? { text: rawResponseValue } : false}>
-            {rawResponseValue || '暂无原始响应'}
+          <Paragraph
+            className="page-code-block"
+            copyable={drawer.rawResponseValue ? { text: drawer.rawResponseValue } : false}
+          >
+            {drawer.rawResponseValue || '暂无原始响应'}
           </Paragraph>
         </DetailPanel>
       </Space>

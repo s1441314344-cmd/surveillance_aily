@@ -7,8 +7,8 @@ import {
   resolveAlert,
   updateAlertNotificationRoute,
   updateAlertWebhook,
-} from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+} from '@/shared/api/alerts';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 import type {
   NotificationRouteFormValues,
   WebhookFormValues,

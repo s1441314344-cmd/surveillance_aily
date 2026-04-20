@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Button, Space, Switch, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { AlertNotificationRoute } from '@/shared/api/configCenter';
+import type { AlertNotificationRoute } from '@/shared/api/alerts';
 import {
   ALERT_SEVERITY_LABELS,
   GENERIC_STATE_LABELS,

@@ -198,6 +198,11 @@ from pathlib import Path
 checklist_path = Path("${checklist_json}")
 checklist = json.loads(checklist_path.read_text(encoding="utf-8"))
 ready = bool(checklist.get("ready_to_release"))
+release_drill_payload = {}
+if "${RELEASE_DRILL_REPORT_PATH}":
+    drill_path = Path("${RELEASE_DRILL_REPORT_PATH}")
+    if drill_path.exists():
+        release_drill_payload = json.loads(drill_path.read_text(encoding="utf-8"))
 summary = {
     "run_id": "${run_id}",
     "git_sha": "${git_sha}",
@@ -228,6 +233,7 @@ summary = {
     },
     "uat_summary_path": "${UAT_SUMMARY_PATH}",
     "release_drill_report_path": "${RELEASE_DRILL_REPORT_PATH}" or None,
+    "release_drill_scheduler_cycle": release_drill_payload.get("preflight_scheduler_cycle"),
     "checklist_path": str(checklist_path),
     "blockers": checklist.get("blockers", []),
     "notes": checklist.get("notes", []),

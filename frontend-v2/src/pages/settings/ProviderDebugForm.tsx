@@ -1,7 +1,7 @@
 import { Alert, Button, Col, Form, Input, Row, Select, Switch } from 'antd';
 import type { FormInstance } from 'antd/es/form';
 import { FilterToolbar, RESULT_FORMAT_DEBUG_OPTIONS } from '@/shared/ui';
-import type { ModelProvider } from '@/shared/api/configCenter';
+import type { ModelProvider } from '@/shared/api/modelProviders';
 import type { DebugFormValues } from '@/pages/settings/types';
 
 type ProviderDebugFormProps = {

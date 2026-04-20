@@ -233,9 +233,16 @@ python3 -m app.schedulers.runner
 
 ```bash
 cd frontend-v2
+cp .env.example .env.local
 npm install
 npm run dev
 ```
+
+- `frontend-v2/.env.example` 已提供推荐本地值：
+  - `VITE_API_BASE_URL=http://localhost:8000`
+  - `VITE_LOCAL_DETECTOR_BASE_URL=http://localhost:8091`
+- 前端开发态未显式配置这两个变量时，代码仍会分别回落到 `http://localhost:8000` 和 `http://localhost:8091`
+- 前端生产构建必须显式注入这两个 `VITE_*` 变量，缺失时会在初始化阶段直接报错
 
 ## 模块运行要点
 
@@ -279,6 +286,7 @@ npm run dev
 - 登录、会话状态与路由守卫
 - 401 自动刷新 access token
 - 基于角色的菜单过滤与页面级 RBAC 访问控制
+- `shared/api` 顶层领域入口、`config-center/*` 内部子域和内部 helper 已分层收口；页层不再直接依赖 `@/shared/api/client`、`@/shared/api/baseUrl`，`getApiErrorMessage` 也已迁到 `@/shared/utils/apiErrorMessage`
 - 摄像头中心状态聚合与异常高亮
 - 任务中心、任务记录、人工反馈、看板分析、审计日志页面
 
@@ -290,4 +298,5 @@ npm run dev
 - 已补充：模型样本评估脚本、示例样本清单、价格表和指标汇总输出
 - 已补充：RTSP 深度诊断 CLI / API、评估 Markdown 报告导出、迁移决策策略输出
 - 已补充：摄像头白名单批量验证 CLI / Markdown 报告
+- 已补充：前端 phase2 治理边界，`tasks / configCenter` retired barrel、`config-center/*` 内部子域、`shared/api/client`、`shared/api/baseUrl` 和已迁出的 `shared/api/errors` 都已进入 lint + AST 双重门禁
 - 下一步建议：进入“联调与验证”小周期，优先完成真实摄像头白名单验证、真实业务样本报告沉淀和系统级回归

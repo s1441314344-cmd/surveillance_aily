@@ -1,5 +1,5 @@
 import { Alert, Button, Empty, InputNumber, Space } from 'antd';
-import type { CameraMedia } from '@/shared/api/configCenter';
+import type { CameraMedia } from '@/shared/api/cameras';
 
 type MediaControlToolbarProps = {
   hasCameraSelected: boolean;

@@ -11,6 +11,7 @@ Smart Inspection V2 local commands:
   make v2-scheduler    # run scheduler process
   make v2-frontend     # run frontend dev server
   make v2-backend-test # run backend pytest suite
+  make v2-backend-integration-test # run backend Postgres/Redis/Celery integration suite
   make v2-frontend-test # run frontend vitest suite
   make v2-verify       # run precheck + integration preflight + final UAT in sequence
   make v2-dev          # deps-up + startup hint
@@ -44,6 +45,7 @@ Recommended flow:
 
 Verification examples:
   make v2-backend-test
+  make v2-backend-integration-test
   make v2-frontend-test
   make v2-security
   make v2-reconcile

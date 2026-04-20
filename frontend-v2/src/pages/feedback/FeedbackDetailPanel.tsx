@@ -5,7 +5,7 @@ import {
   SOURCE_TYPE_LABELS,
   UNKNOWN_LABELS,
 } from '@/shared/ui';
-import { type TaskRecord } from '@/shared/api/tasks';
+import { type TaskRecord } from '@/shared/api/records';
 import { RecordDetailCard } from '@/pages/insights/RecordDetailCard';
 
 type FeedbackDetailPanelProps = {

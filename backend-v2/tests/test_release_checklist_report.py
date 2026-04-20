@@ -32,12 +32,26 @@ def test_release_checklist_ready_when_uat_and_drill_passed():
             "preflight_result": "passed",
             "blocking_issues": [],
             "risks": ["dry-run only"],
+            "preflight_scheduler_cycle": {
+                "observed_count": 1,
+                "latest": {
+                    "mode": "locked",
+                    "due": 1,
+                    "claimed": 1,
+                    "created": 1,
+                    "skipped_inflight": 0,
+                    "stale_recovered": 0,
+                    "precheck_skipped": 0,
+                    "errors": 0,
+                },
+            },
         },
     )
 
     assert checklist.ready_to_release is True
     assert checklist.blockers == []
     assert checklist.release_drill_gate == "passed"
+    assert checklist.release_drill_scheduler_cycle is not None
     assert any("dry-run only" in item for item in checklist.notes)
 
 
@@ -162,3 +176,51 @@ def test_release_checklist_markdown_contains_new_gate_checks():
     markdown = render_release_checklist_markdown(checklist)
     assert "| security | passed |" in markdown
     assert "| reconcile | passed |" in markdown
+
+
+def test_release_checklist_blocks_when_scheduler_cycle_errors_exist_in_release_drill():
+    checklist = build_release_checklist(
+        uat_summary_path="/tmp/uat-summary.json",
+        uat_summary={
+            "result": "passed",
+            "checks": _uat_checks_with_gate_extensions(),
+        },
+        release_drill_report_path="/tmp/release-drill-report.json",
+        release_drill_report={
+            "gate_status": "passed",
+            "preflight_result": "passed",
+            "blocking_issues": [],
+            "risks": [],
+            "preflight_scheduler_cycle": {
+                "observed_count": 2,
+                "latest": {"errors": 1},
+            },
+        },
+    )
+
+    assert checklist.ready_to_release is False
+    assert any("scheduler cycle errors=1" in item for item in checklist.blockers)
+
+
+def test_release_checklist_marks_stale_recovery_as_note():
+    checklist = build_release_checklist(
+        uat_summary_path="/tmp/uat-summary.json",
+        uat_summary={
+            "result": "passed",
+            "checks": _uat_checks_with_gate_extensions(),
+        },
+        release_drill_report_path="/tmp/release-drill-report.json",
+        release_drill_report={
+            "gate_status": "passed",
+            "preflight_result": "passed",
+            "blocking_issues": [],
+            "risks": [],
+            "preflight_scheduler_cycle": {
+                "observed_count": 2,
+                "latest": {"errors": 0, "stale_recovered": 1},
+            },
+        },
+    )
+
+    assert checklist.ready_to_release is True
+    assert any("stale in-flight jobs 1 time(s)" in item for item in checklist.notes)

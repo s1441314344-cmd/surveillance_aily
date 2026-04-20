@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -30,6 +32,40 @@ class HTTPRetryPolicy:
                 if retry_after_seconds is not None and retry_after_seconds > 0:
                     return min(retry_after_seconds, self.max_retry_after_seconds)
         return min(2 ** (attempt - 1), self.max_backoff_seconds)
+
+
+def post_json_with_retry(
+    *,
+    endpoint: str,
+    headers: dict,
+    payload: dict,
+    timeout_seconds: int,
+    retry_policy: HTTPRetryPolicy,
+    client_factory: Callable[..., object] = httpx.Client,
+    sleep_func: Callable[[float], None] = time.sleep,
+) -> dict:
+    last_exc: httpx.HTTPError | None = None
+
+    with client_factory(timeout=timeout_seconds) as client:
+        for attempt in range(1, retry_policy.max_attempts + 1):
+            try:
+                response = client.post(endpoint, headers=headers, json=payload)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as exc:
+                if not retry_policy.should_retry(exc, attempt=attempt):
+                    raise
+                last_exc = exc
+                sleep_func(retry_policy.delay_seconds(exc, attempt=attempt))
+            except httpx.HTTPError as exc:
+                if not retry_policy.should_retry(exc, attempt=attempt):
+                    raise
+                last_exc = exc
+                sleep_func(retry_policy.delay_seconds(exc, attempt=attempt))
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Provider request failed without an exception")
 
 
 def parse_retry_after_seconds(retry_after: str, *, now: datetime | None = None) -> float | None:

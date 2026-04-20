@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { FormInstance } from 'antd';
-import type { CameraTriggerRule, CameraTriggerRuleDebugResult, DebugLiveResult, SignalMonitorConfig } from '@/shared/api/configCenter';
+import type { CameraTriggerRule, CameraTriggerRuleDebugResult, DebugLiveResult, SignalMonitorConfig } from '@/shared/api/cameras';
 import {
   DEFAULT_MONITOR_CONFIG_VALUES,
   DEFAULT_TRIGGER_RULE_VALUES,

@@ -195,6 +195,14 @@ python3 - <<PY
 import json
 from pathlib import Path
 
+release_drill_scheduler_cycle = None
+if "${release_drill_report}" and Path("${release_drill_report}").exists():
+    try:
+        release_drill_payload = json.loads(Path("${release_drill_report}").read_text(encoding="utf-8"))
+        release_drill_scheduler_cycle = release_drill_payload.get("preflight_scheduler_cycle")
+    except Exception:
+        release_drill_scheduler_cycle = None
+
 summary = {
     "run_id": "${run_id}",
     "git_sha": "${git_sha}",
@@ -225,6 +233,7 @@ summary = {
             "report_path": "${release_drill_report}" or None,
         },
     },
+    "release_drill_scheduler_cycle": release_drill_scheduler_cycle,
 }
 Path("${summary_json}").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 

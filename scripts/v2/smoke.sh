@@ -17,7 +17,7 @@ import time
 import uuid
 import urllib.request
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 api_base = "${API_BASE_URL}".rstrip("/")
 max_schedule_wait = int("${SMOKE_SCHEDULE_WAIT_SECONDS}")
@@ -306,7 +306,17 @@ def main():
         )
         schedule_id = schedule["id"]
         schedule_ids.append(schedule_id)
-        print(f"[v2-smoke] schedule created: {schedule_id}, waiting for trigger")
+
+        forced_due_at = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        schedule = get_json(
+            "PATCH",
+            f"/api/job-schedules/{schedule_id}",
+            token=token,
+            json_body={"next_run_at": forced_due_at},
+        )
+        print(
+            f"[v2-smoke] schedule created: {schedule_id}, forced next_run_at={schedule['next_run_at']}, waiting for trigger"
+        )
 
         scheduled_job = None
         schedule_state = None

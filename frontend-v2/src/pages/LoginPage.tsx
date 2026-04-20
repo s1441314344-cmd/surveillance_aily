@@ -1,46 +1,17 @@
-import { useMutation } from '@tanstack/react-query';
-import { Alert, App, Button, Card, Form, Input, Space, Typography } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import { login } from '@/shared/api/auth';
-import { getApiErrorMessage } from '@/shared/api/errors';
-import { toStoreSessionPayload } from '@/shared/auth/session';
-import { useAuthStore } from '@/shared/state/authStore';
-import { PageHeader } from '@/shared/ui';
+import { Alert, Button, Card, Form, Input, Space, Typography } from 'antd';
+import { useLoginPageController } from '@/pages/login/useLoginPageController';
+import { RoutePageHeader } from '@/shared/ui';
 
 const { Paragraph } = Typography;
 
 export function LoginPage() {
-  const { message } = App.useApp();
-  const navigate = useNavigate();
-  const setSession = useAuthStore((state) => state.setSession);
-  const [form] = Form.useForm<{ username: string; password: string }>();
-
-  const loginMutation = useMutation({
-    mutationFn: login,
-    onSuccess: (response) => {
-      setSession(toStoreSessionPayload(response));
-      message.success('登录成功');
-      navigate('/dashboard');
-    },
-  });
-
-  const handleFinish = async (values: { username: string; password: string }) => {
-    try {
-      await loginMutation.mutateAsync(values);
-    } catch (error) {
-      message.error(getApiErrorMessage(error, '登录失败'));
-    }
-  };
+  const { form, loginMutation, handleFinish } = useLoginPageController();
 
   return (
     <div className="login-shell">
       <Card className="login-card">
         <Space orientation="vertical" size={20} className="login-card__stack">
-          <PageHeader
-            eyebrow="统一入口"
-            title="智能巡检系统 V2"
-            description="统一管理巡检任务、摄像头、模型配置与告警分析。默认开发账号可直接进入配置中心联调。"
-          />
+          <RoutePageHeader description="统一管理巡检任务、摄像头、模型配置与告警分析。默认开发账号可直接进入配置中心联调。" />
           <Alert
             type="info"
             showIcon

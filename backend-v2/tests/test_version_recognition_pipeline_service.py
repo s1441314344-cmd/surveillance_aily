@@ -1,3 +1,4 @@
+import ast
 import json
 from io import BytesIO
 from pathlib import Path
@@ -96,15 +97,15 @@ def test_version_recognition_pipeline_roi_fallback_contract(monkeypatch, tmp_pat
         extract_calls: list[dict] = []
 
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.recognize_with_ocr_service",
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
             lambda *, image_bytes, filename, template: _fake_ocr_result(filename),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.crop_image_for_template",
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
             lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("center roi unavailable")),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.crop_image_by_roi",
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
             lambda **_kwargs: b"fallback-roi",
         )
 
@@ -117,7 +118,7 @@ def test_version_recognition_pipeline_roi_fallback_contract(monkeypatch, tmp_pat
             }
 
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.extract_version_recognition_result",
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
             fake_extract,
         )
 
@@ -135,39 +136,212 @@ def test_version_recognition_pipeline_roi_fallback_contract(monkeypatch, tmp_pat
 
         assert finished and finished[-1][0] == "completed"
         assert extract_calls and extract_calls[0]["roi_applied"] is True
-        assert "full" in scopes
+        assert "full" not in scopes
         assert any(scope.startswith("roi_") for scope in scopes)
         assert record.normalized_json["extraction_status"] == "matched"
+
+
+def test_version_recognition_pipeline_skips_full_ocr_when_roi_match_is_stable(monkeypatch, tmp_path):
+    with SessionLocal() as db:
+        job = _seed_version_recognition_job(db, tmp_path)
+        finished, finish_job, create_failed_upload_record = _success_callbacks()
+
+        def fake_recognize(*, image_bytes, filename, template):
+            if filename == "version-upload.png":
+                raise AssertionError("full OCR should be skipped after ROI match")
+            return _fake_ocr_result(filename)
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
+            fake_recognize,
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
+            lambda **_kwargs: b"center-roi",
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
+            lambda **_kwargs: b"fallback-roi",
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
+            lambda **_kwargs: {
+                "extraction_status": "matched",
+                "recognized_version": "BQ-ROI-1-0",
+                "summary": "已识别版本号：BQ-ROI-1-0",
+            },
+        )
+
+        process_version_recognition_job(
+            db,
+            job,
+            job_cancelled=lambda _db, _job_id: False,
+            finish_job=finish_job,
+            create_failed_upload_record=create_failed_upload_record,
+        )
+
+        record = db.query(TaskRecord).filter(TaskRecord.job_id == job.id).one()
+        attempts = json.loads(record.raw_model_response)["attempts"]
+        scopes = [item["scope"] for item in attempts]
+
+        assert finished and finished[-1][0] == "completed"
+        assert "full" not in scopes
+        assert scopes[0] == "roi_center"
+        assert record.normalized_json["recognized_version"] == "BQ-ROI-1-0"
+
+
+def test_version_recognition_pipeline_skips_fallback_rois_when_center_roi_match_is_stable(
+    monkeypatch,
+    tmp_path,
+):
+    with SessionLocal() as db:
+        job = _seed_version_recognition_job(db, tmp_path)
+        finished, finish_job, create_failed_upload_record = _success_callbacks()
+        fallback_roi_calls = {"count": 0}
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
+            lambda *, image_bytes, filename, template: _fake_ocr_result(filename),
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
+            lambda **_kwargs: b"center-roi",
+        )
+
+        def fake_crop_fallback_roi(**_kwargs):
+            fallback_roi_calls["count"] += 1
+            return b"fallback-roi"
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
+            fake_crop_fallback_roi,
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
+            lambda **_kwargs: {
+                "extraction_status": "matched",
+                "recognized_version": "BQ-ROI-ONLY-1-0",
+                "summary": "已识别版本号：BQ-ROI-ONLY-1-0",
+            },
+        )
+
+        process_version_recognition_job(
+            db,
+            job,
+            job_cancelled=lambda _db, _job_id: False,
+            finish_job=finish_job,
+            create_failed_upload_record=create_failed_upload_record,
+        )
+
+        record = db.query(TaskRecord).filter(TaskRecord.job_id == job.id).one()
+        attempts = json.loads(record.raw_model_response)["attempts"]
+        scopes = [item["scope"] for item in attempts]
+
+        assert finished and finished[-1][0] == "completed"
+        assert fallback_roi_calls["count"] == 0
+        assert scopes == ["roi_center"]
+        assert record.normalized_json["recognized_version"] == "BQ-ROI-ONLY-1-0"
+
+
+def test_version_recognition_pipeline_stops_after_first_stable_fallback_roi(
+    monkeypatch,
+    tmp_path,
+):
+    with SessionLocal() as db:
+        job = _seed_version_recognition_job(db, tmp_path)
+        finished, finish_job, create_failed_upload_record = _success_callbacks()
+        fallback_roi_calls: list[str] = []
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
+            lambda *, image_bytes, filename, template: _fake_ocr_result(filename),
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
+            lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("center roi unavailable")),
+        )
+
+        def fake_crop_fallback_roi(*, image_bytes, roi):
+            fallback_roi_calls.append(f"{roi['x']:.2f},{roi['y']:.2f}")
+            return b"fallback-roi"
+
+        extract_calls = {"count": 0}
+
+        def fake_extract(**_kwargs):
+            extract_calls["count"] += 1
+            return {
+                "extraction_status": "matched",
+                "recognized_version": "BQ-FIRST-FALLBACK-1-0",
+                "summary": "已识别版本号：BQ-FIRST-FALLBACK-1-0",
+            }
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
+            fake_crop_fallback_roi,
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
+            fake_extract,
+        )
+
+        process_version_recognition_job(
+            db,
+            job,
+            job_cancelled=lambda _db, _job_id: False,
+            finish_job=finish_job,
+            create_failed_upload_record=create_failed_upload_record,
+        )
+
+        record = db.query(TaskRecord).filter(TaskRecord.job_id == job.id).one()
+        attempts = json.loads(record.raw_model_response)["attempts"]
+        scopes = [item["scope"] for item in attempts]
+
+        assert finished and finished[-1][0] == "completed"
+        assert extract_calls["count"] == 1
+        assert len(fallback_roi_calls) == 1
+        assert scopes == ["roi_right_bottom"]
+        assert record.normalized_json["recognized_version"] == "BQ-FIRST-FALLBACK-1-0"
 
 
 def test_version_recognition_pipeline_rotation_fallback_contract(monkeypatch, tmp_path):
     with SessionLocal() as db:
         job = _seed_version_recognition_job(db, tmp_path)
         finished, finish_job, create_failed_upload_record = _success_callbacks()
-        results = [
-            {"extraction_status": "not_found", "recognized_version": None, "summary": "未识别到版本号"},
-            {"extraction_status": "matched", "recognized_version": "BQ-9-9-9", "summary": "已识别版本号：BQ-9-9-9"},
-        ]
 
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.recognize_with_ocr_service",
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
             lambda *, image_bytes, filename, template: _fake_ocr_result(filename),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.crop_image_for_template",
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
             lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip center roi")),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.crop_image_by_roi",
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
             lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip fallback roi")),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.rotate_image_bytes",
+            "app.services.version_recognition_attempt_service.rotate_image_bytes",
             lambda *, image_bytes, angle: f"rot-{angle}".encode("utf-8"),
         )
+
+        def fake_extract(*, lines, template, roi_applied, context_hint):
+            texts = {str(item.get("text")) for item in lines}
+            if "rot270-version-upload.png" in texts:
+                return {
+                    "extraction_status": "matched",
+                    "recognized_version": "BQ-9-9-9",
+                    "summary": "已识别版本号：BQ-9-9-9",
+                }
+            return {
+                "extraction_status": "not_found",
+                "recognized_version": None,
+                "summary": "未识别到版本号",
+            }
+
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.extract_version_recognition_result",
-            lambda **_kwargs: results.pop(0),
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
+            fake_extract,
         )
 
         process_version_recognition_job(
@@ -188,39 +362,113 @@ def test_version_recognition_pipeline_rotation_fallback_contract(monkeypatch, tm
         assert "通过旋转回退命中" in str(record.normalized_json.get("summary"))
 
 
+def test_version_recognition_pipeline_stops_after_first_stable_rotation_match(monkeypatch, tmp_path):
+    with SessionLocal() as db:
+        job = _seed_version_recognition_job(db, tmp_path)
+        finished, finish_job, create_failed_upload_record = _success_callbacks()
+        rotate_calls: list[int] = []
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
+            lambda *, image_bytes, filename, template: _fake_ocr_result(filename),
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
+            lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip center roi")),
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
+            lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip fallback roi")),
+        )
+
+        def fake_rotate(*, image_bytes, angle):
+            rotate_calls.append(angle)
+            return f"rot-{angle}".encode("utf-8")
+
+        def fake_extract(*, lines, template, roi_applied, context_hint):
+            texts = {str(item.get("text")) for item in lines}
+            if "rot90-version-upload.png" in texts:
+                return {
+                    "extraction_status": "matched",
+                    "recognized_version": "BQ-ROT-90-1-0",
+                    "summary": "已识别版本号：BQ-ROT-90-1-0",
+                }
+            return {
+                "extraction_status": "not_found",
+                "recognized_version": None,
+                "summary": "未识别到版本号",
+            }
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.rotate_image_bytes",
+            fake_rotate,
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
+            fake_extract,
+        )
+
+        process_version_recognition_job(
+            db,
+            job,
+            job_cancelled=lambda _db, _job_id: False,
+            finish_job=finish_job,
+            create_failed_upload_record=create_failed_upload_record,
+        )
+
+        record = db.query(TaskRecord).filter(TaskRecord.job_id == job.id).one()
+        attempts = json.loads(record.raw_model_response)["attempts"]
+        scopes = [item["scope"] for item in attempts]
+
+        assert finished and finished[-1][0] == "completed"
+        assert rotate_calls == [90]
+        assert scopes == ["full", "full_rotated_90"]
+        assert "通过旋转回退命中" in str(record.normalized_json.get("summary"))
+
+
 def test_version_recognition_pipeline_upscale_fallback_contract(monkeypatch, tmp_path):
     with SessionLocal() as db:
         job = _seed_version_recognition_job(db, tmp_path)
         finished, finish_job, create_failed_upload_record = _success_callbacks()
-        results = [
-            {"extraction_status": "not_found", "recognized_version": None, "summary": "未识别到版本号"},
-            {"extraction_status": "not_found", "recognized_version": None, "summary": "未识别到版本号"},
-            {"extraction_status": "matched", "recognized_version": "BQ-7-7-7", "summary": "已识别版本号：BQ-7-7-7"},
-        ]
 
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.recognize_with_ocr_service",
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
             lambda *, image_bytes, filename, template: _fake_ocr_result(filename),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.crop_image_for_template",
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
             lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip center roi")),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.crop_image_by_roi",
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
             lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip fallback roi")),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.rotate_image_bytes",
+            "app.services.version_recognition_attempt_service.rotate_image_bytes",
             lambda *, image_bytes, angle: f"rot-{angle}".encode("utf-8"),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service._upscale_image_bytes",
+            "app.services.version_recognition_attempt_service._upscale_image_bytes",
             lambda *, image_bytes, scale, max_side: b"upscaled-x2",
         )
+
+        def fake_extract(*, lines, template, roi_applied, context_hint):
+            texts = {str(item.get("text")) for item in lines}
+            if "upscaled-rot270-version-upload.png" in texts:
+                return {
+                    "extraction_status": "matched",
+                    "recognized_version": "BQ-7-7-7",
+                    "summary": "已识别版本号：BQ-7-7-7",
+                }
+            return {
+                "extraction_status": "not_found",
+                "recognized_version": None,
+                "summary": "未识别到版本号",
+            }
+
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.extract_version_recognition_result",
-            lambda **_kwargs: results.pop(0),
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
+            fake_extract,
         )
 
         process_version_recognition_job(
@@ -242,39 +490,116 @@ def test_version_recognition_pipeline_upscale_fallback_contract(monkeypatch, tmp
         assert "通过放大/旋转回退命中" in str(record.normalized_json.get("summary"))
 
 
+def test_version_recognition_pipeline_stops_after_first_stable_upscaled_rotation_match(
+    monkeypatch,
+    tmp_path,
+):
+    with SessionLocal() as db:
+        job = _seed_version_recognition_job(db, tmp_path)
+        finished, finish_job, create_failed_upload_record = _success_callbacks()
+        rotate_calls: list[str] = []
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
+            lambda *, image_bytes, filename, template: _fake_ocr_result(filename),
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
+            lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip center roi")),
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
+            lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip fallback roi")),
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service._upscale_image_bytes",
+            lambda *, image_bytes, scale, max_side: b"upscaled-x2",
+        )
+
+        def fake_rotate(*, image_bytes, angle):
+            source = "upscaled" if image_bytes == b"upscaled-x2" else "original"
+            rotate_calls.append(f"{source}:{angle}")
+            return f"{source}-rot-{angle}".encode("utf-8")
+
+        def fake_extract(*, lines, template, roi_applied, context_hint):
+            texts = {str(item.get("text")) for item in lines}
+            if "upscaled-rot90-version-upload.png" in texts:
+                return {
+                    "extraction_status": "matched",
+                    "recognized_version": "BQ-UPSCALED-ROT-90-1-0",
+                    "summary": "已识别版本号：BQ-UPSCALED-ROT-90-1-0",
+                }
+            return {
+                "extraction_status": "not_found",
+                "recognized_version": None,
+                "summary": "未识别到版本号",
+            }
+
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.rotate_image_bytes",
+            fake_rotate,
+        )
+        monkeypatch.setattr(
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
+            fake_extract,
+        )
+
+        process_version_recognition_job(
+            db,
+            job,
+            job_cancelled=lambda _db, _job_id: False,
+            finish_job=finish_job,
+            create_failed_upload_record=create_failed_upload_record,
+        )
+
+        record = db.query(TaskRecord).filter(TaskRecord.job_id == job.id).one()
+        attempts = json.loads(record.raw_model_response)["attempts"]
+        scopes = [item["scope"] for item in attempts]
+
+        assert finished and finished[-1][0] == "completed"
+        assert rotate_calls == ["original:90", "original:270", "upscaled:90"]
+        assert scopes == [
+            "full",
+            "full_rotated_90",
+            "full_rotated_270",
+            "full_upscaled_x2",
+            "full_upscaled_x2_rotated_90",
+        ]
+        assert "通过放大/旋转回退命中" in str(record.normalized_json.get("summary"))
+
+
 def test_version_recognition_pipeline_not_found_degradation_contract(monkeypatch, tmp_path):
     with SessionLocal() as db:
         job = _seed_version_recognition_job(db, tmp_path)
         finished, finish_job, create_failed_upload_record = _success_callbacks()
-        results = [
-            {"extraction_status": "not_found", "recognized_version": None, "summary": "未识别到版本号"},
-            {"extraction_status": "not_found", "recognized_version": None, "summary": "未识别到版本号"},
-            {"extraction_status": "not_found", "recognized_version": None, "summary": "未识别到版本号"},
-        ]
 
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.recognize_with_ocr_service",
+            "app.services.version_recognition_attempt_service.recognize_with_ocr_service",
             lambda *, image_bytes, filename, template: _fake_ocr_result(filename),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.crop_image_for_template",
+            "app.services.version_recognition_attempt_service.crop_image_for_template",
             lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip center roi")),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.crop_image_by_roi",
+            "app.services.version_recognition_attempt_service.crop_image_by_roi",
             lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("skip fallback roi")),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.rotate_image_bytes",
+            "app.services.version_recognition_attempt_service.rotate_image_bytes",
             lambda *, image_bytes, angle: f"rot-{angle}".encode("utf-8"),
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service._upscale_image_bytes",
+            "app.services.version_recognition_attempt_service._upscale_image_bytes",
             lambda *, image_bytes, scale, max_side: b"upscaled-x2",
         )
         monkeypatch.setattr(
-            "app.services.version_recognition_pipeline_service.extract_version_recognition_result",
-            lambda **_kwargs: results.pop(0),
+            "app.services.version_recognition_attempt_service.extract_version_recognition_result",
+            lambda **_kwargs: {
+                "extraction_status": "not_found",
+                "recognized_version": None,
+                "summary": "未识别到版本号",
+            },
         )
 
         process_version_recognition_job(
@@ -292,3 +617,34 @@ def test_version_recognition_pipeline_not_found_degradation_contract(monkeypatch
             record.normalized_json["summary"]
             == "未识别到版本号（已尝试中心ROI、四角ROI、全图、旋转与放大回退）"
         )
+
+
+def test_version_recognition_pipeline_module_delegates_attempt_execution():
+    module_path = Path(__file__).resolve().parents[1] / "app" / "services" / "version_recognition_pipeline_service.py"
+    module_ast = ast.parse(module_path.read_text(encoding="utf-8"))
+
+    imported_modules: set[str] = set()
+    for node in ast.walk(module_ast):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imported_modules.add(alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported_modules.add(node.module)
+
+    assert "app.services.version_recognition_attempt_service" in imported_modules
+
+    target = next(
+        (
+            node
+            for node in module_ast.body
+            if isinstance(node, ast.FunctionDef) and node.name == "process_version_recognition_job"
+        ),
+        None,
+    )
+    assert target is not None
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "run_version_recognition_attempts"
+        for node in ast.walk(target)
+    )

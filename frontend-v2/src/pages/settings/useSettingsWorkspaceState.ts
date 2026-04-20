@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { ModelProvider } from '@/shared/api/configCenter';
+import type { ModelProvider } from '@/shared/api/modelProviders';
 import { getEffectiveSelectionId } from '@/shared/utils/effectiveSelection';
 
 type UseSettingsWorkspaceStateParams = {

@@ -1,5 +1,5 @@
 import { Space } from 'antd';
-import { type DashboardDefinition } from '@/shared/api/configCenter';
+import { type DashboardDefinition } from '@/shared/api/dashboard';
 import {
   ACTIVE_STATUS_LABELS,
   ACTIVE_STATUS_OPTIONS,

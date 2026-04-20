@@ -1,12 +1,13 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listStrategies } from '@/shared/api/configCenter';
+import { listFeedback } from '@/shared/api/feedback';
+import { listStrategies } from '@/shared/api/strategies';
+import { useObjectUrl } from '@/shared/hooks/useObjectUrl';
 import {
   fetchTaskRecordImage,
   getTaskRecord,
-  listFeedback,
   listTaskRecords,
-} from '@/shared/api/tasks';
+} from '@/shared/api/records';
 import type { FeedbackFormValues } from '@/pages/feedback/types';
 
 type UseFeedbackQueryStateParams = {
@@ -26,12 +27,6 @@ function buildFeedbackTaskRecordParams({
     status: resultStatusFilter === 'all' ? undefined : resultStatusFilter,
     strategyId: strategyFilter === 'all' ? undefined : strategyFilter,
   };
-}
-
-function revokeObjectUrl(url: string | null) {
-  if (url) {
-    URL.revokeObjectURL(url);
-  }
 }
 
 function getInitialFeedbackFormValues(
@@ -101,17 +96,7 @@ export function useFeedbackQueryState({
 
   const detail = recordDetailQuery.data ?? null;
   const currentFeedback = useMemo(() => feedbackQuery.data?.[0] ?? null, [feedbackQuery.data]);
-  const imagePreviewUrl = useMemo(
-    () => (imageQuery.data ? URL.createObjectURL(imageQuery.data) : null),
-    [imageQuery.data],
-  );
-
-  useEffect(
-    () => () => {
-      revokeObjectUrl(imagePreviewUrl);
-    },
-    [imagePreviewUrl],
-  );
+  const imagePreviewUrl = useObjectUrl(imageQuery.data);
 
   const initialFormValues: Partial<FeedbackFormValues> | null = getInitialFeedbackFormValues(currentFeedback);
 

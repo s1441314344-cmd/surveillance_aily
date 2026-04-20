@@ -1,5 +1,5 @@
 import { Button, Descriptions, Empty, Modal } from 'antd';
-import type { CameraDiagnostic } from '@/shared/api/configCenter';
+import type { CameraDiagnostic } from '@/shared/api/cameras';
 import { GENERIC_STATE_LABELS, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 
 type DiagnosticsResultModalProps = {

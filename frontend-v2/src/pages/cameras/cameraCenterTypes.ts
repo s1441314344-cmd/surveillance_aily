@@ -2,7 +2,7 @@ import type { FormInstance } from 'antd';
 import type {
   Camera,
   CameraStatus,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/cameras';
 import type {
   CameraFormValues,
   MonitorConfigFormValues,

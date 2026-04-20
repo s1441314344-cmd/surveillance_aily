@@ -1,4 +1,4 @@
-import type { SignalMonitorConfig } from '@/shared/api/configCenter';
+import type { SignalMonitorConfig } from '@/shared/api/cameras';
 import {
   type MonitorConfigFormValues,
   DEFAULT_MONITOR_CONFIG_VALUES,

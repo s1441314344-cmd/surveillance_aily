@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Alert, Button, Drawer, Empty, Input, Select, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { type ModelCallLog } from '@/shared/api/configCenter';
+import { type ModelCallLog } from '@/shared/api/modelProviders';
 import { StatusBadge } from '@/shared/ui';
 
 const { Paragraph, Text } = Typography;

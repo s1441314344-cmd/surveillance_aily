@@ -1,3 +1,7 @@
+// @prd /prd/modules/dashboard-overview.md §5 数据模型 - DashboardSummary / DashboardTrendPoint / StrategyUsagePoint / AnomalyCase
+// @prd /prd/modules/dashboards-config.md §5 数据模型 - DashboardDefinition
+export * from './config-center/dashboard';
+
 import { apiClient } from './client';
 
 export type DashboardSummary = {

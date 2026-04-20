@@ -1,16 +1,18 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  getTrainingConfig,
-  getTrainingOverview,
-  listTrainingHistory,
   listModelCallLogs,
   listModelProviders,
-  listStrategies,
+} from '@/shared/api/modelProviders';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
+import { listStrategies } from '@/shared/api/strategies';
+import {
+  getTrainingConfig,
+  getTrainingOverview,
   listTrainingDatasets,
+  listTrainingHistory,
   listTrainingRuns,
-} from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+} from '@/shared/api/training';
 import { getEffectiveSelectionId } from '@/shared/utils/effectiveSelection';
 
 type UseSettingsQueryStateParams = {

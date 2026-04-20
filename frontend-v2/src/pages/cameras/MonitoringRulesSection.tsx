@@ -1,5 +1,5 @@
 import { Button, Empty, Space } from 'antd';
-import type { CameraTriggerRule, CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/configCenter';
+import type { CameraTriggerRule, CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/cameras';
 import { SectionCard } from '@/shared/ui';
 import { DebugControls } from './DebugControls';
 import { DebugResultPanel } from './DebugResultPanel';

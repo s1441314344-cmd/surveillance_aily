@@ -16,6 +16,7 @@ WITH_E2E="false"
 PERF_ARGS_RAW="${V2_PREFLIGHT_PERF_ARGS:-}"
 SOAK_ARGS_RAW="${V2_PREFLIGHT_SOAK_ARGS:-}"
 SMOKE_SCHEDULE_WAIT_SECONDS="${V2_SMOKE_SCHEDULE_WAIT_SECONDS:-125}"
+SCHEDULER_POLL_SECONDS="${V2_PREFLIGHT_SCHEDULER_POLL_SECONDS:-5}"
 OUTPUT_DIR="${V2_PREFLIGHT_OUTPUT_DIR:-}"
 INJECTION_MODE="${V2_PREFLIGHT_INJECTION_MODE:-}"
 
@@ -50,6 +51,10 @@ while [[ $# -gt 0 ]]; do
       SMOKE_SCHEDULE_WAIT_SECONDS="$2"
       shift 2
       ;;
+    --scheduler-poll-seconds)
+      SCHEDULER_POLL_SECONDS="$2"
+      shift 2
+      ;;
     --output-dir)
       OUTPUT_DIR="$2"
       shift 2
@@ -72,6 +77,15 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if ! [[ "${SMOKE_SCHEDULE_WAIT_SECONDS}" =~ ^[0-9]+$ ]]; then
+  echo "[v2-preflight] --smoke-wait-seconds must be an integer" >&2
+  exit 2
+fi
+if ! [[ "${SCHEDULER_POLL_SECONDS}" =~ ^[0-9]+$ ]] || [[ "${SCHEDULER_POLL_SECONDS}" -lt 1 ]]; then
+  echo "[v2-preflight] --scheduler-poll-seconds must be a positive integer" >&2
+  exit 2
+fi
 
 if [[ -z "${PERF_ARGS_RAW}" ]]; then
   PERF_ARGS_RAW="--jobs 12 --concurrency 4 --files-per-job 1 --poll-timeout-seconds 120"
@@ -198,6 +212,7 @@ summary = {
         "with_e2e": "${WITH_E2E}" == "true",
         "api_port": int("${API_PORT}"),
         "smoke_wait_seconds": int("${SMOKE_SCHEDULE_WAIT_SECONDS}"),
+        "scheduler_poll_seconds": int("${SCHEDULER_POLL_SECONDS}"),
         "perf_args": "${PERF_ARGS_RAW}",
         "soak_args": "${SOAK_ARGS_RAW}",
         "injection_mode": "${INJECTION_MODE}" or None,
@@ -216,6 +231,10 @@ summary = {
             "status": "${scheduler_readiness_status}",
             "log_path": "${log_dir}/scheduler.log",
         },
+    },
+    "scheduler_cycle": {
+        "observed_count": 0,
+        "latest": None,
     },
     "runtime_flags": {
         "local_detector_strict_block": "${LOCAL_DETECTOR_STRICT_BLOCK:-true}" == "true",
@@ -239,6 +258,34 @@ summary = {
         },
     },
 }
+
+scheduler_log_path = Path("${log_dir}/scheduler.log")
+if scheduler_log_path.exists():
+    latest_cycle = None
+    observed_count = 0
+    for raw_line in scheduler_log_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        marker = "schedule cycle mode="
+        if marker not in raw_line:
+            continue
+        observed_count += 1
+        payload = raw_line.split(marker, 1)[1].strip()
+        tokens = payload.split()
+        parsed = {}
+        for token in tokens:
+            if "=" not in token:
+                continue
+            key, value = token.split("=", 1)
+            value = value.strip().strip(",")
+            if value.isdigit():
+                parsed[key] = int(value)
+            else:
+                parsed[key] = value
+        latest_cycle = parsed or None
+    summary["scheduler_cycle"] = {
+        "observed_count": observed_count,
+        "latest": latest_cycle,
+    }
+
 Path("${summary_json_path}").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 PY
 }
@@ -308,7 +355,8 @@ worker_pid="$!"
 echo "[v2-preflight] starting scheduler"
 (
   cd "${BACKEND_DIR}"
-  python3 -m app.schedulers.runner >"${log_dir}/scheduler.log" 2>&1
+  SCHEDULER_POLL_INTERVAL_SECONDS="${SCHEDULER_POLL_SECONDS}" \
+    python3 -m app.schedulers.runner >"${log_dir}/scheduler.log" 2>&1
 ) &
 scheduler_pid="$!"
 

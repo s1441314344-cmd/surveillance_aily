@@ -1,7 +1,7 @@
 import { render, waitFor } from '@testing-library/react';
 import type { FormInstance } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
-import type { Camera } from '@/shared/api/configCenter';
+import type { Camera } from '@/shared/api/cameras';
 import { DEFAULT_CAMERA_VALUES, type CameraFormValues } from '@/pages/cameras/cameraCenterConfig';
 import { useCameraFormSync } from '@/pages/cameras/useCameraFormSync';
 

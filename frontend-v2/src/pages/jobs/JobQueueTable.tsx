@@ -1,51 +1,63 @@
 import { Table } from 'antd';
-import type { Camera } from '@/shared/api/configCenter';
-import type { Job } from '@/shared/api/tasks';
+import type { Camera } from '@/shared/api/cameras';
+import type { Job } from '@/shared/api/jobs';
+import { buildSelectableTableRowProps } from '@/pages/jobs/jobsTableRowSelection';
 import { useJobQueueColumns } from './useJobQueueColumns';
 
-type JobQueueTableProps = {
+export type JobQueueTableDataProps = {
   jobs: Job[];
   cameras: Camera[];
+};
+
+export type JobQueueTableSelectionProps = {
   selectedJobId?: string | null;
+};
+
+export type JobQueueTableStateProps = {
   loading: boolean;
   cancelLoading: boolean;
   retryLoading: boolean;
+};
+
+export type JobQueueTableHandlersProps = {
   onSelectJob: (jobId: string) => void;
   onCancelJob: (jobId: string) => void;
   onRetryJob: (jobId: string) => void;
 };
 
-export function JobQueueTable({
-  jobs,
-  cameras,
-  selectedJobId,
-  loading,
-  cancelLoading,
-  retryLoading,
-  onSelectJob,
-  onCancelJob,
-  onRetryJob,
-}: JobQueueTableProps) {
-  const columns = useJobQueueColumns({ cameras, cancelLoading, retryLoading, onCancelJob, onRetryJob });
+type JobQueueTableProps = {
+  data: JobQueueTableDataProps;
+  selection: JobQueueTableSelectionProps;
+  state: JobQueueTableStateProps;
+  handlers: JobQueueTableHandlersProps;
+};
+
+export function JobQueueTable({ data, selection, state, handlers }: JobQueueTableProps) {
+  const columns = useJobQueueColumns({
+    lookups: { cameras: data.cameras },
+    actions: {
+      loading: {
+        cancelLoading: state.cancelLoading,
+        retryLoading: state.retryLoading,
+      },
+      handlers: {
+        onCancelJob: handlers.onCancelJob,
+        onRetryJob: handlers.onRetryJob,
+      },
+    },
+  });
+  const rowSelectionProps = buildSelectableTableRowProps<Job>({
+    selectedId: selection.selectedJobId,
+    onSelect: handlers.onSelectJob,
+  });
 
   return (
     <Table<Job>
       rowKey="id"
-      dataSource={jobs}
-      loading={loading}
+      dataSource={data.jobs}
+      loading={state.loading}
       pagination={{ pageSize: 6 }}
-      onRow={(record) => ({
-        onClick: () => onSelectJob(record.id),
-        tabIndex: 0,
-        'aria-selected': record.id === selectedJobId,
-        onKeyDown: (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            onSelectJob(record.id);
-          }
-        },
-      })}
-      rowClassName={(record) => `table-row-clickable ${record.id === selectedJobId ? 'table-row-selected' : ''}`}
+      {...rowSelectionProps}
       columns={columns}
     />
   );

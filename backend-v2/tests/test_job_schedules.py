@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
 
+from app.core.database import SessionLocal
+from app.models.job import Job, JobSchedule
 from app.services import schedule_dispatch_service
 from app.services.local_detector_service import LocalDetectorError, LocalDetectorResult
-from app.services.scheduler_service import run_due_job_schedules_once
+from app.services.schedule_dispatch_service import run_due_job_schedules_once
 from app.workers.tasks import process_job
 
 from .test_auth_and_users import auth_headers, login_as_admin, login_as_user
@@ -98,6 +100,53 @@ def test_job_schedule_crud_and_status_flow(client):
     list_after_delete_response = client.get("/api/job-schedules", headers=headers)
     assert list_after_delete_response.status_code == 200
     assert list_after_delete_response.json() == []
+
+
+def test_job_schedule_update_rejects_invalid_next_run_at(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Invalid Next Run Camera",
+            "location": "参数校验点",
+            "ip_address": "192.168.1.29",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/invalid-next-run",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/invalid-next-run",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "10",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+
+    invalid_patch_response = client.patch(
+        f"/api/job-schedules/{schedule['id']}",
+        headers=headers,
+        json={"next_run_at": "not-a-datetime"},
+    )
+    assert invalid_patch_response.status_code == 400
+    assert "next_run_at must be a valid ISO datetime string" in invalid_patch_response.text
 
 
 def test_scheduler_creates_camera_schedule_job_and_updates_runtime_fields(client):
@@ -288,6 +337,250 @@ def test_scheduler_trigger_failure_writes_schedule_last_error(client):
     assert "Camera not found" in refreshed_schedule["last_error"]
     assert refreshed_schedule["last_run_at"] is not None
     assert refreshed_schedule["next_run_at"] is not None
+
+
+def test_scheduler_skips_duplicate_dispatch_when_inflight_schedule_job_exists(client):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Duplicate Guard Camera",
+            "location": "防重测试点",
+            "ip_address": "192.168.1.67",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/duplicate-guard",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/duplicate-guard",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "10",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+    first_run_at = datetime.fromisoformat(schedule["next_run_at"]) + timedelta(seconds=1)
+
+    first_ids = run_due_job_schedules_once(now=first_run_at, dispatch_jobs=False)
+    assert len(first_ids) == 1
+
+    force_due_again_response = client.patch(
+        f"/api/job-schedules/{schedule['id']}",
+        headers=headers,
+        json={
+            "next_run_at": (first_run_at - timedelta(seconds=1)).isoformat(),
+        },
+    )
+    assert force_due_again_response.status_code == 200
+    forced_schedule = force_due_again_response.json()
+    assert forced_schedule["next_run_at"] is not None
+    assert datetime.fromisoformat(forced_schedule["next_run_at"]) <= first_run_at
+
+    second_report = schedule_dispatch_service.run_due_job_schedules_once_report(
+        now=first_run_at + timedelta(seconds=1),
+        dispatch_jobs=False,
+    )
+    assert second_report["created_job_ids"] == []
+    assert second_report["created_count"] == 0
+    assert second_report["skipped_inflight_count"] == 1
+    assert second_report["due_count"] >= 1
+
+    jobs_response = client.get(f"/api/jobs?schedule_id={schedule['id']}", headers=headers)
+    assert jobs_response.status_code == 200
+    jobs = jobs_response.json()
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == first_ids[0]
+    assert jobs[0]["status"] == "queued"
+
+    refreshed_schedule = client.get(f"/api/job-schedules?camera_id={camera['id']}", headers=headers).json()[0]
+    assert refreshed_schedule["last_error"] is not None
+    assert "Skipped duplicate dispatch" in refreshed_schedule["last_error"]
+
+
+def test_scheduler_replaces_stale_inflight_job_when_timeout_exceeded(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    create_camera_response = client.post(
+        "/api/cameras",
+        headers=headers,
+        json={
+            "name": "Stale Guard Camera",
+            "location": "超时防重测试点",
+            "ip_address": "192.168.1.68",
+            "port": 554,
+            "protocol": "rtsp",
+            "username": "operator",
+            "password": "secret123",
+            "rtsp_url": "rtsp://mock/stale-duplicate-guard",
+            "frame_frequency_seconds": 20,
+            "resolution": "720p",
+            "jpeg_quality": 80,
+            "storage_path": "./data/storage/cameras/stale-duplicate-guard",
+        },
+    )
+    assert create_camera_response.status_code == 200
+    camera = create_camera_response.json()
+
+    create_schedule_response = client.post(
+        "/api/job-schedules",
+        headers=headers,
+        json={
+            "camera_id": camera["id"],
+            "strategy_id": "preset-fire",
+            "schedule_type": "interval_minutes",
+            "schedule_value": "10",
+        },
+    )
+    assert create_schedule_response.status_code == 200
+    schedule = create_schedule_response.json()
+    first_run_at = datetime.fromisoformat(schedule["next_run_at"]) + timedelta(seconds=1)
+
+    first_ids = run_due_job_schedules_once(now=first_run_at, dispatch_jobs=False)
+    assert len(first_ids) == 1
+    first_job_id = first_ids[0]
+
+    stale_created_at = first_run_at - timedelta(minutes=20)
+    with SessionLocal() as db:
+        first_job = db.get(Job, first_job_id)
+        assert first_job is not None
+        first_job.created_at = stale_created_at
+        first_job.updated_at = stale_created_at
+        db.commit()
+
+    force_due_again_response = client.patch(
+        f"/api/job-schedules/{schedule['id']}",
+        headers=headers,
+        json={
+            "next_run_at": (first_run_at - timedelta(seconds=1)).isoformat(),
+        },
+    )
+    assert force_due_again_response.status_code == 200
+    forced_schedule = force_due_again_response.json()
+    assert forced_schedule["next_run_at"] is not None
+    assert datetime.fromisoformat(forced_schedule["next_run_at"]) <= first_run_at
+
+    original_timeout_seconds = schedule_dispatch_service.settings.scheduler_inflight_job_timeout_seconds
+    monkeypatch.setattr(schedule_dispatch_service.settings, "scheduler_inflight_job_timeout_seconds", 60)
+    try:
+        second_report = schedule_dispatch_service.run_due_job_schedules_once_report(
+            now=first_run_at + timedelta(seconds=1),
+            dispatch_jobs=False,
+        )
+    finally:
+        monkeypatch.setattr(
+            schedule_dispatch_service.settings,
+            "scheduler_inflight_job_timeout_seconds",
+            original_timeout_seconds,
+        )
+
+    second_ids = second_report["created_job_ids"]
+    assert second_report["created_count"] == 1
+    assert second_report["stale_failed_count"] == 1
+    assert second_report["skipped_inflight_count"] == 0
+    assert len(second_ids) == 1
+    assert second_ids[0] != first_job_id
+
+    jobs_response = client.get(f"/api/jobs?schedule_id={schedule['id']}", headers=headers)
+    assert jobs_response.status_code == 200
+    jobs = jobs_response.json()
+    assert len(jobs) == 2
+    first_job = next(item for item in jobs if item["id"] == first_job_id)
+    second_job = next(item for item in jobs if item["id"] == second_ids[0])
+    assert first_job["status"] == "failed"
+    assert first_job["error_message"] is not None
+    assert "stale in-flight timeout" in first_job["error_message"]
+    assert second_job["status"] == "queued"
+
+
+def test_scheduler_locking_path_pulls_due_schedules_iteratively(client, monkeypatch):
+    login_data = login_as_admin(client)
+    headers = auth_headers(login_data["access_token"])
+
+    camera_ids: list[str] = []
+    for index in range(2):
+        create_camera_response = client.post(
+            "/api/cameras",
+            headers=headers,
+            json={
+                "name": f"Locking Camera {index}",
+                "location": "锁路径测试点",
+                "ip_address": f"192.168.1.8{index}",
+                "port": 554,
+                "protocol": "rtsp",
+                "username": "operator",
+                "password": "secret123",
+                "rtsp_url": f"rtsp://mock/locking-{index}",
+                "frame_frequency_seconds": 20,
+                "resolution": "720p",
+                "jpeg_quality": 80,
+                "storage_path": f"./data/storage/cameras/locking-{index}",
+            },
+        )
+        assert create_camera_response.status_code == 200
+        camera_ids.append(create_camera_response.json()["id"])
+
+    schedule_ids: list[str] = []
+    for camera_id in camera_ids:
+        create_schedule_response = client.post(
+            "/api/job-schedules",
+            headers=headers,
+            json={
+                "camera_id": camera_id,
+                "strategy_id": "preset-fire",
+                "schedule_type": "interval_minutes",
+                "schedule_value": "10",
+            },
+        )
+        assert create_schedule_response.status_code == 200
+        schedule_ids.append(create_schedule_response.json()["id"])
+
+    with SessionLocal() as db:
+        schedules = [db.get(JobSchedule, schedule_id) for schedule_id in schedule_ids]
+        run_at = max(item.next_run_at for item in schedules if item is not None and item.next_run_at is not None) + timedelta(seconds=1)
+
+    pull_count = {"value": 0}
+    queue = list(schedule_ids)
+
+    def fake_take_next_due_schedule_for_update(*, db, now):
+        pull_count["value"] += 1
+        if not queue:
+            return None
+        schedule_id = queue.pop(0)
+        return db.get(JobSchedule, schedule_id)
+
+    monkeypatch.setattr(schedule_dispatch_service, "_supports_schedule_row_locking", lambda db: True)
+    monkeypatch.setattr(
+        schedule_dispatch_service,
+        "_take_next_due_schedule_for_update",
+        fake_take_next_due_schedule_for_update,
+    )
+
+    created_ids = run_due_job_schedules_once(now=run_at, dispatch_jobs=False)
+    assert len(created_ids) == 2
+    assert pull_count["value"] == 3
+
+    jobs_response = client.get("/api/jobs?trigger_mode=schedule", headers=headers)
+    assert jobs_response.status_code == 200
+    created_schedule_ids = {job["schedule_id"] for job in jobs_response.json()}
+    assert set(schedule_ids).issubset(created_schedule_ids)
 
 
 def test_scheduler_precheck_not_matched_will_skip_job_creation(client, monkeypatch):

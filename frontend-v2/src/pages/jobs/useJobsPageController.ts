@@ -13,6 +13,7 @@ export function useJobsPageController() {
   const [form] = Form.useForm<UploadFormValues>();
   const [scheduleEditForm] = Form.useForm<EditScheduleFormValues>();
   const workspace = useJobsWorkspaceState();
+  const { queueFilters, scheduleFilters, draftState, selection } = workspace;
   const {
     taskMode,
     uploadSource,
@@ -22,21 +23,29 @@ export function useJobsPageController() {
   } = useJobsFormWatchState({ form });
 
   const queries = useJobsQueryState({
-    statusFilter: workspace.statusFilter,
-    strategyFilter: workspace.strategyFilter,
-    triggerModeFilter: workspace.triggerModeFilter,
-    cameraFilter: workspace.cameraFilter,
-    scheduleFilter: workspace.scheduleFilter,
-    createdFromFilter: workspace.createdFromFilter,
-    createdToFilter: workspace.createdToFilter,
-    scheduleStatusFilter: workspace.scheduleStatusFilter,
-    scheduleCameraFilter: workspace.scheduleCameraFilter,
-    scheduleStrategyFilter: workspace.scheduleStrategyFilter,
-    selectedJobId: workspace.selectedJobId,
-    taskMode,
-    uploadSource,
-    selectedCameraIdInForm,
-    selectedUploadCameraIdInForm,
+    queueFilters: {
+      statusFilter: queueFilters.statusFilter,
+      strategyFilter: queueFilters.strategyFilter,
+      triggerModeFilter: queueFilters.triggerModeFilter,
+      cameraFilter: queueFilters.cameraFilter,
+      scheduleFilter: queueFilters.scheduleFilter,
+      createdFromFilter: queueFilters.createdFromFilter,
+      createdToFilter: queueFilters.createdToFilter,
+    },
+    scheduleFilters: {
+      scheduleStatusFilter: scheduleFilters.scheduleStatusFilter,
+      scheduleCameraFilter: scheduleFilters.scheduleCameraFilter,
+      scheduleStrategyFilter: scheduleFilters.scheduleStrategyFilter,
+    },
+    selection: {
+      selectedJobId: selection.selectedJobId,
+    },
+    workflow: {
+      taskMode,
+      uploadSource,
+      selectedCameraIdInForm,
+      selectedUploadCameraIdInForm,
+    },
   });
 
   useEnsureDefaultJobStrategy({
@@ -45,52 +54,74 @@ export function useJobsPageController() {
   });
 
   const mutations = useJobsMutationState({
-    form,
-    scheduleEditForm,
-    setFileList: workspace.setFileList,
-    setSelectedJobId: workspace.setSelectedJobId,
-    setTriggerModeFilter: workspace.setTriggerModeFilter,
-    setScheduleFilter: workspace.setScheduleFilter,
-    setEditingSchedule: workspace.setEditingSchedule,
+    forms: {
+      form,
+      scheduleEditForm,
+    },
+    jobWorkflow: {
+      setFileList: draftState.setFileList,
+      setSelectedJobId: selection.setSelectedJobId,
+    },
+    scheduleWorkflow: {
+      setTriggerModeFilter: queueFilters.setTriggerModeFilter,
+      setScheduleFilter: queueFilters.setScheduleFilter,
+      setEditingSchedule: selection.setEditingSchedule,
+    },
   });
 
   const actions = useJobsFormActionState({
-    form,
-    scheduleEditForm,
-    taskMode,
-    uploadSource,
-    fileList: workspace.fileList,
-    selectedCameraInForm: queries.selectedCameraInForm,
-    selectedUploadCameraInForm: queries.selectedUploadCameraInForm,
-    editingSchedule: workspace.editingSchedule,
-    setFileList: workspace.setFileList,
-    setEditScheduleType: workspace.setEditScheduleType,
-    setEditingSchedule: workspace.setEditingSchedule,
+    forms: {
+      form,
+      scheduleEditForm,
+    },
+    workflow: {
+      taskMode,
+      uploadSource,
+    },
+    resources: {
+      selectedCameraInForm: queries.selectedCameraInForm,
+      selectedUploadCameraInForm: queries.selectedUploadCameraInForm,
+    },
+    draftState: {
+      fileList: draftState.fileList,
+      editingSchedule: selection.editingSchedule,
+      setFileList: draftState.setFileList,
+      setEditScheduleType: draftState.setEditScheduleType,
+      setEditingSchedule: selection.setEditingSchedule,
+    },
     mutations,
   });
 
   const handlers = useJobsWorkspaceHandlers({
-    setScheduleFilter: workspace.setScheduleFilter,
-    setTriggerModeFilter: workspace.setTriggerModeFilter,
-    setCreatedFromFilter: workspace.setCreatedFromFilter,
-    setCreatedToFilter: workspace.setCreatedToFilter,
-    setSelectedJobId: workspace.setSelectedJobId,
-    setSelectedScheduleId: workspace.setSelectedScheduleId,
-    setWorkspaceTab: workspace.setWorkspaceTab,
-    setStatusFilter: workspace.setStatusFilter,
-    setStrategyFilter: workspace.setStrategyFilter,
-    setCameraFilter: workspace.setCameraFilter,
-    setScheduleStatusFilter: workspace.setScheduleStatusFilter,
-    setScheduleCameraFilter: workspace.setScheduleCameraFilter,
-    setScheduleStrategyFilter: workspace.setScheduleStrategyFilter,
-    handleResetQueueFilters: workspace.handleResetQueueFilters,
-    handleResetScheduleFilters: workspace.handleResetScheduleFilters,
-    handleOpenScheduleEditor: actions.handleOpenScheduleEditor,
-    cancelMutation: mutations.cancelMutation,
-    retryMutation: mutations.retryMutation,
-    runScheduleNowMutation: mutations.runScheduleNowMutation,
-    scheduleStatusMutation: mutations.scheduleStatusMutation,
-    deleteScheduleMutation: mutations.deleteScheduleMutation,
+    queueFilters: {
+      setScheduleFilter: queueFilters.setScheduleFilter,
+      setTriggerModeFilter: queueFilters.setTriggerModeFilter,
+      setCreatedFromFilter: queueFilters.setCreatedFromFilter,
+      setCreatedToFilter: queueFilters.setCreatedToFilter,
+      setStatusFilter: queueFilters.setStatusFilter,
+      setStrategyFilter: queueFilters.setStrategyFilter,
+      setCameraFilter: queueFilters.setCameraFilter,
+      handleResetQueueFilters: queueFilters.handleResetQueueFilters,
+    },
+    scheduleFilters: {
+      setScheduleStatusFilter: scheduleFilters.setScheduleStatusFilter,
+      setScheduleCameraFilter: scheduleFilters.setScheduleCameraFilter,
+      setScheduleStrategyFilter: scheduleFilters.setScheduleStrategyFilter,
+      handleResetScheduleFilters: scheduleFilters.handleResetScheduleFilters,
+    },
+    selection: {
+      setSelectedJobId: selection.setSelectedJobId,
+      setSelectedScheduleId: selection.setSelectedScheduleId,
+      setWorkspaceTab: selection.setWorkspaceTab,
+      handleOpenScheduleEditor: actions.handleOpenScheduleEditor,
+    },
+    mutations: {
+      cancelMutation: mutations.cancelMutation,
+      retryMutation: mutations.retryMutation,
+      runScheduleNowMutation: mutations.runScheduleNowMutation,
+      scheduleStatusMutation: mutations.scheduleStatusMutation,
+      deleteScheduleMutation: mutations.deleteScheduleMutation,
+    },
   });
 
   const jobDetail = mapJobToDetailView(queries.selectedJob);

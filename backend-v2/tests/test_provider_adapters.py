@@ -1019,3 +1019,55 @@ def test_ark_adapter_http_400_includes_server_detail_and_hint(monkeypatch, tmp_p
 def test_provider_factory_maps_doubao_alias_to_ark_adapter():
     adapter = get_provider_adapter("doubao")
     assert isinstance(adapter, ArkAdapter)
+
+
+@pytest.mark.parametrize(
+    ("adapter_cls", "module_path", "policy_attr"),
+    [
+        (OpenAIAdapter, "app.services.providers.openai_adapter", "OPENAI_RETRY_POLICY"),
+        (GoogleAdapter, "app.services.providers.google_adapter", "GOOGLE_RETRY_POLICY"),
+        (ArkAdapter, "app.services.providers.ark_adapter", "ARK_RETRY_POLICY"),
+        (ZhipuAdapter, "app.services.providers.zhipu_adapter", "ZHIPU_RETRY_POLICY"),
+    ],
+)
+def test_provider_post_with_retry_delegates_to_shared_executor(
+    monkeypatch,
+    adapter_cls,
+    module_path,
+    policy_attr,
+):
+    called: dict = {}
+
+    def fake_executor(*, endpoint, headers, payload, timeout_seconds, retry_policy, client_factory, sleep_func):
+        called["args"] = {
+            "endpoint": endpoint,
+            "headers": headers,
+            "payload": payload,
+            "timeout_seconds": timeout_seconds,
+            "retry_policy": retry_policy,
+            "client_factory": client_factory,
+            "sleep_func": sleep_func,
+        }
+        return {"ok": True}
+
+    monkeypatch.setattr(f"{module_path}.post_json_with_retry", fake_executor, raising=False)
+    monkeypatch.setattr(
+        f"{module_path}.httpx.Client",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("adapter should delegate to shared retry executor")),
+    )
+    module = __import__(module_path, fromlist=["_dummy"])
+    policy = getattr(module, policy_attr)
+
+    result = adapter_cls()._post_with_retry(
+        endpoint="https://provider.example/api",
+        headers={"Authorization": "Bearer test"},
+        payload={"foo": "bar"},
+        timeout_seconds=12,
+    )
+
+    assert result == {"ok": True}
+    assert called["args"]["endpoint"] == "https://provider.example/api"
+    assert called["args"]["headers"] == {"Authorization": "Bearer test"}
+    assert called["args"]["payload"] == {"foo": "bar"}
+    assert called["args"]["timeout_seconds"] == 12
+    assert called["args"]["retry_policy"] is policy

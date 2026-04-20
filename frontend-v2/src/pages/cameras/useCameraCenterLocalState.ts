@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Form } from 'antd';
-import type { CameraDiagnostic } from '@/shared/api/configCenter';
+import type { CameraDiagnostic } from '@/shared/api/cameras';
 import {
   CREATE_CAMERA_ID,
   DEFAULT_CAMERA_VALUES,

@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
-import type { Camera, Strategy } from '@/shared/api/configCenter';
-import type { Job, JobSchedule } from '@/shared/api/tasks';
+import type { Camera } from '@/shared/api/cameras';
+import type { Strategy } from '@/shared/api/strategies';
+import type { Job, JobSchedule } from '@/shared/api/jobs';
 import {
   getCameraOptions,
   getJobStatusOptions,
   getScheduleFilterOptions,
+  getStrategySelectOptions,
   getStrategyOptions,
 } from '@/pages/jobs/jobsQueryUtils';
 
@@ -13,29 +15,38 @@ const EMPTY_CAMERAS: Camera[] = [];
 const EMPTY_JOBS: Job[] = [];
 const EMPTY_JOB_SCHEDULES: JobSchedule[] = [];
 
-type UseJobsQueryDerivedStateParams = {
+type UseJobsQueryDerivedStateQueryDataParams = {
   strategiesData: Strategy[] | undefined;
   camerasData: Camera[] | undefined;
   jobsData: Job[] | undefined;
   schedulesData: JobSchedule[] | undefined;
   selectedJobData: Job | undefined;
+};
+
+type UseJobsQueryDerivedStateWorkflowParams = {
   taskMode: 'upload' | 'camera_once' | 'camera_schedule';
   uploadSource: 'local_file' | 'camera_snapshot';
+};
+
+type UseJobsQueryDerivedStateSelectionParams = {
   selectedCameraIdInForm?: string;
   selectedUploadCameraIdInForm?: string;
 };
 
+type UseJobsQueryDerivedStateParams = {
+  queryData: UseJobsQueryDerivedStateQueryDataParams;
+  workflow: UseJobsQueryDerivedStateWorkflowParams;
+  selection: UseJobsQueryDerivedStateSelectionParams;
+};
+
 export function useJobsQueryDerivedState({
-  strategiesData,
-  camerasData,
-  jobsData,
-  schedulesData,
-  selectedJobData,
-  taskMode,
-  uploadSource,
-  selectedCameraIdInForm,
-  selectedUploadCameraIdInForm,
+  queryData,
+  workflow,
+  selection,
 }: UseJobsQueryDerivedStateParams) {
+  const { strategiesData, camerasData, jobsData, schedulesData, selectedJobData } = queryData;
+  const { taskMode, uploadSource } = workflow;
+  const { selectedCameraIdInForm, selectedUploadCameraIdInForm } = selection;
   const strategies = strategiesData ?? EMPTY_STRATEGIES;
   const cameras = camerasData ?? EMPTY_CAMERAS;
   const jobs = jobsData ?? EMPTY_JOBS;
@@ -64,6 +75,7 @@ export function useJobsQueryDerivedState({
   const scheduleFilterOptions = useMemo(() => getScheduleFilterOptions(schedules), [schedules]);
   const jobStatusOptions = useMemo(() => getJobStatusOptions(), []);
   const strategyOptions = useMemo(() => getStrategyOptions(strategies), [strategies]);
+  const strategySelectOptions = useMemo(() => getStrategySelectOptions(strategies), [strategies]);
   const cameraOptions = useMemo(() => getCameraOptions(cameras), [cameras]);
 
   return {
@@ -79,6 +91,7 @@ export function useJobsQueryDerivedState({
     scheduleFilterOptions,
     jobStatusOptions,
     strategyOptions,
+    strategySelectOptions,
     cameraOptions,
   };
 }

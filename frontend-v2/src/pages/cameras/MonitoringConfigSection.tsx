@@ -20,8 +20,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RUNTIME_MODE_LABELS, RUNTIME_MODE_OPTIONS, SCHEDULE_TYPE_OPTIONS } from './cameraCenterConfig';
 import type { MonitorConfigFormValues } from './cameraCenterConfig';
 import { SectionCard } from '@/shared/ui';
-import { getApiErrorMessage } from '@/shared/api/errors';
-import { captureCameraPhoto, fetchCameraMediaFile } from '@/shared/api/configCenter';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
+import { captureCameraPhoto, fetchCameraMediaFile } from '@/shared/api/cameras';
 
 const { Text } = Typography;
 

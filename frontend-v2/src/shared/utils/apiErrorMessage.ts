@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export function getApiErrorMessage(error: unknown, fallback = '请求失败，请稍后重试') {
-  if (axios.isAxiosError(error)) {
+  if (axios.isAxiosError(error) && error) {
     const detail = error.response?.data?.detail;
     if (Array.isArray(detail)) {
       return detail.join('; ');

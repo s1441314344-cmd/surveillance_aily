@@ -1,7 +1,7 @@
 import { render, waitFor } from '@testing-library/react';
 import type { FormInstance } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
-import type { SignalMonitorConfig, CameraTriggerRule, CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/configCenter';
+import type { SignalMonitorConfig, CameraTriggerRule, CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/cameras';
 import {
   DEFAULT_MONITOR_CONFIG_VALUES,
   DEFAULT_TRIGGER_RULE_VALUES,

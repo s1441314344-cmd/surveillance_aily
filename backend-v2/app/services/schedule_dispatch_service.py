@@ -1,5 +1,6 @@
 import logging
 import time
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.camera import Camera
-from app.models.job import JobSchedule
+from app.models.job import Job, JobSchedule
 from app.models.model_call_log import ModelCallLog
 from app.services.camera_capture_service import CameraCaptureError, capture_camera_frame
 from app.services.camera_roi_service import CameraRoiError, apply_analysis_roi_to_frame, extract_analysis_roi
@@ -34,13 +35,46 @@ PRECHECK_LOCAL_FRAME_SAMPLES = 3
 PRECHECK_LOCAL_SAMPLE_INTERVAL_MS = 200
 
 
+@dataclass
+class ScheduleDispatchReport:
+    mode: str
+    due_count: int = 0
+    claimed_count: int = 0
+    created_job_ids: list[str] = field(default_factory=list)
+    skipped_inflight_count: int = 0
+    stale_failed_count: int = 0
+    precheck_skipped_count: int = 0
+    error_count: int = 0
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "mode": self.mode,
+            "due_count": self.due_count,
+            "claimed_count": self.claimed_count,
+            "created_count": len(self.created_job_ids),
+            "created_job_ids": list(self.created_job_ids),
+            "skipped_inflight_count": self.skipped_inflight_count,
+            "stale_failed_count": self.stale_failed_count,
+            "precheck_skipped_count": self.precheck_skipped_count,
+            "error_count": self.error_count,
+        }
+
+
 def run_due_job_schedules_once(
     *,
     now: datetime | None = None,
     dispatch_jobs: bool | None = None,
 ) -> list[str]:
+    return run_due_job_schedules_once_report(now=now, dispatch_jobs=dispatch_jobs)["created_job_ids"]
+
+
+def run_due_job_schedules_once_report(
+    *,
+    now: datetime | None = None,
+    dispatch_jobs: bool | None = None,
+) -> dict[str, object]:
     with SessionLocal() as db:
-        return run_due_job_schedules_once_with_db(db, now=now, dispatch_jobs=dispatch_jobs)
+        return run_due_job_schedules_once_with_db_report(db, now=now, dispatch_jobs=dispatch_jobs)
 
 
 def run_due_job_schedules_once_with_db(
@@ -49,64 +83,242 @@ def run_due_job_schedules_once_with_db(
     now: datetime | None = None,
     dispatch_jobs: bool | None = None,
 ) -> list[str]:
-    current_time = ensure_aware(now or datetime.now(timezone.utc))
-    stmt = (
-        select(JobSchedule)
-        .where(JobSchedule.status == "active")
-        .where(JobSchedule.next_run_at.is_not(None))
-        .where(JobSchedule.next_run_at <= current_time)
-        .order_by(JobSchedule.next_run_at.asc(), JobSchedule.id.asc())
-    )
-    schedules = list(db.scalars(stmt))
-    created_job_ids: list[str] = []
+    return run_due_job_schedules_once_with_db_report(db, now=now, dispatch_jobs=dispatch_jobs)["created_job_ids"]
 
-    for schedule in schedules:
-        try:
-            precheck_passed, precheck_message = _run_schedule_precheck_if_needed(
+
+def run_due_job_schedules_once_with_db_report(
+    db: Session,
+    *,
+    now: datetime | None = None,
+    dispatch_jobs: bool | None = None,
+) -> dict[str, object]:
+    current_time = ensure_aware(now or datetime.now(timezone.utc))
+    report = ScheduleDispatchReport(mode="locked" if _supports_schedule_row_locking(db=db) else "snapshot")
+
+    if report.mode == "locked":
+        while True:
+            schedule = _take_next_due_schedule_for_update(db=db, now=current_time)
+            if schedule is None:
+                break
+            report.claimed_count += 1
+            events, job_id = _process_single_due_schedule(
                 db=db,
                 schedule=schedule,
                 now=current_time,
+                dispatch_jobs=dispatch_jobs,
             )
-            if not precheck_passed:
+            _apply_schedule_events(report=report, events=events, job_id=job_id)
+        report.due_count = report.claimed_count
+        return report.to_dict()
+
+    schedules = _run_due_schedules_snapshot(db=db, now=current_time)
+    report.due_count = len(schedules)
+    report.claimed_count = len(schedules)
+    for schedule in schedules:
+        events, job_id = _process_single_due_schedule(
+            db=db,
+            schedule=schedule,
+            now=current_time,
+            dispatch_jobs=dispatch_jobs,
+        )
+        _apply_schedule_events(report=report, events=events, job_id=job_id)
+    return report.to_dict()
+
+
+def _apply_schedule_events(
+    *,
+    report: ScheduleDispatchReport,
+    events: set[str],
+    job_id: str | None,
+) -> None:
+    if "created" in events and job_id:
+        report.created_job_ids.append(job_id)
+    if "skipped_inflight" in events:
+        report.skipped_inflight_count += 1
+    if "stale_recovered" in events:
+        report.stale_failed_count += 1
+    if "precheck_skipped" in events:
+        report.precheck_skipped_count += 1
+    if "error" in events:
+        report.error_count += 1
+
+
+def _process_single_due_schedule(
+    *,
+    db: Session,
+    schedule: JobSchedule,
+    now: datetime,
+    dispatch_jobs: bool | None,
+) -> tuple[set[str], str | None]:
+    events: set[str] = set()
+    try:
+        inflight_job = _get_inflight_schedule_job(db=db, schedule_id=schedule.id)
+        if inflight_job is not None:
+            inflight_timeout_seconds = _resolve_inflight_timeout_seconds()
+            inflight_age_seconds = _calculate_inflight_job_age_seconds(
+                job=inflight_job,
+                now=now,
+            )
+            if (
+                inflight_timeout_seconds > 0
+                and inflight_age_seconds is not None
+                and inflight_age_seconds >= inflight_timeout_seconds
+            ):
+                _mark_inflight_job_stale_failed(
+                    db=db,
+                    schedule_id=schedule.id,
+                    inflight_job=inflight_job,
+                    inflight_age_seconds=inflight_age_seconds,
+                    timeout_seconds=inflight_timeout_seconds,
+                    now=now,
+                )
+                events.add("stale_recovered")
+            else:
                 persisted_schedule = db.get(JobSchedule, schedule.id)
                 if persisted_schedule is None:
-                    continue
-                persisted_schedule.last_run_at = current_time
+                    return {"error"}, None
+                persisted_schedule.last_run_at = now
                 persisted_schedule.next_run_at = calculate_next_run_at(
                     persisted_schedule.schedule_type,
                     persisted_schedule.schedule_value,
-                    current_time,
+                    now,
                 )
-                persisted_schedule.last_error = precheck_message or "Precheck not matched"
+                persisted_schedule.last_error = f"Skipped duplicate dispatch: in-flight job {inflight_job.id}"
                 db.commit()
-                continue
+                return {"skipped_inflight"}, None
 
-            job = create_camera_schedule_job(
-                db,
-                schedule=schedule,
-                requested_by="scheduler",
-                dispatch=dispatch_jobs,
-            )
-            created_job_ids.append(job.id)
-            if job.status == "failed" and job.error_message:
-                persisted_schedule = db.get(JobSchedule, schedule.id)
-                if persisted_schedule is not None:
-                    persisted_schedule.last_error = job.error_message
-                    db.commit()
-        except Exception as exc:
+        precheck_passed, precheck_message = _run_schedule_precheck_if_needed(
+            db=db,
+            schedule=schedule,
+            now=now,
+        )
+        if not precheck_passed:
             persisted_schedule = db.get(JobSchedule, schedule.id)
             if persisted_schedule is None:
-                continue
-            persisted_schedule.last_run_at = current_time
+                return {"error"}, None
+            persisted_schedule.last_run_at = now
             persisted_schedule.next_run_at = calculate_next_run_at(
                 persisted_schedule.schedule_type,
                 persisted_schedule.schedule_value,
-                current_time,
+                now,
             )
-            persisted_schedule.last_error = str(exc)
+            persisted_schedule.last_error = precheck_message or "Precheck not matched"
             db.commit()
+            events.add("precheck_skipped")
+            return events, None
 
-    return created_job_ids
+        job = create_camera_schedule_job(
+            db,
+            schedule=schedule,
+            requested_by="scheduler",
+            dispatch=dispatch_jobs,
+        )
+        if job.status == "failed" and job.error_message:
+            persisted_schedule = db.get(JobSchedule, schedule.id)
+            if persisted_schedule is not None:
+                persisted_schedule.last_error = job.error_message
+                db.commit()
+        events.add("created")
+        return events, job.id
+    except Exception as exc:
+        persisted_schedule = db.get(JobSchedule, schedule.id)
+        if persisted_schedule is None:
+            return events | {"error"}, None
+        persisted_schedule.last_run_at = now
+        persisted_schedule.next_run_at = calculate_next_run_at(
+            persisted_schedule.schedule_type,
+            persisted_schedule.schedule_value,
+            now,
+        )
+        persisted_schedule.last_error = str(exc)
+        db.commit()
+        events.add("error")
+        return events, None
+
+
+def _build_due_schedule_stmt(*, now: datetime):
+    return (
+        select(JobSchedule)
+        .where(JobSchedule.status == "active")
+        .where(JobSchedule.next_run_at.is_not(None))
+        .where(JobSchedule.next_run_at <= now)
+        .order_by(JobSchedule.next_run_at.asc(), JobSchedule.id.asc())
+    )
+
+
+def _supports_schedule_row_locking(*, db: Session) -> bool:
+    bind = db.get_bind()
+    dialect_name = bind.dialect.name if bind and bind.dialect else ""
+    return dialect_name in {"postgresql", "mysql", "mariadb"}
+
+
+def _take_next_due_schedule_for_update(
+    *,
+    db: Session,
+    now: datetime,
+) -> JobSchedule | None:
+    stmt = _build_due_schedule_stmt(now=now).limit(1).with_for_update(skip_locked=True)
+    return db.scalar(stmt)
+
+
+def _run_due_schedules_snapshot(
+    *,
+    db: Session,
+    now: datetime,
+) -> list[JobSchedule]:
+    return list(db.scalars(_build_due_schedule_stmt(now=now)))
+
+
+def _get_inflight_schedule_job(*, db: Session, schedule_id: str) -> Job | None:
+    return db.scalar(
+        select(Job)
+        .where(Job.schedule_id == schedule_id)
+        .where(Job.status.in_(("queued", "running")))
+        .order_by(Job.created_at.desc(), Job.id.desc())
+        .limit(1)
+    )
+
+
+def _resolve_inflight_timeout_seconds() -> int:
+    raw_timeout = getattr(settings, "scheduler_inflight_job_timeout_seconds", 900)
+    try:
+        timeout = int(raw_timeout)
+    except (TypeError, ValueError):
+        return 900
+    return max(timeout, 0)
+
+
+def _calculate_inflight_job_age_seconds(*, job: Job, now: datetime) -> float | None:
+    reference_time = job.started_at or job.updated_at or job.created_at
+    if reference_time is None:
+        return None
+    reference_time = ensure_aware(reference_time)
+    return max((now - reference_time).total_seconds(), 0.0)
+
+
+def _mark_inflight_job_stale_failed(
+    *,
+    db: Session,
+    schedule_id: str,
+    inflight_job: Job,
+    inflight_age_seconds: float,
+    timeout_seconds: int,
+    now: datetime,
+) -> None:
+    age_seconds_int = int(inflight_age_seconds)
+    inflight_job.status = "failed"
+    inflight_job.finished_at = now
+    inflight_job.error_message = (
+        "Marked failed by scheduler: stale in-flight timeout "
+        f"(age={age_seconds_int}s, timeout={timeout_seconds}s)"
+    )
+    persisted_schedule = db.get(JobSchedule, schedule_id)
+    if persisted_schedule is not None:
+        persisted_schedule.last_error = (
+            "Recovered stale in-flight job "
+            f"{inflight_job.id} after {age_seconds_int}s (timeout={timeout_seconds}s)"
+        )
+    db.commit()
 
 
 def _run_schedule_precheck_if_needed(

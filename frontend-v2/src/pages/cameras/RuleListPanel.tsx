@@ -1,6 +1,6 @@
 import { Button, Empty, Popconfirm, Space, Tag, Typography } from 'antd';
 import { TRIGGER_EVENT_TYPE_LABELS } from './cameraCenterConfig';
-import type { CameraTriggerRule } from '@/shared/api/configCenter';
+import type { CameraTriggerRule } from '@/shared/api/cameras';
 import { DataStateBlock, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 
 const { Text } = Typography;

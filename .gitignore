@@ -81,6 +81,10 @@ cloudflared.tgz
 mes-workflow-designer/frontend/node_modules/
 mes-workflow-designer/backend/node_modules/
 frontend-v2/node_modules/
+frontend-v2/.env
+frontend-v2/.env.local
+frontend-v2/.env.*.local
+!frontend-v2/.env.example
 frontend-v2/dist/
 frontend-v2/playwright-report/
 frontend-v2/test-results/

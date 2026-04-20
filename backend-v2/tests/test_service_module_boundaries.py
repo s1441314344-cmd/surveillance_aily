@@ -18,7 +18,9 @@ from app.services.job_creation_service import (
 from app.services.job_queries import get_job_or_404, list_jobs, serialize_job
 from app.services.schedule_dispatch_service import (
     run_due_job_schedules_once,
+    run_due_job_schedules_once_report,
     run_due_job_schedules_once_with_db,
+    run_due_job_schedules_once_with_db_report,
 )
 from app.services.signal_monitor_orchestrator import (
     run_due_signal_monitors_once,
@@ -65,7 +67,9 @@ def test_job_service_reexports_split_modules():
 
 def test_scheduler_service_reexports_split_modules():
     assert scheduler_service.run_due_job_schedules_once is run_due_job_schedules_once
+    assert scheduler_service.run_due_job_schedules_once_report is run_due_job_schedules_once_report
     assert scheduler_service.run_due_job_schedules_once_with_db is run_due_job_schedules_once_with_db
+    assert scheduler_service.run_due_job_schedules_once_with_db_report is run_due_job_schedules_once_with_db_report
     assert scheduler_service.run_camera_status_sweep_once is run_camera_status_sweep_once
     assert scheduler_service.run_camera_status_sweep_once_with_db is run_camera_status_sweep_once_with_db
     assert scheduler_service.run_due_signal_monitors_once is run_due_signal_monitors_once

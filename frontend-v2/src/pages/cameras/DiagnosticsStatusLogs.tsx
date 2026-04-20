@@ -1,5 +1,5 @@
 import { Empty, Pagination, Space, Typography } from 'antd';
-import type { CameraStatusLog } from '@/shared/api/configCenter';
+import type { CameraStatusLog } from '@/shared/api/cameras';
 import { CAMERA_ALERT_STATUS_LABELS, CAMERA_CONNECTION_LABELS } from '@/pages/cameras/cameraCenterConfig';
 import { DataStateBlock, SectionCard, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 

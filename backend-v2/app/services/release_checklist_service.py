@@ -27,6 +27,7 @@ class ReleaseChecklist:
     uat_checks: dict[str, str]
     release_drill_gate: str
     release_drill_result: str
+    release_drill_scheduler_cycle: dict[str, object] | None
     ready_to_release: bool
     blockers: list[str]
     notes: list[str]
@@ -63,12 +64,14 @@ def build_release_checklist(
 
     release_drill_gate = "missing"
     release_drill_result = "missing"
+    release_drill_scheduler_cycle: dict[str, object] | None = None
     resolved_release_drill_path: str | None = None
 
     if release_drill_report is not None and release_drill_report_path is not None:
         resolved_release_drill_path = str(Path(release_drill_report_path).expanduser().resolve())
         release_drill_gate = str(release_drill_report.get("gate_status") or "missing")
         release_drill_result = str(release_drill_report.get("preflight_result") or "missing")
+        release_drill_scheduler_cycle = _normalize_scheduler_cycle(release_drill_report.get("preflight_scheduler_cycle"))
         if release_drill_gate != "passed":
             blockers.append(f"Release drill gate status is {release_drill_gate}.")
         if release_drill_result != "passed":
@@ -82,6 +85,22 @@ def build_release_checklist(
                 blockers.append(
                     "Release drill backfill is still dry-run; rerun with apply mode before final release."
                 )
+
+        if release_drill_scheduler_cycle is not None:
+            observed_count = _safe_int(release_drill_scheduler_cycle.get("observed_count"), default=0)
+            latest_payload = release_drill_scheduler_cycle.get("latest")
+            if observed_count <= 0:
+                notes.append("Release drill scheduler cycle metrics missing in preflight logs.")
+            if isinstance(latest_payload, dict):
+                error_count = _safe_int(latest_payload.get("errors"), default=0)
+                stale_recovered = _safe_int(latest_payload.get("stale_recovered"), default=0)
+                if error_count > 0:
+                    blockers.append(f"Release drill scheduler cycle errors={error_count}.")
+                if stale_recovered > 0:
+                    notes.append(
+                        "Release drill scheduler cycle recovered stale in-flight jobs "
+                        f"{stale_recovered} time(s)."
+                    )
 
         for risk in release_drill_report.get("risks") or []:
             notes.append(f"Release drill risk: {risk}")
@@ -100,10 +119,30 @@ def build_release_checklist(
         uat_checks=uat_checks,
         release_drill_gate=release_drill_gate,
         release_drill_result=release_drill_result,
+        release_drill_scheduler_cycle=release_drill_scheduler_cycle,
         ready_to_release=ready_to_release,
         blockers=blockers,
         notes=notes,
     )
+
+
+def _safe_int(value, *, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_scheduler_cycle(raw_payload: object) -> dict[str, object] | None:
+    if not isinstance(raw_payload, dict):
+        return None
+    observed_count = _safe_int(raw_payload.get("observed_count"), default=0)
+    latest = raw_payload.get("latest")
+    normalized_latest = latest if isinstance(latest, dict) else None
+    return {
+        "observed_count": max(observed_count, 0),
+        "latest": normalized_latest,
+    }
 
 
 def save_release_checklist(checklist: ReleaseChecklist, output_path: str | Path) -> Path:
@@ -136,6 +175,18 @@ def render_release_checklist_markdown(
 
     for check_name in UAT_CHECKLIST_REPORT_ITEMS:
         lines.append(f"| {check_name} | {checklist.uat_checks.get(check_name, 'missing')} |")
+
+    if checklist.release_drill_scheduler_cycle is not None:
+        latest_payload = checklist.release_drill_scheduler_cycle.get("latest")
+        latest_text = json.dumps(latest_payload, ensure_ascii=False) if isinstance(latest_payload, dict) else "-"
+        lines.extend(
+            [
+                "",
+                "### Release Drill Scheduler Cycle",
+                f"- observed_count: `{checklist.release_drill_scheduler_cycle.get('observed_count', 0)}`",
+                f"- latest: `{latest_text}`",
+            ]
+        )
 
     lines.extend(["", "## 2. 阻断项", ""])
     if checklist.blockers:

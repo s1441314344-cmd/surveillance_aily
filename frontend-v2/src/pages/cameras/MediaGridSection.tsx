@@ -1,5 +1,5 @@
 import { Button, Card, Col, Empty, Image, Popconfirm, Row, Space, Typography } from 'antd';
-import type { CameraMedia } from '@/shared/api/configCenter';
+import type { CameraMedia } from '@/shared/api/cameras';
 import { CAMERA_MEDIA_STATUS_LABELS, CAMERA_MEDIA_TYPE_LABELS } from '@/pages/cameras/cameraCenterConfig';
 import { DataStateBlock, StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 

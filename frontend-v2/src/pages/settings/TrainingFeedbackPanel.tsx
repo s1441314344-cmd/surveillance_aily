@@ -21,20 +21,20 @@ import {
 import dayjs from 'dayjs';
 import type {
   Strategy,
-  TrainingConfig,
-  TrainingDataset,
-  TrainingHistory,
-  TrainingOverview,
-  TrainingPipelineRunResponse,
-  TrainingRun,
-} from '@/shared/api/configCenter';
+} from '@/shared/api/strategies';
 import {
   approveTrainingRun,
   rejectTrainingRun,
   runTrainingPipeline,
   updateTrainingConfig,
-} from '@/shared/api/configCenter';
-import { getApiErrorMessage } from '@/shared/api/errors';
+  type TrainingConfig,
+  type TrainingDataset,
+  type TrainingHistory,
+  type TrainingOverview,
+  type TrainingPipelineRunResponse,
+  type TrainingRun,
+} from '@/shared/api/training';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 
 const { Text } = Typography;
 

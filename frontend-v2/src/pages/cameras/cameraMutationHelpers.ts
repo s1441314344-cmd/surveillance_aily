@@ -1,6 +1,6 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import type { MessageInstance } from 'antd/es/message/interface';
-import { getApiErrorMessage } from '@/shared/api/errors';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
 
 export const createApiErrorHandler = (message: MessageInstance, fallback: string) => (error: unknown) => {
   message.error(getApiErrorMessage(error, fallback));

@@ -5,7 +5,9 @@ from app.services.camera_status_sweep_service import (
 )
 from app.services.schedule_dispatch_service import (
     run_due_job_schedules_once,
+    run_due_job_schedules_once_report,
     run_due_job_schedules_once_with_db,
+    run_due_job_schedules_once_with_db_report,
 )
 from app.services.signal_monitor_orchestrator import (
     run_due_signal_monitors_once,
@@ -17,7 +19,9 @@ __all__ = [
     "run_camera_status_sweep_once_with_db",
     "run_due_alert_webhook_deliveries_once",
     "run_due_job_schedules_once",
+    "run_due_job_schedules_once_report",
     "run_due_job_schedules_once_with_db",
+    "run_due_job_schedules_once_with_db_report",
     "run_due_signal_monitors_once",
     "run_due_signal_monitors_once_with_db",
 ]

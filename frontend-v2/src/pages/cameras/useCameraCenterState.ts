@@ -1,7 +1,7 @@
 import { App } from 'antd';
 import { useCallback } from 'react';
-import { getApiErrorMessage } from '@/shared/api/errors';
-import type { CameraDiagnostic } from '@/shared/api/configCenter';
+import { getApiErrorMessage } from '@/shared/utils/apiErrorMessage';
+import type { CameraDiagnostic } from '@/shared/api/cameras';
 import type {
   CameraFormValues,
 } from '@/pages/cameras/cameraCenterConfig';

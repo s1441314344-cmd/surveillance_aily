@@ -104,6 +104,15 @@ def test_smoke_script_cleans_up_created_schedules_and_cameras_on_exit():
     assert 'delete_json(f"/api/cameras/{camera_id}"' in script
 
 
+def test_makefile_keeps_real_async_and_backend_integration_targets():
+    makefile = (ROOT_DIR / "Makefile").read_text(encoding="utf-8")
+
+    assert "v2-real-async-test" in makefile
+    assert "v2-backend-integration-test" in makefile
+    assert "@./scripts/v2/real-async-test.sh" in makefile
+    assert "@./scripts/v2/backend-integration-test.sh" in makefile
+
+
 def test_security_script_uses_quoted_python_heredoc_and_filters_platform_noise():
     script = (ROOT_DIR / "scripts/v2/security.sh").read_text(encoding="utf-8")
 
@@ -125,6 +134,25 @@ def test_preflight_supports_failure_injection_modes():
     assert "--inject-queue-down" in script
     assert "--inject-worker-unregistered" in script
     assert '"injection_mode": "${INJECTION_MODE}" or None' in script
+
+
+def test_preflight_preserves_smoke_wait_default_and_scheduler_poll_controls():
+    script = (ROOT_DIR / "scripts/v2/preflight.sh").read_text(encoding="utf-8")
+
+    assert 'SMOKE_SCHEDULE_WAIT_SECONDS="${V2_SMOKE_SCHEDULE_WAIT_SECONDS:-125}"' in script
+    assert 'SCHEDULER_POLL_SECONDS="${V2_PREFLIGHT_SCHEDULER_POLL_SECONDS:-5}"' in script
+    assert "--scheduler-poll-seconds" in script
+    assert '"scheduler_poll_seconds": int("${SCHEDULER_POLL_SECONDS}")' in script
+    assert 'SCHEDULER_POLL_INTERVAL_SECONDS="${SCHEDULER_POLL_SECONDS}"' in script
+
+
+def test_smoke_keeps_retry_flow_and_forced_schedule_trigger_path():
+    script = (ROOT_DIR / "scripts/v2/smoke.sh").read_text(encoding="utf-8")
+
+    assert 'if failed_terminal["status"] != "failed":' in script
+    assert 'f"/api/jobs/{failed_job_id}/retry"' in script
+    assert 'forced_due_at = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()' in script
+    assert 'json_body={"next_run_at": forced_due_at}' in script
 
 
 def test_e2e_entrypoint_supports_group_selection_via_env():

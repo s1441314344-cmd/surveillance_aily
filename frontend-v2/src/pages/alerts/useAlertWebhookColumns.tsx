@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Button, Space, Switch, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { AlertWebhook } from '@/shared/api/configCenter';
+import type { AlertWebhook } from '@/shared/api/alerts';
 import {
   GENERIC_STATE_LABELS,
   StatusBadge,

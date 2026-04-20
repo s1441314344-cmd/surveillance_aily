@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { FormInstance } from 'antd';
-import type { Camera } from '@/shared/api/configCenter';
+import type { Camera } from '@/shared/api/cameras';
 import {
   DEFAULT_CAMERA_VALUES,
   type CameraFormValues,

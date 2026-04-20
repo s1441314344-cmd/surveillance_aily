@@ -1,7 +1,7 @@
 import { App, type FormInstance } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
-import type { Camera } from '@/shared/api/configCenter';
-import type { JobSchedule } from '@/shared/api/tasks';
+import type { Camera } from '@/shared/api/cameras';
+import type { JobSchedule } from '@/shared/api/jobs';
 import type { EditScheduleFormValues, UploadFormValues } from '@/pages/jobs/types';
 import { DEFAULT_FORM_VALUES } from '@/pages/jobs/types';
 import type { useJobsMutationState } from '@/pages/jobs/useJobsMutationState';
@@ -34,18 +34,34 @@ const CAMERA_ONCE_DEFAULT_FIELDS = {
 const CAMERA_ID_FIELD = 'cameraId';
 const UPLOAD_CAMERA_FIELD = 'uploadCameraId';
 
-type UseJobsFormActionStateParams = {
+type UseJobsFormActionStateFormsParams = {
   form: FormInstance<UploadFormValues>;
   scheduleEditForm: FormInstance<EditScheduleFormValues>;
+};
+
+type UseJobsFormActionStateWorkflowParams = {
   taskMode: UploadFormValues['taskMode'];
   uploadSource: UploadFormValues['uploadSource'];
-  fileList: UploadFile[];
+};
+
+type UseJobsFormActionStateResourcesParams = {
   selectedCameraInForm: Camera | null;
   selectedUploadCameraInForm: Camera | null;
+};
+
+type UseJobsFormActionStateDraftStateParams = {
+  fileList: UploadFile[];
   editingSchedule: JobSchedule | null;
   setFileList: (value: UploadFile[]) => void;
   setEditScheduleType: (value: EditScheduleFormValues['scheduleType']) => void;
   setEditingSchedule: (value: JobSchedule | null) => void;
+};
+
+type UseJobsFormActionStateParams = {
+  forms: UseJobsFormActionStateFormsParams;
+  workflow: UseJobsFormActionStateWorkflowParams;
+  resources: UseJobsFormActionStateResourcesParams;
+  draftState: UseJobsFormActionStateDraftStateParams;
   mutations: ReturnType<typeof useJobsMutationState>;
 };
 
@@ -74,11 +90,15 @@ function getSubmitLoadingState(mutations: ReturnType<typeof useJobsMutationState
   ].some(Boolean);
 }
 
-function applyTaskModeDefaults(
-  nextTaskMode: UploadFormValues['taskMode'],
-  form: FormInstance<UploadFormValues>,
-  setFileList: (value: UploadFile[]) => void,
-) {
+function applyTaskModeDefaults({
+  nextTaskMode,
+  form,
+  setFileList,
+}: {
+  nextTaskMode: UploadFormValues['taskMode'];
+  form: FormInstance<UploadFormValues>;
+  setFileList: (value: UploadFile[]) => void;
+}) {
   const isUpload = isUploadTaskMode(nextTaskMode);
   const isCameraOnce = isCameraOnceTaskMode(nextTaskMode);
   if (!isUpload) {
@@ -95,11 +115,15 @@ function applyTaskModeDefaults(
   }
 }
 
-function applyUploadSourceDefaults(
-  uploadSource: UploadFormValues['uploadSource'] | undefined,
-  form: FormInstance<UploadFormValues>,
-  setFileList: (value: UploadFile[]) => void,
-) {
+function applyUploadSourceDefaults({
+  uploadSource,
+  form,
+  setFileList,
+}: {
+  uploadSource: UploadFormValues['uploadSource'] | undefined;
+  form: FormInstance<UploadFormValues>;
+  setFileList: (value: UploadFile[]) => void;
+}) {
   if (isLocalUploadSource(uploadSource)) {
     form.setFieldValue(UPLOAD_CAMERA_FIELD, undefined);
     return;
@@ -138,17 +162,10 @@ function resetJobInputFields({
 }
 
 export function useJobsFormActionState({
-  form,
-  scheduleEditForm,
-  taskMode,
-  uploadSource,
-  fileList,
-  selectedCameraInForm,
-  selectedUploadCameraInForm,
-  editingSchedule,
-  setFileList,
-  setEditScheduleType,
-  setEditingSchedule,
+  forms,
+  workflow,
+  resources,
+  draftState,
   mutations,
 }: UseJobsFormActionStateParams) {
   const { message } = App.useApp();
@@ -158,37 +175,55 @@ export function useJobsFormActionState({
 
   const { handleOpenScheduleEditor, handleCloseScheduleEditor, handleSubmitScheduleEdit } =
     useJobsScheduleEditorActions({
-      scheduleEditForm,
-      editingSchedule,
-      setEditScheduleType,
-      setEditingSchedule,
-      updateScheduleMutation,
+      form: {
+        scheduleEditForm: forms.scheduleEditForm,
+      },
+      draftState: {
+        editingSchedule: draftState.editingSchedule,
+        setEditScheduleType: draftState.setEditScheduleType,
+        setEditingSchedule: draftState.setEditingSchedule,
+      },
+      mutations: {
+        updateScheduleMutation,
+      },
     });
 
   const handleUploadSubmit = (values: UploadFormValues) =>
     handleJobsUploadSubmit(values, {
-      message,
-      fileList,
-      selectedCameraInForm,
-      selectedUploadCameraInForm,
+      feedback: {
+        message,
+      },
+      resources: {
+        fileList: draftState.fileList,
+        selectedCameraInForm: resources.selectedCameraInForm,
+        selectedUploadCameraInForm: resources.selectedUploadCameraInForm,
+      },
       mutations,
     });
 
   const handleResetInput = () =>
     resetJobInputFields({
-      taskMode,
-      uploadSource,
-      setFileList,
-      form,
+      taskMode: workflow.taskMode,
+      uploadSource: workflow.uploadSource,
+      setFileList: draftState.setFileList,
+      form: forms.form,
     });
 
   const handleFormValuesChange = (changedValues: Partial<UploadFormValues>) => {
     if (changedValues.taskMode) {
-      applyTaskModeDefaults(changedValues.taskMode, form, setFileList);
+      applyTaskModeDefaults({
+        nextTaskMode: changedValues.taskMode,
+        form: forms.form,
+        setFileList: draftState.setFileList,
+      });
     }
 
     if (shouldApplyUploadSourceDefaults(changedValues)) {
-      applyUploadSourceDefaults(changedValues.uploadSource, form, setFileList);
+      applyUploadSourceDefaults({
+        uploadSource: changedValues.uploadSource,
+        form: forms.form,
+        setFileList: draftState.setFileList,
+      });
     }
   };
 

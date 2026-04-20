@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     scheduler_poll_interval_seconds: int = 30
     scheduler_camera_status_sweep_enabled: bool = True
     scheduler_camera_status_sweep_interval_seconds: int = 60
+    scheduler_inflight_job_timeout_seconds: int = 900
     feedback_training_enabled: bool = True
     feedback_training_cron: str = "0 2 * * *"
     feedback_training_min_samples: int = 30

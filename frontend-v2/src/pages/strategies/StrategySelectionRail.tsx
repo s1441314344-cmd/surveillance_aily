@@ -1,5 +1,5 @@
 import { Space } from 'antd';
-import { type Strategy } from '@/shared/api/configCenter';
+import { type Strategy } from '@/shared/api/strategies';
 import {
   ACTIVE_STATUS_LABELS,
   ACTIVE_STATUS_OPTIONS,

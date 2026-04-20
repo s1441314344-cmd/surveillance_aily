@@ -1,6 +1,6 @@
 import { Input, Space, Tag, Typography } from 'antd';
 import { TRIGGER_EVENT_TYPE_LABELS } from './cameraCenterConfig';
-import type { CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/configCenter';
+import type { CameraTriggerRuleDebugResult, DebugLiveResult } from '@/shared/api/cameras';
 import { StatusBadge, UNKNOWN_LABELS } from '@/shared/ui';
 
 const { Text } = Typography;

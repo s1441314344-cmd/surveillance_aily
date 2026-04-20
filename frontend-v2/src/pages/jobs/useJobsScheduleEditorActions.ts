@@ -1,29 +1,39 @@
 import { App, type FormInstance } from 'antd';
-import type { JobSchedule } from '@/shared/api/tasks';
+import type { JobSchedule } from '@/shared/api/jobs';
 import type { EditScheduleFormValues } from '@/pages/jobs/types';
 import type { useJobsMutationState } from '@/pages/jobs/useJobsMutationState';
 
-type UseJobsScheduleEditorActionsParams = {
+type UseJobsScheduleEditorActionsFormParams = {
   scheduleEditForm: FormInstance<EditScheduleFormValues>;
+};
+
+type UseJobsScheduleEditorActionsDraftStateParams = {
   editingSchedule: JobSchedule | null;
   setEditScheduleType: (value: EditScheduleFormValues['scheduleType']) => void;
   setEditingSchedule: (value: JobSchedule | null) => void;
+};
+
+type UseJobsScheduleEditorActionsMutationsParams = {
   updateScheduleMutation: ReturnType<typeof useJobsMutationState>['updateScheduleMutation'];
 };
 
+type UseJobsScheduleEditorActionsParams = {
+  form: UseJobsScheduleEditorActionsFormParams;
+  draftState: UseJobsScheduleEditorActionsDraftStateParams;
+  mutations: UseJobsScheduleEditorActionsMutationsParams;
+};
+
 export function useJobsScheduleEditorActions({
-  scheduleEditForm,
-  editingSchedule,
-  setEditScheduleType,
-  setEditingSchedule,
-  updateScheduleMutation,
+  form,
+  draftState,
+  mutations,
 }: UseJobsScheduleEditorActionsParams) {
   const { message } = App.useApp();
 
   const handleOpenScheduleEditor = (schedule: JobSchedule) => {
-    setEditScheduleType(schedule.schedule_type as EditScheduleFormValues['scheduleType']);
-    setEditingSchedule(schedule);
-    scheduleEditForm.setFieldsValue({
+    draftState.setEditScheduleType(schedule.schedule_type as EditScheduleFormValues['scheduleType']);
+    draftState.setEditingSchedule(schedule);
+    form.scheduleEditForm.setFieldsValue({
       precheckStrategyId: schedule.precheck_strategy_id ?? undefined,
       precheckPersonThreshold: schedule.precheck_config?.person_threshold ?? 0.5,
       precheckSoftNegativeThreshold: schedule.precheck_config?.soft_negative_threshold ?? 0.2,
@@ -36,13 +46,13 @@ export function useJobsScheduleEditorActions({
   };
 
   const handleCloseScheduleEditor = () => {
-    setEditingSchedule(null);
-    setEditScheduleType('interval_minutes');
-    scheduleEditForm.resetFields();
+    draftState.setEditingSchedule(null);
+    draftState.setEditScheduleType('interval_minutes');
+    form.scheduleEditForm.resetFields();
   };
 
   const handleSubmitScheduleEdit = async (values: EditScheduleFormValues) => {
-    if (!editingSchedule) {
+    if (!draftState.editingSchedule) {
       return;
     }
 
@@ -55,8 +65,8 @@ export function useJobsScheduleEditorActions({
       return;
     }
 
-    await updateScheduleMutation.mutateAsync({
-      scheduleId: editingSchedule.id,
+    await mutations.updateScheduleMutation.mutateAsync({
+      scheduleId: draftState.editingSchedule.id,
       payload: {
         precheckStrategyId: values.precheckStrategyId || undefined,
         precheckConfig:

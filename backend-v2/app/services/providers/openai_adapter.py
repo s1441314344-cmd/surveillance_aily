@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.services.model_provider_service import load_model_provider_runtime
 from app.services.providers.base import ModelProviderAdapter, ProviderRequest, ProviderResponse
 from app.services.providers.mock_response import build_mock_provider_response
-from app.services.providers.retry_policy import HTTPRetryPolicy
+from app.services.providers.retry_policy import HTTPRetryPolicy, post_json_with_retry
 from app.services.providers.utils import (
     build_schema_instruction,
     encode_image_to_data_url,
@@ -124,28 +124,15 @@ class OpenAIAdapter(ModelProviderAdapter):
         payload: dict,
         timeout_seconds: int,
     ) -> dict:
-        last_exc: httpx.HTTPError | None = None
-
-        with httpx.Client(timeout=timeout_seconds) as client:
-            for attempt in range(1, OPENAI_RETRY_POLICY.max_attempts + 1):
-                try:
-                    response = client.post(endpoint, headers=headers, json=payload)
-                    response.raise_for_status()
-                    return response.json()
-                except httpx.HTTPStatusError as exc:
-                    if not OPENAI_RETRY_POLICY.should_retry(exc, attempt=attempt):
-                        raise
-                    last_exc = exc
-                    time.sleep(OPENAI_RETRY_POLICY.delay_seconds(exc, attempt=attempt))
-                except httpx.HTTPError as exc:
-                    if not OPENAI_RETRY_POLICY.should_retry(exc, attempt=attempt):
-                        raise
-                    last_exc = exc
-                    time.sleep(OPENAI_RETRY_POLICY.delay_seconds(exc, attempt=attempt))
-
-        if last_exc is not None:
-            raise last_exc
-        raise RuntimeError("OpenAI request failed without an exception")
+        return post_json_with_retry(
+            endpoint=endpoint,
+            headers=headers,
+            payload=payload,
+            timeout_seconds=timeout_seconds,
+            retry_policy=OPENAI_RETRY_POLICY,
+            client_factory=httpx.Client,
+            sleep_func=time.sleep,
+        )
 
     def _build_endpoint(self, base_url: str) -> str:
         normalized = (base_url or "").rstrip("/")
