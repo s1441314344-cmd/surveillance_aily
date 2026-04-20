@@ -16,8 +16,8 @@
 - 登录失败反馈
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §3 角色与权限、§4.4 事实源优先级
-- **关联模块**：`docs/PRD/modules/users-and-permissions.md` §5 页面数据模型
+- **全局规则**：`/prd/需求总览.md` §3 角色与权限、§4.4 事实源优先级
+- **关联模块**：`/prd/modules/users-and-permissions.md` §5 页面数据模型
 
 ### Demo 实现状态
 
@@ -112,7 +112,7 @@
 ## 5. 数据模型
 
 ### 5.1 依赖共享实体
-- `User / Role`：引用 `docs/PRD/需求总览.md` §3
+- `User / Role`：引用 `/prd/需求总览.md` §3
 
 ### 5.2 页面私有数据
 | 字段 | 含义 |

@@ -16,8 +16,8 @@
 - 定义校验与删除
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §3 角色与权限、§5.1 共享实体
-- **关联模块**：`docs/PRD/modules/dashboard-overview.md` §3.1
+- **全局规则**：`/prd/需求总览.md` §3 角色与权限、§5.1 共享实体
+- **关联模块**：`/prd/modules/dashboard-overview.md` §3.1
 
 ### Demo 实现状态
 
@@ -107,7 +107,7 @@
 
 ## 5. 数据模型
 ### 5.1 依赖共享实体
-- `DashboardDefinition`：引用 `docs/PRD/需求总览.md` §5.1
+- `DashboardDefinition`：引用 `/prd/需求总览.md` §5.1
 
 ### 5.2 页面私有包装对象
 | 字段 | 含义 |

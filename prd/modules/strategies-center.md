@@ -17,8 +17,8 @@
 - 策略启停
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §3 角色与权限、§4.2 主线状态枚举、§5.1 共享实体
-- **关联模块**：`docs/PRD/modules/jobs-center.md` §3.1、`docs/PRD/modules/settings-model-system.md` §3.1
+- **全局规则**：`/prd/需求总览.md` §3 角色与权限、§4.2 主线状态枚举、§5.1 共享实体
+- **关联模块**：`/prd/modules/jobs-center.md` §3.1、`/prd/modules/settings-model-system.md` §3.1
 
 ### Demo 实现状态
 

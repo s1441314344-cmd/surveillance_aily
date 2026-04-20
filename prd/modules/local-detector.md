@@ -17,8 +17,8 @@
 - 调试历史
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §4.3 扩展子域定级
-- **关联模块**：`docs/PRD/modules/cameras-devices.md` §3.2
+- **全局规则**：`/prd/需求总览.md` §4.3 扩展子域定级
+- **关联模块**：`/prd/modules/cameras-devices.md` §3.2
 
 ### Demo 实现状态
 

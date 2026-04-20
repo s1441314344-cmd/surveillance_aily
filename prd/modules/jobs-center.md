@@ -16,8 +16,8 @@
 - 定时计划列表与编辑
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §4.1 主业务闭环、§4.2 主线状态枚举
-- **关联模块**：`docs/PRD/modules/strategies-center.md` §3.2、`docs/PRD/modules/records-center.md` §3.1、`docs/PRD/modules/cameras-devices.md` §3.1
+- **全局规则**：`/prd/需求总览.md` §4.1 主业务闭环、§4.2 主线状态枚举
+- **关联模块**：`/prd/modules/strategies-center.md` §3.2、`/prd/modules/records-center.md` §3.1、`/prd/modules/cameras-devices.md` §3.1
 
 ### Demo 实现状态
 

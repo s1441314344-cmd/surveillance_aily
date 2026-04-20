@@ -16,8 +16,8 @@
 - 媒体删除
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §5.1 支撑实体
-- **共享上下文**：`docs/PRD/modules/cameras-索引.md` §3
+- **全局规则**：`/prd/需求总览.md` §5.1 支撑实体
+- **共享上下文**：`/prd/modules/cameras-索引.md` §3
 
 ### Demo 实现状态
 

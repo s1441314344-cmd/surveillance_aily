@@ -16,8 +16,8 @@
 - 通知路由管理
 
 ### 模块依赖
-- **全局规则**：`docs/PRD/需求总览.md` §3 角色与权限、§4.3 扩展子域定级
-- **关联模块**：`docs/PRD/modules/cameras-monitoring.md` §3.1
+- **全局规则**：`/prd/需求总览.md` §3 角色与权限、§4.3 扩展子域定级
+- **关联模块**：`/prd/modules/cameras-monitoring.md` §3.1
 
 ### Demo 实现状态
 
